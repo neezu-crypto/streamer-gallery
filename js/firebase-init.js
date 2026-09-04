@@ -163,12 +163,30 @@ window.galLinkKakaoAccount = (kakaoAccessToken) => linkKakaoAccountFn({ kakaoAcc
 window.galRequestStreamerVerification = (data) => requestStreamerVerificationFn(Object.assign({ source: 'streamer-gallery' }, data));
 window.galCompleteAccountSwitch = completeAccountSwitch;
 
+// 스트리머 인증 유저 프로필 자동 채움(2026-09-05 추가) — 인증 신청 때 이미 제출한
+// 닉네임/SOOP 아이디를 프로필 모달에서 다시 입력하게 하지 않는다. 이미 사용자가
+// 직접 프로필을 저장해둔 적 있으면(닉네임 있음) 덮어쓰지 않음 — updateProfile
+// 서버 쪽에도 같은 가드가 있지만, 여기서 먼저 확인해 불필요한 쓰기 자체를 줄인다.
+// 인증 신청 닉네임(최대 20자 등)이 프로필 닉네임 상한(12자)보다 길 수 있어 자른다.
+async function autoFillProfileFromVerification(uid, nickname, soopId) {
+  if (!nickname) return;
+  try {
+    const existing = await get(ref(db, 'gallery/profiles/' + uid));
+    if (existing.exists() && existing.val() && existing.val().nickname) return;
+    await httpsCallable(functions, 'updateGalleryProfile')({ nickname: nickname.slice(0, 12), soopId: soopId || '' });
+  } catch (e) {
+    console.error('프로필 자동 채움 실패', e);
+  }
+}
+
 async function checkVerifiedStreamer(uid) {
   try {
     const q = query(ref(db, 'streamerVerifications'), orderByChild('uid'), equalTo(uid), limitToFirst(1));
     const snap = await get(q);
     window.galIsVerifiedStreamer = snap.exists();
-    window.galVerifiedStreamerNickname = snap.exists() ? (Object.values(snap.val())[0].nickname || null) : null;
+    const record = snap.exists() ? Object.values(snap.val())[0] : null;
+    window.galVerifiedStreamerNickname = record ? (record.nickname || null) : null;
+    if (record) await autoFillProfileFromVerification(uid, record.nickname, record.soopId);
   } catch (e) {
     console.error('스트리머 인증 여부 확인 실패', e);
     window.galIsVerifiedStreamer = false;

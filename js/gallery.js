@@ -156,11 +156,9 @@
     });
   }
 
-  document.addEventListener('click', function (e) {
-    if (e.target.closest('#open-login-btn')) {
-      window.galOpenLoginModal && window.galOpenLoginModal();
-    }
-  });
+  // #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
+  // 모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
+  // 경합해서 로그인 후에도 항상 로그인 모달만 뜨는 버그가 생긴다).
 
   subscribeImages();
 })();
