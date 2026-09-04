@@ -1,0 +1,13 @@
+{
+  "name": "gallery-functions",
+  "description": "streamer-gallery Cloud Functions (isolated codebase, does not touch other functions in this project)",
+  "engines": { "node": "22" },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^6.0.0",
+    "@aws-sdk/client-s3": "^3.1126.0",
+    "@aws-sdk/s3-request-presigner": "^3.1126.0"
+  },
+  "private": true
+}

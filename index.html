@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>스트리머 갤러리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="devbar">
+  <div class="devbar-inner">
+    <div class="devbar-viewport" id="devbar-viewport">
+      <div class="devbar-track" id="devbar-track">
+        <span class="devbar-label">스트리머 갤러리 · BY 오목지면시그</span>
+        <a class="dev-game-link" href="https://www.sooplive.com/station/skftodwocks2" target="_blank" rel="noopener noreferrer">방송국</a>
+        <a class="dev-game-link" data-game-id="stockMarket" href="https://neezu-crypto.github.io/soop-stock-market/index.html" target="_blank" rel="noopener noreferrer">스트리머 주식시장</a>
+        <a class="dev-game-link" data-game-id="backgroundMarket" href="https://neezu-crypto.github.io/interior-3d-viewer/" target="_blank" rel="noopener noreferrer">스트리머 배경시장</a>
+        <a class="dev-game-link" data-game-id="lifeGame" href="https://neezu-crypto.github.io/streamer-life-game/" target="_blank" rel="noopener noreferrer">스트리머 인생게임</a>
+        <a class="dev-game-link" data-game-id="bettingMarket" href="https://neezu-crypto.github.io/StreamBet-Market/" target="_blank" rel="noopener noreferrer">스트리머 배팅시장</a>
+        <a class="dev-game-link" data-game-id="rocketGame" href="https://neezu-crypto.github.io/rocket-game/" target="_blank" rel="noopener noreferrer">로켓 게임</a>
+        <a class="dev-game-link" data-game-id="dontClickAds" href="https://neezu-crypto.github.io/dont-click-ads/" target="_blank" rel="noopener noreferrer">절대 광고를 클릭하지 마</a>
+        <a class="dev-game-link" data-game-id="midnightMartRun" href="https://neezu-crypto.github.io/midnight-mart-run/" target="_blank" rel="noopener noreferrer">미드나잇 마트런</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">🖼️</span>
+      <span class="brand-name">스트리머 <em>갤러리</em></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="glitch-btn btn-upload" id="open-upload-btn" type="button" data-text="+ 업로드">
+        <span class="btn-text">+ 업로드</span>
+      </button>
+      <button class="avatar avatar-login" id="open-login-btn" type="button" title="로그인">로그인</button>
+    </div>
+  </header>
+
+  <div class="gallery-lobby-head">
+    <h1>🖼️ 스트리머 갤러리</h1>
+    <p class="pitch" style="margin:0;">방송 스크린샷과 AI 일러스트를 함께 올리고 구경하는 공간이에요.</p>
+  </div>
+
+  <div class="gallery-filter-bar">
+    <div class="propose-field gallery-filter-search">
+      <input type="text" id="gallery-filter-streamer" maxlength="20" placeholder=" ">
+      <label for="gallery-filter-streamer" data-text="스트리머 이름으로 검색">스트리머 이름으로 검색</label>
+    </div>
+    <div class="gallery-category-chips" id="gallery-category-chips">
+      <button class="chip active" type="button" data-category="all">전체</button>
+      <button class="chip" type="button" data-category="screenshot">스크린샷</button>
+      <button class="chip" type="button" data-category="ai-art">AI 일러스트</button>
+      <button class="chip" type="button" data-category="fan-art">팬아트</button>
+      <button class="chip" type="button" data-category="meme">밈</button>
+      <button class="chip" type="button" data-category="etc">기타</button>
+    </div>
+  </div>
+
+  <div class="gallery-grid" id="gallery-grid">
+    <p class="empty-msg">이미지를 불러오는 중...</p>
+  </div>
+</div>
+
+<div class="propose-backdrop" id="upload-backdrop">
+  <div class="propose-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">NEW_UPLOAD</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="upload-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <p class="propose-modal-title">🖼️ 이미지 업로드</p>
+    <p class="propose-modal-sub">방송 스크린샷이나 AI 일러스트를 올려서 함께 공유해보세요.</p>
+    <div class="propose-field">
+      <input type="text" id="upload-streamer" maxlength="20" placeholder=" ">
+      <label for="upload-streamer" data-text="스트리머 이름">스트리머 이름</label>
+    </div>
+    <div class="propose-field">
+      <select id="upload-category">
+        <option value="screenshot">스크린샷</option>
+        <option value="ai-art">AI 일러스트</option>
+        <option value="fan-art">팬아트</option>
+        <option value="meme">밈</option>
+        <option value="etc">기타</option>
+      </select>
+      <label for="upload-category" data-text="카테고리">카테고리</label>
+    </div>
+    <div class="propose-field">
+      <input type="file" id="upload-file" accept="image/*">
+      <label for="upload-file" data-text="이미지 파일">이미지 파일</label>
+    </div>
+    <button class="glitch-btn" id="upload-submit-btn" type="button" data-text="업로드하기">
+      <span class="btn-text">업로드하기</span>
+    </button>
+    <p class="propose-modal-sub" id="upload-status"></p>
+  </div>
+</div>
+
+<div class="profile-backdrop" id="login-backdrop">
+  <div class="profile-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">SECURE_LOGIN</span>
+      <div class="terminal-dots">
+        <button class="profile-modal-close" id="login-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <h3 class="profile-modal-title">로그인</h3>
+    <p class="login-modal-sub">로그인하면 업로드하거나 좋아요·댓글을 남길 수 있어요.</p>
+    <button class="btn-login-option btn-google" id="login-google-btn" type="button">
+      <span class="login-option-icon">G</span> Google로 시작하기
+    </button>
+    <button class="btn-login-option btn-kakao" id="kakao-login-btn" type="button">
+      <span class="login-option-icon">K</span> 카카오로 시작하기
+    </button>
+    <button class="btn-login-option btn-verify-cta" id="login-verify-btn" type="button">
+      스트리머 인증 신청하기
+    </button>
+    <p class="login-modal-hint">스트리머 인증 신청은 로그인 없이도 가능해요.</p>
+  </div>
+</div>
+
+<div class="propose-backdrop" id="verify-backdrop">
+  <div class="propose-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">STREAMER_VERIFY</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="verify-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <p class="propose-modal-title">🎙️ 스트리머 인증</p>
+    <p class="propose-modal-sub">방송 닉네임과 SOOP 아이디를 입력해 신청하면 관리자에게 즉시 전달돼요. 인증되면 로그인 없이도 실계정처럼 업로드하고 좋아요·댓글을 남길 수 있어요.</p>
+    <div id="verify-form">
+      <div class="propose-field">
+        <input type="text" id="verify-nickname" maxlength="20" placeholder=" ">
+        <label for="verify-nickname" data-text="방송 닉네임">방송 닉네임</label>
+      </div>
+      <div class="propose-field">
+        <input type="text" id="verify-soopid" maxlength="20" placeholder=" ">
+        <label for="verify-soopid" data-text="SOOP 아이디">SOOP 아이디</label>
+      </div>
+      <button class="glitch-btn" id="verify-submit-btn" type="button" data-text="신청하기">
+        <span class="btn-text">신청하기</span>
+      </button>
+    </div>
+    <div id="verify-pending" style="display:none;">
+      <p class="propose-modal-sub" id="verify-pending-text"></p>
+      <button class="glitch-btn" id="verify-check-btn" type="button" data-text="🔄 승인됐는지 확인하기">
+        <span class="btn-text">🔄 승인됐는지 확인하기</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script defer src="https://developers.kakao.com/sdk/js/kakao.js"></script>
+<script type="module" src="js/firebase-init.js"></script>
+<script type="module" src="js/devbar-links.js"></script>
+<script defer src="js/devbar.js"></script>
+<script defer src="js/login-modal.js"></script>
+<script defer src="js/kakao-login.js"></script>
+<script defer src="js/streamer-verify.js"></script>
+<script defer src="js/gallery.js"></script>
+</body>
+</html>
