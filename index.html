@@ -202,6 +202,14 @@
   </div>
 </div>
 
+<!-- 관리자 신고 목록 썸네일 클릭 시 뜨는 풀이미지 뷰어 — admin-backdrop보다 위에 뜨도록
+     image-view-backdrop 수식자로 z-index를 높인다. 이미지를 한 번 더 클릭하면
+     전체화면의 80%까지 확대(zoomed 클래스 토글)한다. -->
+<div class="propose-backdrop image-view-backdrop" id="admin-image-view-backdrop">
+  <button class="propose-modal-close image-view-close" id="admin-image-view-close" type="button" aria-label="닫기">✕</button>
+  <img id="admin-image-view-img" class="image-view-img" alt="">
+</div>
+
 <!-- 범용 확인 모달(window.confirm 대체) — 팝업 로그인 직후처럼 브라우저가 "활성 탭이
      아니다"로 오판하는 순간에 네이티브 confirm()을 부르면 크롬이 다이얼로그를 아예
      띄우지도 않고 조용히 억제해버리는 문제가 있어(soop-stock-market에서 실제로 겪고

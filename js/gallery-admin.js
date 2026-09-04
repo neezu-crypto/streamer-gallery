@@ -10,12 +10,29 @@
   var reportsPanel = document.getElementById('admin-reports-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
+  var imageViewBackdrop = document.getElementById('admin-image-view-backdrop');
+  var imageViewImg = document.getElementById('admin-image-view-img');
+  var imageViewClose = document.getElementById('admin-image-view-close');
   if (!backdrop) return;
 
   var reportsUnsub = null;
   var latestReports = [];
   var unlocksUnsub = null;
   var latestUnlockRequests = [];
+
+  function openImageView(url) {
+    imageViewImg.classList.remove('zoomed');
+    imageViewImg.src = url;
+    imageViewBackdrop.classList.add('open');
+  }
+  function closeImageView() {
+    imageViewBackdrop.classList.remove('open');
+    imageViewImg.src = '';
+  }
+  imageViewImg.addEventListener('click', function () { imageViewImg.classList.toggle('zoomed'); });
+  imageViewClose.addEventListener('click', closeImageView);
+  imageViewBackdrop.addEventListener('click', function (e) { if (e.target === imageViewBackdrop) closeImageView(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && imageViewBackdrop.classList.contains('open')) closeImageView(); });
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -133,7 +150,11 @@
   });
   closeBtn.addEventListener('click', function () { backdrop.classList.remove('open'); });
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) backdrop.classList.remove('open'); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && backdrop.classList.contains('open')) backdrop.classList.remove('open'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !backdrop.classList.contains('open')) return;
+    if (imageViewBackdrop.classList.contains('open')) return;
+    backdrop.classList.remove('open');
+  });
 
   tabsWrap.addEventListener('click', function (e) {
     var btn = e.target.closest('.chip');
@@ -163,7 +184,7 @@
     if (!row) return;
     if (e.target.closest('.admin-row-thumb.clickable')) {
       var reportedImg = findImage(row.dataset.imageId);
-      if (reportedImg) window.open(reportedImg.imageUrl || reportedImg.thumbUrl, '_blank', 'noopener');
+      if (reportedImg) openImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
       return;
     }
     if (e.target.closest('.admin-dismiss-btn')) {

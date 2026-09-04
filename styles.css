@@ -210,6 +210,10 @@ button{ font-family: inherit; cursor: pointer; }
   font-size:11px; display:flex; align-items:center; justify-content:center;
 }
 .propose-modal-close:hover{ color: var(--gold-text); border-color:var(--gold-line); }
+.image-view-backdrop{ z-index:600; }
+.image-view-close{ position:fixed; top:20px; right:20px; }
+.image-view-img{ max-width:60vw; max-height:60vh; object-fit:contain; cursor:zoom-in; box-shadow:0 30px 80px rgba(0,0,0,0.6); }
+.image-view-img.zoomed{ width:80vw; height:80vh; cursor:zoom-out; }
 .propose-modal-title{ font-family: var(--font-display); font-size:15px; font-weight:700; margin: 0 0 6px; letter-spacing:0.06em; }
 .propose-modal-sub{ font-size:12px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
 
