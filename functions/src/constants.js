@@ -9,6 +9,8 @@ const AUDIT_LOG_CAP = 200; // "최근 처리 내역" — 이 개수를 넘는 �
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
 
 const COMMENT_MAX_LENGTH = 300;
+const COMMENT_COOLDOWN_MS = 8000; // 연속 댓글 도배 방지 — 계정당 8초에 한 번만 작성 가능
+const IMAGE_REPORTS_CAP = 500; // 신고는 유저당-이미지당 1회로 이미 막혀있지만, 방어적으로 상한도 둔다
 
 // 프로필(업로드/좋아요/댓글과 무관한 계정 단위 닉네임/SOOP 아이디) — 둘 다 선택 입력.
 // SOOP_ID_RE는 자매 저장소들과 동일 규칙(영문 소문자/숫자 2~20자)이라야 avatarUrlFor
@@ -32,6 +34,8 @@ module.exports = {
   AUDIT_LOG_CAP,
   FORBIDDEN_TEXT_RE,
   COMMENT_MAX_LENGTH,
+  COMMENT_COOLDOWN_MS,
+  IMAGE_REPORTS_CAP,
   CATEGORIES,
   PROFILE_NICKNAME_MAX_LENGTH,
   SOOP_ID_RE,

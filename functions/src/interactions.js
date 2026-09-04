@@ -1,7 +1,8 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
-const { FORBIDDEN_TEXT_RE, COMMENT_MAX_LENGTH } = require('./constants');
+const { trimToLast } = require('./lib/capped-log');
+const { FORBIDDEN_TEXT_RE, COMMENT_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP } = require('./constants');
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
@@ -47,12 +48,24 @@ const postComment = onCall(async (request) => {
   if (FORBIDDEN_TEXT_RE.test(trimmed)) throw new HttpsError('invalid-argument', '허용되지 않는 문자가 포함되어 있습니다.');
 
   const db = getDatabase();
+  // 연속 도배 방지 — 마지막 댓글 작성 시각을 계정별로 기록해두고 쿨다운 내 재작성을 막는다.
+  // 클라이언트가 노출할 필요 없는 서버 내부 상태라 RTDB 규칙에 별도 노드를 두지 않았다
+  // (Admin SDK는 규칙을 우회하므로 기본 deny로도 클라이언트 접근은 이미 막혀있다).
+  const lastCommentRef = db.ref(`gallery/userLastCommentAt/${uid}`);
+  const lastCommentAt = (await lastCommentRef.get()).val() || 0;
+  const now = Date.now();
+  if (now - lastCommentAt < COMMENT_COOLDOWN_MS) {
+    const waitSec = Math.ceil((COMMENT_COOLDOWN_MS - (now - lastCommentAt)) / 1000);
+    throw new HttpsError('resource-exhausted', `댓글은 ${waitSec}초 후에 다시 작성할 수 있어요.`);
+  }
+
   const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
 
   const commentRef = db.ref(`gallery/comments/${imageId}`).push();
-  await commentRef.set({ uid, text: trimmed, createdAt: Date.now() });
+  await commentRef.set({ uid, text: trimmed, createdAt: now });
   await db.ref(`gallery/images/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
+  await lastCommentRef.set(now);
 
   return { commentId: commentRef.key };
 });
@@ -69,8 +82,19 @@ const reportImage = onCall(async (request) => {
   const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
 
-  const reportRef = db.ref('gallery/imageReports').push();
+  // 중복 신고 방지 — gallery/likes의 userLikes 미러와 동일한 패턴으로 "이 uid가 이
+  // imageId를 신고했다"를 별도 노드에 기록해두고 재신고를 막는다(orderByChild 없이
+  // 단건 조회로 확인 가능해 추가 인덱스가 필요 없다).
+  const dedupRef = db.ref(`gallery/imageReportsByUser/${uid}/${imageId}`);
+  if ((await dedupRef.get()).exists()) {
+    throw new HttpsError('already-exists', '이미 신고한 이미지예요.');
+  }
+
+  const reportsRef = db.ref('gallery/imageReports');
+  const reportRef = reportsRef.push();
   await reportRef.set({ imageId, reporterUid: uid, reason: trimmedReason, createdAt: Date.now() });
+  await dedupRef.set(true);
+  await trimToLast(reportsRef, IMAGE_REPORTS_CAP);
   return { reportId: reportRef.key };
 });
 
