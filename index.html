@@ -202,12 +202,13 @@
   </div>
 </div>
 
-<!-- 관리자 신고 목록 썸네일 클릭 시 뜨는 풀이미지 뷰어 — admin-backdrop보다 위에 뜨도록
-     image-view-backdrop 수식자로 z-index를 높인다. 이미지를 한 번 더 클릭하면
+<!-- 풀이미지 뷰어(공용, js/image-viewer.js) — 관리자 신고/전체이미지 목록 썸네일과
+     메인페이지 상세보기 모달(#detail-image) 양쪽에서 재사용한다. detail-backdrop/
+     admin-backdrop보다 위에 뜨도록 z-index를 높이고, 이미지를 한 번 더 클릭하면
      전체화면의 80%까지 확대(zoomed 클래스 토글)한다. -->
-<div class="propose-backdrop image-view-backdrop" id="admin-image-view-backdrop">
-  <button class="propose-modal-close image-view-close" id="admin-image-view-close" type="button" aria-label="닫기">✕</button>
-  <img id="admin-image-view-img" class="image-view-img" alt="">
+<div class="propose-backdrop image-view-backdrop" id="image-view-backdrop">
+  <button class="propose-modal-close image-view-close" id="image-view-close" type="button" aria-label="닫기">✕</button>
+  <img id="image-view-img" class="image-view-img" alt="">
 </div>
 
 <!-- 범용 확인 모달(window.confirm 대체) — 팝업 로그인 직후처럼 브라우저가 "활성 탭이
@@ -324,6 +325,7 @@
 <script defer src="js/kakao-login.js"></script>
 <script defer src="js/streamer-verify.js"></script>
 <script defer src="js/gallery.js"></script>
+<script defer src="js/image-viewer.js"></script>
 <script defer src="js/gallery-unlock.js"></script>
 <script defer src="js/gallery-detail.js"></script>
 <script defer src="js/gallery-admin.js"></script>

@@ -10,29 +10,12 @@
   var reportsPanel = document.getElementById('admin-reports-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
-  var imageViewBackdrop = document.getElementById('admin-image-view-backdrop');
-  var imageViewImg = document.getElementById('admin-image-view-img');
-  var imageViewClose = document.getElementById('admin-image-view-close');
   if (!backdrop) return;
 
   var reportsUnsub = null;
   var latestReports = [];
   var unlocksUnsub = null;
   var latestUnlockRequests = [];
-
-  function openImageView(url) {
-    imageViewImg.classList.remove('zoomed');
-    imageViewImg.src = url;
-    imageViewBackdrop.classList.add('open');
-  }
-  function closeImageView() {
-    imageViewBackdrop.classList.remove('open');
-    imageViewImg.src = '';
-  }
-  imageViewImg.addEventListener('click', function () { imageViewImg.classList.toggle('zoomed'); });
-  imageViewClose.addEventListener('click', closeImageView);
-  imageViewBackdrop.addEventListener('click', function (e) { if (e.target === imageViewBackdrop) closeImageView(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && imageViewBackdrop.classList.contains('open')) closeImageView(); });
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -73,7 +56,7 @@
     imagesPanel.innerHTML = images.map(function (img) {
       return (
         '<div class="admin-row" data-image-id="' + escapeHtml(img.id) + '">' +
-          '<div class="admin-row-thumb"><img src="' + escapeHtml(img.thumbUrl) + '" alt=""></div>' +
+          '<div class="admin-row-thumb clickable" title="클릭하면 풀이미지로 열어요"><img src="' + escapeHtml(img.thumbUrl) + '" alt=""></div>' +
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">' + escapeHtml(img.streamerName || '익명') + ' · ' + escapeHtml(labels[img.category] || img.category || '') + '</div>' +
             '<div class="admin-row-reason">♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
@@ -152,7 +135,7 @@
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) backdrop.classList.remove('open'); });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape' || !backdrop.classList.contains('open')) return;
-    if (imageViewBackdrop.classList.contains('open')) return;
+    if (window.galIsImageViewOpen && window.galIsImageViewOpen()) return;
     backdrop.classList.remove('open');
   });
 
@@ -184,7 +167,7 @@
     if (!row) return;
     if (e.target.closest('.admin-row-thumb.clickable')) {
       var reportedImg = findImage(row.dataset.imageId);
-      if (reportedImg) openImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
+      if (reportedImg) window.galOpenImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
       return;
     }
     if (e.target.closest('.admin-dismiss-btn')) {
@@ -205,6 +188,11 @@
   imagesPanel.addEventListener('click', function (e) {
     var row = e.target.closest('.admin-row');
     if (!row) return;
+    if (e.target.closest('.admin-row-thumb.clickable')) {
+      var img = findImage(row.dataset.imageId);
+      if (img) window.galOpenImageView(img.imageUrl || img.thumbUrl);
+      return;
+    }
     if (e.target.closest('.admin-delete-btn')) {
       deleteImage(row.dataset.imageId, e.target);
     }

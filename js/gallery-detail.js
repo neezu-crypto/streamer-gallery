@@ -91,9 +91,17 @@
     openModal(img);
   });
 
+  imageEl.addEventListener('click', function () {
+    if (currentImageId) window.galOpenImageView(imageEl.src);
+  });
+
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !backdrop.classList.contains('open')) return;
+    if (window.galIsImageViewOpen && window.galIsImageViewOpen()) return;
+    closeModal();
+  });
 
   likeBtn.addEventListener('click', async function () {
     if (!currentImageId) return;

@@ -1,0 +1,27 @@
+// 풀이미지 뷰어(공용) — 관리자 신고/전체이미지 목록 썸네일과 메인페이지 상세보기 모달
+// 양쪽에서 재사용한다. window.galOpenImageView(url)를 부르면 뜨고, 뜬 이미지를 한 번 더
+// 클릭하면 전체화면의 80%까지 확대된다(zoomed 클래스 토글).
+(function () {
+  var backdrop = document.getElementById('image-view-backdrop');
+  var img = document.getElementById('image-view-img');
+  var closeBtn = document.getElementById('image-view-close');
+  if (!backdrop) return;
+
+  function open(url) {
+    img.classList.remove('zoomed');
+    img.src = url;
+    backdrop.classList.add('open');
+  }
+  function close() {
+    backdrop.classList.remove('open');
+    img.src = '';
+  }
+  window.galOpenImageView = open;
+  window.galCloseImageView = close;
+  window.galIsImageViewOpen = function () { return backdrop.classList.contains('open'); };
+
+  img.addEventListener('click', function () { img.classList.toggle('zoomed'); });
+  closeBtn.addEventListener('click', close);
+  backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && backdrop.classList.contains('open')) close(); });
+})();

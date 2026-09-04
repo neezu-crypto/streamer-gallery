@@ -337,7 +337,7 @@ button{ font-family: inherit; cursor: pointer; }
 /* ---------- 이미지 상세 모달(좋아요/댓글/신고) ---------- */
 .detail-modal{ max-width:520px; max-height:88vh; overflow-y:auto; }
 .detail-image-wrap{ width:100%; border-radius:2px; overflow:hidden; background:var(--panel-raised); margin-bottom:14px; }
-.detail-image-wrap img{ width:100%; max-height:50vh; object-fit:contain; display:block; }
+.detail-image-wrap img{ width:100%; max-height:50vh; object-fit:contain; display:block; cursor:zoom-in; }
 .detail-meta-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px; }
 .detail-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
 #detail-like-btn{ display:flex; align-items:center; gap:6px; }
