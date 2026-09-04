@@ -85,4 +85,38 @@ const adminDismissImageReport = onCall(async (request) => {
   return { dismissed: true };
 });
 
-module.exports = { adminDeleteImage, adminDeleteComment, adminDismissImageReport };
+// 게임별 정지 관리(2026-09-05 추가, 신규 게임 온보딩 체크리스트) — StreamBet-Market의
+// banAccount/unbanAccount와 동일 패턴이지만 이름은 다르게 짓는다. Cloud Functions
+// 리소스 이름은 codebase로 네임스페이스되지 않아(2026-09-04 whoAmI 충돌 사고로 확인)
+// banAccount/unbanAccount는 이미 StreamBet-Market이 선점 중이라 그대로 쓰면 그 함수를
+// 덮어쓴다. bannedAccounts/{uid}/games/gallery에 쓰고, assertNotBanned(lib/auth.js)가
+// 이미 이 경로를 읽고 있으므로 별도 검증 로직 변경은 필요 없다.
+const banGalleryAccount = onCall(async (request) => {
+  const adminUid = await requireAdmin(request);
+  const adminName = (request.auth.token && (request.auth.token.name || request.auth.token.email)) || adminUid;
+  const { uid, reason } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', '대상 uid를 입력해 주세요.');
+  if (!reason || !reason.trim()) throw new HttpsError('invalid-argument', '정지 사유를 입력해 주세요.');
+
+  await getDatabase().ref('bannedAccounts/' + uid + '/games/gallery').set({
+    reason: reason.trim(),
+    bannedAt: Date.now(),
+    bannedBy: adminUid,
+    bannedByName: adminName,
+  });
+  await logAudit(adminUid, adminName, '계정 정지', uid + ' · ' + reason.trim());
+  return { status: 'banned' };
+});
+
+const unbanGalleryAccount = onCall(async (request) => {
+  const adminUid = await requireAdmin(request);
+  const adminName = (request.auth.token && (request.auth.token.name || request.auth.token.email)) || adminUid;
+  const { uid } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', '대상 uid를 입력해 주세요.');
+
+  await getDatabase().ref('bannedAccounts/' + uid + '/games/gallery').remove();
+  await logAudit(adminUid, adminName, '계정 정지 해제', uid);
+  return { status: 'unbanned' };
+});
+
+module.exports = { adminDeleteImage, adminDeleteComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount };
