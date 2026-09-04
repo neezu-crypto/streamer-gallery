@@ -11,10 +11,12 @@
   var nicknameInput = document.getElementById('unlock-nickname');
   var submitBtn = document.getElementById('unlock-submit-btn');
   var statusEl = document.getElementById('unlock-status');
+  var cancelBtn = document.getElementById('unlock-cancel-btn');
   if (!backdrop) return;
 
   var currentStreamerId = null;
   var currentStreamerName = '';
+  var currentPendingRequestId = null;
 
   function openModal(streamerId, streamerName) {
     if (!window.galTrusted) {
@@ -24,10 +26,12 @@
     }
     currentStreamerId = streamerId;
     currentStreamerName = streamerName;
+    currentPendingRequestId = null;
     nameEl.textContent = streamerName;
     nicknameInput.value = '';
     statusEl.textContent = '';
     submitBtn.disabled = false;
+    cancelBtn.style.display = 'none';
     backdrop.classList.add('open');
   }
   function closeModal() { backdrop.classList.remove('open'); }
@@ -51,11 +55,18 @@
       var action = result.data.action;
       if (action === 'already-unlocked') {
         statusEl.textContent = '✅ 이미 해금된 스트리머예요! 새로고침하면 반영돼요.';
+      } else if (action === 'already-pending-mine') {
+        statusEl.textContent = '⏳ 이미 대기 중인 내 해금 신청이 있어요. 후원창에서 별풍선을 보내주세요.';
+        currentPendingRequestId = result.data.requestId;
+        cancelBtn.style.display = '';
+        window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
       } else if (action === 'already-pending') {
         statusEl.textContent = '⏳ 이미 대기 중인 해금 신청이 있어요. 후원창에서 별풍선을 보내주세요.';
         window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
       } else {
         statusEl.textContent = '✅ 해금 신청이 접수됐어요. 후원창에서 별풍선을 보내주시면 관리자가 확인 후 해금해드려요.';
+        currentPendingRequestId = result.data.requestId;
+        cancelBtn.style.display = '';
         window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
       }
     } catch (err) {
@@ -63,6 +74,23 @@
       statusEl.textContent = '❌ 신청 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
     } finally {
       submitBtn.disabled = false;
+    }
+  });
+
+  cancelBtn.addEventListener('click', async function () {
+    if (!currentPendingRequestId) return;
+    if (!confirm('해금 신청을 취소할까요?')) return;
+    cancelBtn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('cancelStreamerUnlockRequest');
+      await fn({ requestId: currentPendingRequestId });
+      currentPendingRequestId = null;
+      cancelBtn.style.display = 'none';
+      statusEl.textContent = '신청을 취소했어요. 다시 신청할 수 있어요.';
+    } catch (err) {
+      alert('신청 취소 중 오류: ' + (err && err.message ? err.message : err));
+    } finally {
+      cancelBtn.disabled = false;
     }
   });
 })();

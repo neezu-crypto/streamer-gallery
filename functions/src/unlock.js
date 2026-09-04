@@ -42,7 +42,16 @@ const requestStreamerUnlock = onCall(async (request) => {
     .orderByChild('streamerId').equalTo(streamerId).get();
   if (existingSnap.exists()) {
     let hasPending = false;
-    existingSnap.forEach((child) => { if (child.val().status === 'pending') hasPending = true; });
+    let myPendingId = null;
+    existingSnap.forEach((child) => {
+      if (child.val().status === 'pending') {
+        hasPending = true;
+        if (child.val().requesterUid === uid) myPendingId = child.key;
+      }
+    });
+    // 내 신청이 대기 중이면 취소할 수 있게 requestId를 같이 돌려준다 — 남의 신청이면
+    // (전역 해금이라 이미 그 스트리머는 대기열에 걸려있는 셈) requestId 없이 안내만.
+    if (myPendingId) return { action: 'already-pending-mine', requestId: myPendingId };
     if (hasPending) return { action: 'already-pending' };
   }
 
@@ -94,4 +103,25 @@ const adminRejectStreamerUnlock = onCall(async (request) => {
   return { ok: true };
 });
 
-module.exports = { requestStreamerUnlock, adminApproveStreamerUnlock, adminRejectStreamerUnlock };
+// 본인이 신청한 대기 중인 해금 신청 취소(2026-09-05 추가) — status를 바꾸는 대신
+// 아예 지워서, requestStreamerUnlock의 "이미 대기 중" 체크에 걸리지 않고 바로
+// 재신청할 수 있게 한다.
+const cancelStreamerUnlockRequest = onCall(async (request) => {
+  const uid = await requireTrustedAccount(request);
+  await assertNotBanned(uid);
+  const { requestId } = request.data || {};
+  if (!requestId) throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const db = getDatabase();
+  const reqRef = db.ref(`gallery/unlockRequests/${requestId}`);
+  const snap = await reqRef.get();
+  if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 신청입니다.');
+  const data = snap.val();
+  if (data.requesterUid !== uid) throw new HttpsError('permission-denied', '본인이 신청한 건만 취소할 수 있어요.');
+  if (data.status !== 'pending') throw new HttpsError('failed-precondition', '이미 처리된 신청이에요.');
+
+  await reqRef.remove();
+  return { cancelled: true };
+});
+
+module.exports = { requestStreamerUnlock, cancelStreamerUnlockRequest, adminApproveStreamerUnlock, adminRejectStreamerUnlock };

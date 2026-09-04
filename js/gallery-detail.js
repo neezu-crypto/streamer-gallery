@@ -9,6 +9,7 @@
   var categoryEl = document.getElementById('detail-category');
   var likeBtn = document.getElementById('detail-like-btn');
   var likeCountEl = document.getElementById('detail-like-count');
+  var deleteBtn = document.getElementById('detail-delete-btn');
   var reportBtn = document.getElementById('detail-report-btn');
   var reportForm = document.getElementById('detail-report-form');
   var reportReasonInput = document.getElementById('detail-report-reason');
@@ -45,8 +46,15 @@
 
   function renderComments(list) {
     if (!list.length) { commentsWrap.innerHTML = '<p class="empty-msg">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</p>'; return; }
+    var myUid = window.galUser && window.galUser.uid;
     commentsWrap.innerHTML = list.map(function (c) {
-      return '<div class="detail-comment-row"><span class="detail-comment-text">' + escapeHtml(c.text) + '</span></div>';
+      var mine = myUid && c.uid === myUid;
+      return (
+        '<div class="detail-comment-row" data-comment-id="' + escapeHtml(c.id) + '">' +
+          '<span class="detail-comment-text">' + escapeHtml(c.text) + '</span>' +
+          (mine ? '<button class="text-link detail-comment-delete-btn" type="button">삭제</button>' : '') +
+        '</div>'
+      );
     }).join('');
   }
 
@@ -66,6 +74,7 @@
     streamerEl.textContent = img.streamerName || '익명';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
+    deleteBtn.style.display = (window.galUser && img.uploaderUid === window.galUser.uid) ? '' : 'none';
     reportForm.style.display = 'none';
     reportReasonInput.value = '';
     reportStatus.textContent = '';
@@ -116,6 +125,36 @@
       alert('좋아요 처리 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
     } finally {
       likeBtn.disabled = false;
+    }
+  });
+
+  deleteBtn.addEventListener('click', async function () {
+    if (!currentImageId) return;
+    if (!confirm('이 이미지를 삭제할까요? 되돌릴 수 없어요.')) return;
+    deleteBtn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('deleteOwnImage');
+      await fn({ imageId: currentImageId });
+      closeModal();
+    } catch (e) {
+      alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
+    } finally {
+      deleteBtn.disabled = false;
+    }
+  });
+
+  commentsWrap.addEventListener('click', async function (e) {
+    var btn = e.target.closest('.detail-comment-delete-btn');
+    if (!btn || !currentImageId) return;
+    var row = e.target.closest('.detail-comment-row');
+    if (!confirm('이 댓글을 삭제할까요?')) return;
+    btn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('deleteOwnComment');
+      await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
+    } catch (e2) {
+      alert('댓글 삭제 중 오류: ' + (e2 && e2.message ? e2.message : e2));
+      btn.disabled = false;
     }
   });
 

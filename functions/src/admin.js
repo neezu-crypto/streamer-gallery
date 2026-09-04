@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
-const { requireAuth, isAdmin } = require('./lib/auth');
+const { requireAuth, isAdmin, assertNotBanned } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -18,11 +18,9 @@ async function requireAdmin(request) {
 // R2에 올라간 실제 파일을 함께 정리한다. 좋아요 미러(userLikes/{uid}/{imageId})는
 // gallery/likes/{imageId} 목록을 먼저 읽어야만 정리 대상 uid를 알 수 있으므로,
 // 삭제 순서상 반드시 읽기가 지우기보다 먼저 와야 한다(안 그러면 미러가 고아로 남음).
-const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
-  const uid = await requireAdmin(request);
-  const { imageId } = request.data || {};
-  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
-
+// adminDeleteImage(관리자)와 deleteOwnImage(본인) 둘 다 이 로직을 그대로 쓰고,
+// 호출부에서 소유권/권한 검증만 각자 다르게 한다.
+async function performImageDeletion(imageId) {
   const db = getDatabase();
   const [imageSnap, likesSnap, reportsSnap] = await Promise.all([
     db.ref(`gallery/images/${imageId}`).get(),
@@ -51,8 +49,45 @@ const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_K
       console.error('R2 파일 삭제 실패(메타데이터는 이미 삭제됨):', key, e);
     }
   }
+  return imageSnap.val();
+}
 
+// adminDeleteComment(관리자)와 deleteOwnComment(본인)가 공유하는 삭제 로직.
+async function performCommentDeletion(imageId, commentId) {
+  const db = getDatabase();
+  const commentRef = db.ref(`gallery/comments/${imageId}/${commentId}`);
+  const snap = await commentRef.get();
+  if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
+  await commentRef.remove();
+  await db.ref(`gallery/images/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
+  return snap.val();
+}
+
+const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const uid = await requireAdmin(request);
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  await performImageDeletion(imageId);
   await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.deleteImage', imageId);
+  return { deleted: true };
+});
+
+// 본인이 업로드한 이미지 셀프 삭제(2026-09-05 추가) — 관리자 승인 없이도 본인
+// 콘텐츠는 직접 지울 수 있어야 한다.
+const deleteOwnImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const uid = requireAuth(request);
+  await assertNotBanned(uid);
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const imageSnap = await getDatabase().ref(`gallery/images/${imageId}`).get();
+  if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
+  if (imageSnap.val().uploaderUid !== uid) {
+    throw new HttpsError('permission-denied', '본인이 업로드한 이미지만 삭제할 수 있어요.');
+  }
+
+  await performImageDeletion(imageId);
   return { deleted: true };
 });
 
@@ -61,13 +96,25 @@ const adminDeleteComment = onCall(async (request) => {
   const { imageId, commentId } = request.data || {};
   if (!imageId || !commentId) throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
 
-  const db = getDatabase();
-  const commentRef = db.ref(`gallery/comments/${imageId}/${commentId}`);
-  if (!(await commentRef.get()).exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
-
-  await commentRef.remove();
-  await db.ref(`gallery/images/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
+  await performCommentDeletion(imageId, commentId);
   await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.deleteComment', `${imageId}/${commentId}`);
+  return { deleted: true };
+});
+
+// 본인이 작성한 댓글 셀프 삭제(2026-09-05 추가).
+const deleteOwnComment = onCall(async (request) => {
+  const uid = requireAuth(request);
+  await assertNotBanned(uid);
+  const { imageId, commentId } = request.data || {};
+  if (!imageId || !commentId) throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const commentSnap = await getDatabase().ref(`gallery/comments/${imageId}/${commentId}`).get();
+  if (!commentSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
+  if (commentSnap.val().uid !== uid) {
+    throw new HttpsError('permission-denied', '본인이 작성한 댓글만 삭제할 수 있어요.');
+  }
+
+  await performCommentDeletion(imageId, commentId);
   return { deleted: true };
 });
 
@@ -119,4 +166,4 @@ const unbanGalleryAccount = onCall(async (request) => {
   return { status: 'unbanned' };
 });
 
-module.exports = { adminDeleteImage, adminDeleteComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount };
+module.exports = { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount };
