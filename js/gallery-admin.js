@@ -10,12 +10,15 @@
   var reportsPanel = document.getElementById('admin-reports-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
+  var bansPanel = document.getElementById('admin-bans-panel');
   if (!backdrop) return;
 
   var reportsUnsub = null;
   var latestReports = [];
   var unlocksUnsub = null;
   var latestUnlockRequests = [];
+  var bansUnsub = null;
+  var latestBans = [];
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -33,6 +36,9 @@
       var img = findImage(r.imageId);
       var thumb = img ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="">' : '';
       var when = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR') : '';
+      var banBtn = img && img.uploaderUid
+        ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>'
+        : '';
       return (
         '<div class="admin-row" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '">' +
           '<div class="admin-row-thumb' + (img ? ' clickable' : '') + '" title="' + (img ? '클릭하면 풀이미지로 열어요' : '') + '">' + thumb + '</div>' +
@@ -41,6 +47,7 @@
             '<div class="admin-row-reason">' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
+            banBtn +
             '<button class="text-link admin-dismiss-btn" type="button">신고 무시</button>' +
             '<button class="text-link admin-delete-btn" type="button">이미지 삭제</button>' +
           '</div>' +
@@ -62,7 +69,26 @@
             '<div class="admin-row-reason">♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
+            (img.uploaderUid ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +
             '<button class="text-link admin-delete-btn" type="button">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderBans() {
+    if (!latestBans.length) { bansPanel.innerHTML = '<p class="empty-msg">정지된 계정이 없어요.</p>'; return; }
+    bansPanel.innerHTML = latestBans.map(function (b) {
+      var when = b.bannedAt ? new Date(b.bannedAt).toLocaleString('ko-KR') : '';
+      return (
+        '<div class="admin-row" data-uid="' + escapeHtml(b.uid) + '">' +
+          '<div class="admin-row-body">' +
+            '<div class="admin-row-meta">' + escapeHtml(b.uid) + ' · ' + when + '</div>' +
+            '<div class="admin-row-reason">' + (escapeHtml(b.reason) || '(사유 없음)') + ' · 처리자: ' + escapeHtml(b.bannedByName || '') + '</div>' +
+          '</div>' +
+          '<div class="admin-row-actions">' +
+            '<button class="text-link admin-unban-btn" type="button">정지 해제</button>' +
           '</div>' +
         '</div>'
       );
@@ -117,9 +143,28 @@
     });
   }
 
+  // bannedAccounts는 게임 전체가 공유하는 루트 노드라 정지 사유에 다른 게임 것도 섞여
+  // 올 수 있다 — games.gallery가 있는 것만 걸러서 보여준다(정지 자체는 게임별이라
+  // 실제 효력엔 문제없음, 목록에 다른 게임 정지 건이 안 보이게 필터링만 하는 것).
+  function subscribeBans() {
+    if (bansUnsub) return;
+    var bansRef = window.galFirebase.ref(window.galDb, 'bannedAccounts');
+    bansUnsub = window.galFirebase.onValue(bansRef, function (snap) {
+      var data = snap.val() || {};
+      latestBans = Object.keys(data)
+        .filter(function (uid) { return data[uid] && data[uid].games && data[uid].games.gallery; })
+        .map(function (uid) { return Object.assign({ uid: uid }, data[uid].games.gallery); })
+        .sort(function (a, b) { return (b.bannedAt || 0) - (a.bannedAt || 0); });
+      renderBans();
+    }, function (err) {
+      console.error('정지 계정 목록 구독 실패', err);
+      bansPanel.innerHTML = '<p class="empty-msg">정지 계정 목록을 불러오지 못했어요.</p>';
+    });
+  }
+
   document.addEventListener('gal-auth-changed', function (e) {
     adminBtn.style.display = e.detail.isAdmin ? '' : 'none';
-    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); }
+    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); subscribeBans(); }
   });
   document.addEventListener('gal-images-updated', function () {
     if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
@@ -130,6 +175,7 @@
     renderReports();
     renderImages();
     renderUnlocks();
+    renderBans();
   });
   closeBtn.addEventListener('click', function () { backdrop.classList.remove('open'); });
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) backdrop.classList.remove('open'); });
@@ -148,7 +194,24 @@
     reportsPanel.style.display = tab === 'reports' ? '' : 'none';
     imagesPanel.style.display = tab === 'images' ? '' : 'none';
     unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
+    bansPanel.style.display = tab === 'bans' ? '' : 'none';
   });
+
+  async function banUploader(uid, btn) {
+    var reason = prompt('정지 사유를 입력해 주세요.');
+    if (reason === null) return;
+    if (!reason.trim()) { alert('정지 사유를 입력해야 해요.'); return; }
+    btn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('banGalleryAccount');
+      await fn({ uid: uid, reason: reason.trim() });
+      alert('✅ 정지 처리했어요.');
+    } catch (e) {
+      alert('정지 처리 중 오류: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   async function deleteImage(imageId, btn) {
     if (!confirm('이 이미지를 삭제할까요? 되돌릴 수 없어요.')) return;
@@ -170,7 +233,9 @@
       if (reportedImg) window.galOpenImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
       return;
     }
-    if (e.target.closest('.admin-dismiss-btn')) {
+    if (e.target.closest('.admin-ban-btn')) {
+      banUploader(e.target.dataset.uid, e.target);
+    } else if (e.target.closest('.admin-dismiss-btn')) {
       var btn = e.target;
       btn.disabled = true;
       try {
@@ -193,8 +258,26 @@
       if (img) window.galOpenImageView(img.imageUrl || img.thumbUrl);
       return;
     }
-    if (e.target.closest('.admin-delete-btn')) {
+    if (e.target.closest('.admin-ban-btn')) {
+      banUploader(e.target.dataset.uid, e.target);
+    } else if (e.target.closest('.admin-delete-btn')) {
       deleteImage(row.dataset.imageId, e.target);
+    }
+  });
+
+  bansPanel.addEventListener('click', async function (e) {
+    var row = e.target.closest('.admin-row');
+    if (!row) return;
+    if (e.target.closest('.admin-unban-btn')) {
+      var btn = e.target;
+      btn.disabled = true;
+      try {
+        var fn = window.galFirebase.httpsCallable('unbanGalleryAccount');
+        await fn({ uid: row.dataset.uid });
+      } catch (err) {
+        alert('정지 해제 중 오류: ' + (err && err.message ? err.message : err));
+        btn.disabled = false;
+      }
     }
   });
 
