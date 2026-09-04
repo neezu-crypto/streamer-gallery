@@ -83,7 +83,7 @@ const registerImage = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
 
-  const { imageId, key, thumbKey, streamerId, streamerName, category } = request.data || {};
+  const { imageId, key, thumbKey, streamerId, streamerName, category, width, height } = request.data || {};
   if (!imageId || !key || typeof key !== 'string' || !key.startsWith(`images/${imageId}.`)) {
     throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
   }
@@ -114,6 +114,10 @@ const registerImage = onCall(async (request) => {
 
   const imageUrl = `${R2_PUBLIC_BASE_URL}/${key}`;
   const thumbUrl = `${R2_PUBLIC_BASE_URL}/${thumbKey}`;
+  // width/height는 매소너리 그리드가 이미지 로드를 기다리지 않고 비율대로 배치하는
+  // 용도일 뿐 보안과 무관 — 값이 이상하면 그냥 저장 안 하고 클라이언트가 기본 비율로
+  // 대체하게 둔다(치명적 오류로 취급하지 않음).
+  const hasValidDimensions = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
   await db.ref(`gallery/images/${imageId}`).set({
     streamerId,
     streamerName: name,
@@ -122,6 +126,7 @@ const registerImage = onCall(async (request) => {
     thumbUrl,
     key,
     thumbKey,
+    ...(hasValidDimensions ? { width, height } : {}),
     uploaderUid: uid,
     createdAt: Date.now(),
     likeCount: 0,

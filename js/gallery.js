@@ -7,6 +7,7 @@
 // 차이로 같은 스트리머가 다르게 취급되면 해금 여부 판별 자체가 무의미해지기 때문.
 (function () {
   var grid = document.getElementById('gallery-grid');
+  var loadMoreBtn = document.getElementById('gallery-load-more-btn');
   var chipsWrap = document.getElementById('gallery-category-chips');
   var searchInput = document.getElementById('gallery-filter-streamer');
   var uploadBackdrop = document.getElementById('upload-backdrop');
@@ -62,6 +63,27 @@
   }
   window.galIsStreamerUnlocked = isStreamerUnlocked;
 
+  // 매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
+  // 반드시 같은 값이어야 한다(둘 중 하나만 바꾸면 span 계산이 어긋난다).
+  var MASONRY_ROW_UNIT = 4;
+  var MASONRY_GAP = 16;
+  var DEFAULT_ASPECT_RATIO = 4 / 3; // width/height — 비율 정보 없는(마이그레이션 이전) 이미지용 기본값
+
+  // 카드 너비(반응형이라 컬럼 수에 따라 바뀜)는 실제 DOM에 붙은 뒤에만 알 수 있어서,
+  // grid.innerHTML을 채운 직후 한 번 읽어(reflow 1회) 각 카드의 grid-row-end span을
+  // 계산해 넣는다. 이미지의 실제 로드를 기다리지 않아도 되는 게 핵심 — width/height를
+  // 업로드 시점에 이미 저장해뒀기 때문에(registerImage) 레이아웃이 튀지 않는다.
+  function applyMasonrySpans() {
+    grid.querySelectorAll('.gallery-card').forEach(function (card) {
+      var w = card.offsetWidth;
+      if (!w) return;
+      var ratio = parseFloat(card.dataset.ratio) || DEFAULT_ASPECT_RATIO;
+      var h = w / ratio;
+      var span = Math.max(1, Math.ceil((h + MASONRY_GAP) / (MASONRY_ROW_UNIT + MASONRY_GAP)));
+      card.style.gridRowEnd = 'span ' + span;
+    });
+  }
+
   function renderGrid() {
     if (!grid) return;
     var streamerQuery = (searchInput && searchInput.value || '').trim().toLowerCase();
@@ -71,46 +93,34 @@
       return true;
     });
 
+    if (loadMoreBtn) loadMoreBtn.style.display = hasMoreImages ? '' : 'none';
+
     if (!filtered.length) {
       grid.innerHTML = '<p class="empty-msg">' + (allImages.length ? '조건에 맞는 이미지가 없어요.' : '아직 업로드된 이미지가 없어요. 첫 이미지를 올려보세요!') + '</p>';
-      // 필터에 걸린 게 없어도 아직 안 불러온 더 오래된 이미지 중엔 있을 수 있으니
-      // "더 보기"는 계속 보여준다.
-      if (hasMoreImages) {
-        grid.insertAdjacentHTML('beforeend', '<button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn">더 보기</button>');
-      }
       return;
     }
 
+    // 핀터레스트식 매소너리(2026-09-05 변경) — 카드는 이미지만 보여준다(스트리머명/
+    // 카테고리/좋아요 수는 클릭해서 상세보기로 확인). 잠금 배지만 예외 — 업로드/상세보기가
+    // 막혀있다는 걸 알려주는 기능적 표시라 그대로 둔다.
     grid.innerHTML = filtered.map(function (img) {
-      var label = CATEGORY_LABELS[img.category] || img.category || '';
       var locked = !isStreamerUnlocked(img.streamerId);
+      var ratio = (img.width && img.height) ? (img.width / img.height) : '';
       return (
-        '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '">' +
-          '<div class="gallery-card-thumb">' +
-            (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
-            (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
-          '</div>' +
-          '<div class="gallery-card-body">' +
-            '<div class="gallery-card-head">' +
-              '<span class="gallery-card-streamer">' + escapeHtml(img.streamerName || '익명') + '</span>' +
-              '<span class="gallery-badge">' + escapeHtml(label) + '</span>' +
-            '</div>' +
-            '<div class="gallery-card-meta">' +
-              '<span class="liked">♥ ' + (img.likeCount || 0) + '</span>' +
-              '<span>💬 ' + (img.commentCount || 0) + '</span>' +
-            '</div>' +
-          '</div>' +
+        '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
+          (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
+          (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
         '</div>'
       );
     }).join('');
-
-    // 필터링과 무관하게 "더 로드된 원본이 더 있는지"만 보고 노출 여부를 정한다 —
-    // 필터 결과가 적다고 버튼을 숨기면, 아직 안 불러온 원본 중에 필터에 맞는 게
-    // 더 있어도 사용자가 "더 보기"를 누를 방법이 없어진다.
-    if (hasMoreImages) {
-      grid.insertAdjacentHTML('beforeend', '<button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn">더 보기</button>');
-    }
+    applyMasonrySpans();
   }
+
+  var masonryResizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(masonryResizeTimer);
+    masonryResizeTimer = setTimeout(applyMasonrySpans, 150);
+  });
 
   function subscribeImages() {
     if (!window.galFirebase || !window.galDb) { setTimeout(subscribeImages, 200); return; }
@@ -135,9 +145,8 @@
     });
   }
 
-  if (grid) {
-    grid.addEventListener('click', function (e) {
-      if (!e.target.closest('#gallery-load-more-btn')) return;
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', function () {
       imagesLimit += IMAGES_PAGE_SIZE;
       subscribeImages();
     });
@@ -221,6 +230,8 @@
   // 그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
   // 축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
   // 나오는데, 썸네일은 정지 이미지로 충분하고 원본(imageUrl)은 애니메이션 그대로다.
+  // 이 김에 원본 실제 크기(width/height)도 같이 얻어서 매소너리 그리드가 이미지
+  // 로드를 기다리지 않고 바로 비율대로 배치할 수 있게 registerImage에 같이 넘긴다.
   function makeThumbnailBlob(file) {
     return new Promise(function (resolve, reject) {
       var img = new Image();
@@ -235,7 +246,7 @@
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(function (blob) {
           if (!blob) { reject(new Error('썸네일 생성에 실패했어요.')); return; }
-          resolve(blob);
+          resolve({ blob: blob, width: w, height: h });
         }, 'image/jpeg', 0.82);
       };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없어요.')); };
@@ -266,23 +277,27 @@
       uploadSubmitBtn.disabled = true;
       uploadStatus.textContent = '⏳ 썸네일 생성 중...';
       try {
-        var thumbBlob = await makeThumbnailBlob(file);
+        var thumb = await makeThumbnailBlob(file);
 
         uploadStatus.textContent = '⏳ 업로드 준비 중...';
         var requestUploadFn = window.galFirebase.httpsCallable('requestImageUpload');
-        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size, thumbFileSize: thumbBlob.size });
+        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size });
         var uploadUrl = prepared.data.uploadUrl, thumbUploadUrl = prepared.data.thumbUploadUrl;
         var imageId = prepared.data.imageId, key = prepared.data.key, thumbKey = prepared.data.thumbKey;
 
         uploadStatus.textContent = '⏳ 이미지 업로드 중...';
         var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
         if (!putRes.ok) throw new Error('R2 업로드 실패 (status ' + putRes.status + ')');
-        var thumbPutRes = await fetch(thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumbBlob });
+        var thumbPutRes = await fetch(thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
         if (!thumbPutRes.ok) throw new Error('썸네일 업로드 실패 (status ' + thumbPutRes.status + ')');
 
         uploadStatus.textContent = '⏳ 등록 중...';
         var registerFn = window.galFirebase.httpsCallable('registerImage');
-        await registerFn({ imageId: imageId, key: key, thumbKey: thumbKey, streamerId: selectedStreamerId, streamerName: selectedStreamerName, category: category });
+        await registerFn({
+          imageId: imageId, key: key, thumbKey: thumbKey,
+          streamerId: selectedStreamerId, streamerName: selectedStreamerName, category: category,
+          width: thumb.width, height: thumb.height,
+        });
 
         uploadStatus.textContent = '✅ 업로드 완료!';
         resetStreamerPicker();

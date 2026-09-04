@@ -301,39 +301,37 @@ button{ font-family: inherit; cursor: pointer; }
 }
 .streamer-row:hover{ border-color: var(--gold-line); color: var(--gold-text); }
 
+/* 핀터레스트식 매소너리(2026-09-05 변경) — grid-auto-rows를 아주 작은 단위(4px)로
+   두고, 카드마다 실제 이미지 비율에 맞춰 JS(gallery.js의 applyMasonrySpans)가
+   grid-row-end: span N을 계산해서 넣는다. ROW_UNIT/GAP 값은 저 함수의 상수와
+   반드시 일치해야 한다 — 여기서 바꾸면 거기도 같이 바꿀 것. */
 .gallery-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  grid-auto-rows:4px; gap:16px;
 }
 .gallery-load-more-btn{
-  grid-column:1 / -1; justify-self:center; margin-top:8px; padding:10px 24px;
+  display:block; margin:24px auto 0; padding:10px 24px;
   border:1px solid var(--hairline); border-radius:2px;
 }
 .gallery-load-more-btn:hover{ border-color:var(--gold-line); color:var(--gold-text); }
 .gallery-card{
-  background:var(--panel); border:1px solid var(--hairline); border-radius:2px; overflow:hidden;
-  display:flex; flex-direction:column; transition: border-color .15s, box-shadow .15s;
-  cursor:pointer;
+  background:var(--panel-raised); border:1px solid var(--hairline); border-radius:2px; overflow:hidden;
+  position:relative; cursor:pointer; transition: border-color .15s, box-shadow .15s;
 }
 .gallery-card:hover{ border-color:var(--gold-line); box-shadow: 0 0 20px rgba(255,176,59,0.1); }
-.gallery-card-thumb{
-  aspect-ratio: 4 / 3; width:100%; background:var(--panel-raised); position:relative;
-  display:flex; align-items:center; justify-content:center; overflow:hidden;
-}
-.gallery-card-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-card img{ width:100%; height:100%; object-fit:cover; display:block; }
 .gallery-lock-badge{
   position:absolute; top:8px; right:8px; font-size:14px; line-height:1;
   background:rgba(5,5,5,0.72); border:1px solid var(--gold-line); border-radius:2px;
   padding:5px 6px; pointer-events:none;
 }
-.gallery-card-body{ padding:12px 14px 14px; display:flex; flex-direction:column; gap:6px; }
-.gallery-card-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+/* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
+   모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */
 .gallery-card-streamer{ font-size:13px; font-weight:700; color:var(--text); }
 .gallery-badge{
   font-size:10px; padding:3px 8px; border-radius:2px; font-weight:700; white-space:nowrap; letter-spacing:0.04em;
   background: var(--gold-dim); color: var(--gold-text); border:1px solid var(--gold-line);
 }
-.gallery-card-meta{ display:flex; align-items:center; gap:14px; font-size:11.5px; color:var(--muted); }
-.gallery-card-meta .liked{ color: var(--mint); }
 
 .btn-admin{ width:auto; min-width:0; padding:9px 16px; font-size:12.5px; border-color: var(--mint); color: var(--mint); }
 .btn-admin:hover, .btn-admin:focus-visible{ background-color: var(--mint); color:#1a0f00; box-shadow: 0 0 25px rgba(255,93,143,0.45); }
