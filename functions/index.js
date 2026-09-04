@@ -3,4 +3,5 @@ initializeApp();
 
 module.exports = {
   ...require('./src/whoami'),
+  ...require('./src/r2'),
 };

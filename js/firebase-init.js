@@ -46,7 +46,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app);
-const whoAmIFn = httpsCallable(functions, 'whoAmI');
+const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -

@@ -1,6 +1,5 @@
-// 갤러리 그리드 렌더링 + 검색/카테고리 필터 + 업로드 모달 뼈대.
-// 실제 이미지 업로드(R2 presigned URL 발급 → 직접 업로드 → 메타데이터 등록)를 처리하는
-// Cloud Function은 아직 없다 — 업로드 버튼은 지금은 안내 문구만 띄우는 스텁이다.
+// 갤러리 그리드 렌더링 + 검색/카테고리 필터 + 업로드(requestImageUpload로 presigned URL
+// 발급 → R2에 직접 PUT → registerImage로 메타데이터 등록, 3단계).
 // gallery/images 노드 읽기는 이미 database.rules.json에 반영돼 있어 지금부터도 동작한다.
 (function () {
   var grid = document.getElementById('gallery-grid');
@@ -109,9 +108,48 @@
     uploadBackdrop.addEventListener('click', function (e) { if (e.target === uploadBackdrop) closeUploadModal(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && uploadBackdrop.classList.contains('open')) closeUploadModal(); });
   }
+  var ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+  var MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
   if (uploadSubmitBtn) {
-    uploadSubmitBtn.addEventListener('click', function () {
-      if (uploadStatus) uploadStatus.textContent = '⏳ 업로드 기능은 곧 추가될 예정이에요. 조금만 기다려 주세요!';
+    uploadSubmitBtn.addEventListener('click', async function () {
+      var streamerInput = document.getElementById('upload-streamer');
+      var categorySelect = document.getElementById('upload-category');
+      var fileInput = document.getElementById('upload-file');
+      var streamerName = (streamerInput.value || '').trim();
+      var category = categorySelect.value;
+      var file = fileInput.files && fileInput.files[0];
+
+      if (!streamerName) { uploadStatus.textContent = '⚠️ 스트리머 이름을 입력해 주세요.'; return; }
+      if (!file) { uploadStatus.textContent = '⚠️ 이미지 파일을 선택해 주세요.'; return; }
+      if (!ALLOWED_CONTENT_TYPES.has(file.type)) { uploadStatus.textContent = '⚠️ jpg/png/webp/gif 이미지만 업로드할 수 있어요.'; return; }
+      if (file.size > MAX_UPLOAD_BYTES) { uploadStatus.textContent = '⚠️ 이미지 용량은 15MB 이하여야 해요.'; return; }
+
+      uploadSubmitBtn.disabled = true;
+      uploadStatus.textContent = '⏳ 업로드 준비 중...';
+      try {
+        var requestUploadFn = window.galFirebase.httpsCallable('requestImageUpload');
+        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size });
+        var uploadUrl = prepared.data.uploadUrl, imageId = prepared.data.imageId, key = prepared.data.key;
+
+        uploadStatus.textContent = '⏳ 이미지 업로드 중...';
+        var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+        if (!putRes.ok) throw new Error('R2 업로드 실패 (status ' + putRes.status + ')');
+
+        uploadStatus.textContent = '⏳ 등록 중...';
+        var registerFn = window.galFirebase.httpsCallable('registerImage');
+        await registerFn({ imageId: imageId, key: key, streamerName: streamerName, category: category });
+
+        uploadStatus.textContent = '✅ 업로드 완료!';
+        streamerInput.value = '';
+        fileInput.value = '';
+        setTimeout(closeUploadModal, 700);
+      } catch (err) {
+        console.error('이미지 업로드 실패', err);
+        uploadStatus.textContent = '❌ 업로드 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
+      } finally {
+        uploadSubmitBtn.disabled = false;
+      }
     });
   }
 

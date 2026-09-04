@@ -37,6 +37,13 @@ R2는 egress(다운로드 트래픽) 요금이 없어서 장기 운영 비용을
 - 배포 전 `firebase deploy --only functions --project soop-stock-market`을 한번 시도해
   "found in your project but do not exist in your local source code" 목록이 뜨면(실제
   삭제되기 전에 중단됨), 그게 지금 시점에 절대 건드리면 안 되는 다른 앱 소유 함수 목록이다.
+- **주의(2026-09-04 실제 발생): `codebase`("gallery")는 firebase-tools가 로컬에서 배포
+  단위를 구분하는 개념일 뿐, 실제 GCP Cloud Function 리소스 이름은 codebase로
+  네임스페이스되지 않는다 — 프로젝트+리전 전체에서 함수 이름이 유일해야 한다.** 최초 배포
+  때 이 저장소의 `whoAmI`가 rocket-game의 `whoAmI`(같은 이름으로 export)를 실제로 덮어쓴
+  적 있음(로직이 우연히 동일해서 기능 손상은 없었지만 이름을 `galleryCheckAdmin`으로
+  바꿔서 재발을 막음). 새 함수를 추가할 때 이름이 다른 자매 저장소와 겹치지 않는지
+  `firebase functions:list --project soop-stock-market`으로 먼저 확인할 것.
 
 ## database.rules.json 동기화 필수 (2026-09-04)
 
