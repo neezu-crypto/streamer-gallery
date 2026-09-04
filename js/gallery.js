@@ -215,6 +215,33 @@
   }
   var ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
   var MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+  var THUMB_MAX_DIMENSION = 480;
+
+  // 실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
+  // 그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
+  // 축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
+  // 나오는데, 썸네일은 정지 이미지로 충분하고 원본(imageUrl)은 애니메이션 그대로다.
+  function makeThumbnailBlob(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, THUMB_MAX_DIMENSION / Math.max(w, h));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error('썸네일 생성에 실패했어요.')); return; }
+          resolve(blob);
+        }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없어요.')); };
+      img.src = url;
+    });
+  }
 
   if (uploadSubmitBtn) {
     uploadSubmitBtn.addEventListener('click', async function () {
@@ -237,19 +264,25 @@
       }
 
       uploadSubmitBtn.disabled = true;
-      uploadStatus.textContent = '⏳ 업로드 준비 중...';
+      uploadStatus.textContent = '⏳ 썸네일 생성 중...';
       try {
+        var thumbBlob = await makeThumbnailBlob(file);
+
+        uploadStatus.textContent = '⏳ 업로드 준비 중...';
         var requestUploadFn = window.galFirebase.httpsCallable('requestImageUpload');
-        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size });
-        var uploadUrl = prepared.data.uploadUrl, imageId = prepared.data.imageId, key = prepared.data.key;
+        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size, thumbFileSize: thumbBlob.size });
+        var uploadUrl = prepared.data.uploadUrl, thumbUploadUrl = prepared.data.thumbUploadUrl;
+        var imageId = prepared.data.imageId, key = prepared.data.key, thumbKey = prepared.data.thumbKey;
 
         uploadStatus.textContent = '⏳ 이미지 업로드 중...';
         var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
         if (!putRes.ok) throw new Error('R2 업로드 실패 (status ' + putRes.status + ')');
+        var thumbPutRes = await fetch(thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumbBlob });
+        if (!thumbPutRes.ok) throw new Error('썸네일 업로드 실패 (status ' + thumbPutRes.status + ')');
 
         uploadStatus.textContent = '⏳ 등록 중...';
         var registerFn = window.galFirebase.httpsCallable('registerImage');
-        await registerFn({ imageId: imageId, key: key, streamerId: selectedStreamerId, streamerName: selectedStreamerName, category: category });
+        await registerFn({ imageId: imageId, key: key, thumbKey: thumbKey, streamerId: selectedStreamerId, streamerName: selectedStreamerName, category: category });
 
         uploadStatus.textContent = '✅ 업로드 완료!';
         resetStreamerPicker();

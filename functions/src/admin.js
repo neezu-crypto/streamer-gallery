@@ -41,12 +41,13 @@ async function performImageDeletion(imageId) {
   }
   await db.ref().update(updates);
 
-  const key = imageSnap.val().key;
-  if (key) {
+  const { key, thumbKey } = imageSnap.val();
+  const r2Keys = [key, thumbKey].filter(Boolean);
+  for (const r2Key of r2Keys) {
     try {
-      await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+      await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: r2Key }));
     } catch (e) {
-      console.error('R2 파일 삭제 실패(메타데이터는 이미 삭제됨):', key, e);
+      console.error('R2 파일 삭제 실패(메타데이터는 이미 삭제됨):', r2Key, e);
     }
   }
   return imageSnap.val();
