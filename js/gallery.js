@@ -18,6 +18,7 @@
     meme: '밈',
     etc: '기타',
   };
+  window.galCategoryLabels = CATEGORY_LABELS;
 
   var allImages = [];
   var activeCategory = 'all';
@@ -45,7 +46,7 @@
     grid.innerHTML = filtered.map(function (img) {
       var label = CATEGORY_LABELS[img.category] || img.category || '';
       return (
-        '<div class="gallery-card">' +
+        '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '">' +
           '<div class="gallery-card-thumb">' +
             (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
           '</div>' +
@@ -72,7 +73,9 @@
       allImages = Object.keys(data).map(function (id) {
         return Object.assign({ id: id }, data[id]);
       }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      window.galAllImages = allImages;
       renderGrid();
+      document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
     }, function (err) {
       console.error('갤러리 목록 구독 실패', err);
       grid.innerHTML = '<p class="empty-msg">이미지를 불러오지 못했어요. 새로고침해 주세요.</p>';

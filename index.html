@@ -36,6 +36,9 @@
       <span class="brand-name">스트리머 <em>갤러리</em></span>
     </div>
     <div class="topbar-actions">
+      <button class="glitch-btn btn-admin" id="open-admin-btn" type="button" style="display:none;" data-text="관리자">
+        <span class="btn-text">관리자</span>
+      </button>
       <button class="glitch-btn btn-upload" id="open-upload-btn" type="button" data-text="+ 업로드">
         <span class="btn-text">+ 업로드</span>
       </button>
@@ -103,6 +106,71 @@
   </div>
 </div>
 
+<div class="propose-backdrop" id="detail-backdrop">
+  <div class="propose-modal detail-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">IMAGE_DETAIL</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="detail-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <div class="detail-image-wrap">
+      <img id="detail-image" alt="">
+    </div>
+    <div class="detail-meta-row">
+      <span class="gallery-card-streamer" id="detail-streamer"></span>
+      <span class="gallery-badge" id="detail-category"></span>
+    </div>
+    <div class="detail-actions-row">
+      <button class="chip" id="detail-like-btn" type="button">♥ <span id="detail-like-count">0</span></button>
+      <button class="text-link" id="detail-report-btn" type="button">신고하기</button>
+    </div>
+    <div class="detail-report-form" id="detail-report-form" style="display:none;">
+      <div class="propose-field" style="margin-bottom:0.8rem;">
+        <input type="text" id="detail-report-reason" maxlength="300" placeholder=" ">
+        <label for="detail-report-reason" data-text="신고 사유(선택)">신고 사유(선택)</label>
+      </div>
+      <button class="glitch-btn" id="detail-report-submit" type="button" data-text="신고 제출">
+        <span class="btn-text">신고 제출</span>
+      </button>
+      <p class="propose-modal-sub" id="detail-report-status"></p>
+    </div>
+    <div class="detail-comments" id="detail-comments">
+      <p class="empty-msg">댓글을 불러오는 중...</p>
+    </div>
+    <div class="detail-comment-form">
+      <div class="propose-field" style="margin-bottom:0;">
+        <input type="text" id="detail-comment-input" maxlength="300" placeholder=" ">
+        <label for="detail-comment-input" data-text="댓글 남기기">댓글 남기기</label>
+      </div>
+      <button class="glitch-btn" id="detail-comment-submit" type="button" data-text="등록">
+        <span class="btn-text">등록</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="propose-backdrop" id="admin-backdrop">
+  <div class="propose-modal admin-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">ADMIN_PANEL</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="admin-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <div class="gallery-category-chips" id="admin-tabs">
+      <button class="chip active" type="button" data-admin-tab="reports">신고 목록</button>
+      <button class="chip" type="button" data-admin-tab="images">전체 이미지</button>
+    </div>
+    <div class="admin-panel-body" id="admin-reports-panel">
+      <p class="empty-msg">신고 목록을 불러오는 중...</p>
+    </div>
+    <div class="admin-panel-body" id="admin-images-panel" style="display:none;">
+      <p class="empty-msg">이미지 목록을 불러오는 중...</p>
+    </div>
+  </div>
+</div>
+
 <div class="profile-backdrop" id="login-backdrop">
   <div class="profile-modal">
     <div class="terminal-header">
@@ -166,5 +234,7 @@
 <script defer src="js/kakao-login.js"></script>
 <script defer src="js/streamer-verify.js"></script>
 <script defer src="js/gallery.js"></script>
+<script defer src="js/gallery-detail.js"></script>
+<script defer src="js/gallery-admin.js"></script>
 </body>
 </html>

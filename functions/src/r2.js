@@ -91,6 +91,7 @@ const registerImage = onCall(async (request) => {
     category,
     imageUrl,
     thumbUrl: imageUrl,
+    key,
     uploaderUid: uid,
     createdAt: Date.now(),
     likeCount: 0,
@@ -100,4 +101,4 @@ const registerImage = onCall(async (request) => {
   return { imageId, imageUrl };
 });
 
-module.exports = { requestImageUpload, registerImage };
+module.exports = { requestImageUpload, registerImage, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
