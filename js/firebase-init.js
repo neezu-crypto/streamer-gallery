@@ -93,9 +93,20 @@ window.galLoginMethodLabel = function () {
 };
 window.galSignInWithCustomToken = (token) => signInWithCustomToken(auth, token);
 
-// 구글 팝업 인증 직후처럼 "활성 탭이 아니다"로 오판되기 쉬운 순간엔 네이티브
-// confirm()이 억제될 수 있지만, 그 정도로 자주 겪는 경로가 아니라(구글 계정이
-// 이미 다른 uid에 연동된 극히 드문 경우에만 탐) 일단 네이티브 confirm을 쓴다.
+// 구글 팝업이 닫힌 직후엔 브라우저가 이 탭을 잠깐 "활성 탭이 아니다"로 오판해서
+// 네이티브 confirm()을 억제한다(실제로 콘솔에 "suppressed because this page is
+// not the active tab" 경고가 뜨며 재현 확인됨, 2026-09-04). 억제된 confirm()은
+// 조용히 false를 반환하므로, 아무 안내 없이 "이어서 진행할까요?"를 취소한 것처럼
+// 동작이 멈춰버린다 — 여러 자매 사이트가 같은 Firebase Auth 사용자 풀을 공유하는
+// 구조상, 기존에 다른 사이트에서 이미 구글 계정을 연동해본 사용자가 "새 사이트"에서
+// 처음 로그인할 때마다 이 경로(auth/credential-already-in-use)를 타게 되어 드문
+// 경우가 아니다. 팝업이 닫히고 탭이 다시 활성 상태로 인식될 시간을 주기 위해
+// confirm() 호출 전 짧게 지연시킨다.
+function delayedConfirm(message) {
+  return new Promise((resolve) => setTimeout(() => resolve(confirm(message)), 300));
+}
+window.galDelayedConfirm = delayedConfirm; // 팝업 기반 로그인(카카오 등) 직후 confirm()에도 재사용
+
 async function completeAccountSwitch(customToken) {
   await signInWithCustomToken(auth, customToken);
   alert('✅ 이제 이 기기에서도 같은 계정을 이어서 쓸 수 있어요.');
@@ -113,7 +124,7 @@ function signIn() {
     window.galCloseLoginModal && window.galCloseLoginModal();
   }).catch(async (err) => {
     if (err && err.code === 'auth/credential-already-in-use') {
-      if (!confirm('🔗 이미 연동된 계정을 발견했어요!\n이 기기에서도 같은 계정으로 이어서 진행할까요?')) return;
+      if (!(await delayedConfirm('🔗 이미 연동된 계정을 발견했어요!\n이 기기에서도 같은 계정으로 이어서 진행할까요?'))) return;
       try {
         await signInWithPopup(auth, googleProvider);
         await linkGoogleAccountFn();
