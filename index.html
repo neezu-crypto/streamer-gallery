@@ -82,9 +82,11 @@
     <p class="propose-modal-title">🖼️ 이미지 업로드</p>
     <p class="propose-modal-sub">방송 스크린샷이나 AI 일러스트를 올려서 함께 공유해보세요.</p>
     <div class="propose-field">
-      <input type="text" id="upload-streamer" maxlength="20" placeholder=" ">
-      <label for="upload-streamer" data-text="스트리머 이름">스트리머 이름</label>
+      <input type="text" id="upload-streamer-search" placeholder=" " autocomplete="off">
+      <label for="upload-streamer-search" data-text="스트리머 이름으로 검색">스트리머 이름으로 검색</label>
     </div>
+    <div class="streamer-search-results" id="upload-streamer-results"></div>
+    <p class="propose-modal-sub" id="upload-streamer-selected" style="display:none;"></p>
     <div class="propose-field">
       <select id="upload-category">
         <option value="screenshot">스크린샷</option>
@@ -103,6 +105,31 @@
       <span class="btn-text">업로드하기</span>
     </button>
     <p class="propose-modal-sub" id="upload-status"></p>
+  </div>
+</div>
+
+<!-- 스트리머별 업로드 잠금 해금 신청(2026-09-05 추가) — 업로드 시도 또는 잠긴
+     스트리머 이미지 클릭 시 이 모달로 유도된다. 별풍선 후원은 SOOP 방송에서 직접
+     하는 것이라 이 모달은 신청 접수만 하고, 실제 후원 확인은 관리자가 수동으로
+     한다(soop-stock-market의 "동결 해제(후원)"와 동일 원칙). -->
+<div class="propose-backdrop" id="unlock-backdrop">
+  <div class="propose-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">UNLOCK_REQUEST</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="unlock-modal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <p class="propose-modal-title">🔒 스트리머 해금 신청</p>
+    <p class="propose-modal-sub"><strong id="unlock-streamer-name"></strong>님은 아직 이미지 업로드/상세보기가 잠겨있어요. 별풍선 <strong id="unlock-balloon-cost">100</strong>개 후원 후 신청하면, 관리자가 확인하고 해금해드려요. 한 번 해금되면 이후 누구나 이 스트리머 이미지를 올리고 볼 수 있어요.</p>
+    <div class="propose-field">
+      <input type="text" id="unlock-nickname" maxlength="20" placeholder=" ">
+      <label for="unlock-nickname" data-text="후원할 때 쓸 닉네임">후원할 때 쓸 닉네임</label>
+    </div>
+    <button class="glitch-btn" id="unlock-submit-btn" type="button" data-text="해금 신청하기">
+      <span class="btn-text">해금 신청하기</span>
+    </button>
+    <p class="propose-modal-sub" id="unlock-status"></p>
   </div>
 </div>
 
@@ -161,12 +188,16 @@
     <div class="gallery-category-chips" id="admin-tabs">
       <button class="chip active" type="button" data-admin-tab="reports">신고 목록</button>
       <button class="chip" type="button" data-admin-tab="images">전체 이미지</button>
+      <button class="chip" type="button" data-admin-tab="unlocks">해금 신청</button>
     </div>
     <div class="admin-panel-body" id="admin-reports-panel">
       <p class="empty-msg">신고 목록을 불러오는 중...</p>
     </div>
     <div class="admin-panel-body" id="admin-images-panel" style="display:none;">
       <p class="empty-msg">이미지 목록을 불러오는 중...</p>
+    </div>
+    <div class="admin-panel-body" id="admin-unlocks-panel" style="display:none;">
+      <p class="empty-msg">해금 신청을 불러오는 중...</p>
     </div>
   </div>
 </div>
@@ -285,6 +316,7 @@
 <script defer src="js/kakao-login.js"></script>
 <script defer src="js/streamer-verify.js"></script>
 <script defer src="js/gallery.js"></script>
+<script defer src="js/gallery-unlock.js"></script>
 <script defer src="js/gallery-detail.js"></script>
 <script defer src="js/gallery-admin.js"></script>
 </body>

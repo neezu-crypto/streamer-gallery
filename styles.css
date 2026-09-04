@@ -289,6 +289,14 @@ button{ font-family: inherit; cursor: pointer; }
 .chip:hover{ border-color: var(--gold-line); color: var(--gold-text); }
 .chip.active{ background: var(--gold-dim); border-color: var(--gold-line); color: var(--gold-text); }
 
+/* ---------- 스트리머 검색 결과(업로드 폼 — 인생게임/로켓게임과 동일 패턴) ---------- */
+.streamer-search-results{ display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; margin:-0.6rem 0 1.2rem; }
+.streamer-row{
+  background:var(--panel-raised); border:1px solid var(--hairline); border-radius:2px;
+  padding:8px 12px; cursor:pointer; font-size:13px; transition: border-color .15s ease;
+}
+.streamer-row:hover{ border-color: var(--gold-line); color: var(--gold-text); }
+
 .gallery-grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;
 }
@@ -299,10 +307,15 @@ button{ font-family: inherit; cursor: pointer; }
 }
 .gallery-card:hover{ border-color:var(--gold-line); box-shadow: 0 0 20px rgba(255,176,59,0.1); }
 .gallery-card-thumb{
-  aspect-ratio: 4 / 3; width:100%; background:var(--panel-raised);
+  aspect-ratio: 4 / 3; width:100%; background:var(--panel-raised); position:relative;
   display:flex; align-items:center; justify-content:center; overflow:hidden;
 }
 .gallery-card-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-lock-badge{
+  position:absolute; top:8px; right:8px; font-size:14px; line-height:1;
+  background:rgba(5,5,5,0.72); border:1px solid var(--gold-line); border-radius:2px;
+  padding:5px 6px; pointer-events:none;
+}
 .gallery-card-body{ padding:12px 14px 14px; display:flex; flex-direction:column; gap:6px; }
 .gallery-card-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .gallery-card-streamer{ font-size:13px; font-weight:700; color:var(--text); }

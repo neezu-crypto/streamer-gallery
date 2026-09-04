@@ -81,7 +81,14 @@
     if (!card) return;
     var id = card.dataset.imageId;
     var img = (window.galAllImages || []).find(function (i) { return i.id === id; });
-    if (img) openModal(img);
+    if (!img) return;
+    // 스트리머별 업로드 잠금(2026-09-05 추가) — 잠긴 스트리머 이미지는 그리드엔
+    // 나오지만(🔒 배지), 클릭하면 상세보기(좋아요/댓글) 대신 해금 신청 모달로 유도한다.
+    if (window.galIsStreamerUnlocked && !window.galIsStreamerUnlocked(img.streamerId)) {
+      window.galOpenUnlockModal && window.galOpenUnlockModal(img.streamerId, img.streamerName);
+      return;
+    }
+    openModal(img);
   });
 
   closeBtn.addEventListener('click', closeModal);

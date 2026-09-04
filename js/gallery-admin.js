@@ -9,10 +9,13 @@
   var tabsWrap = document.getElementById('admin-tabs');
   var reportsPanel = document.getElementById('admin-reports-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
+  var unlocksPanel = document.getElementById('admin-unlocks-panel');
   if (!backdrop) return;
 
   var reportsUnsub = null;
   var latestReports = [];
+  var unlocksUnsub = null;
+  var latestUnlockRequests = [];
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -66,6 +69,40 @@
     }).join('');
   }
 
+  function renderUnlocks() {
+    var pending = latestUnlockRequests.filter(function (r) { return r.status === 'pending'; });
+    if (!pending.length) { unlocksPanel.innerHTML = '<p class="empty-msg">대기 중인 해금 신청이 없어요.</p>'; return; }
+    unlocksPanel.innerHTML = pending.map(function (r) {
+      var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString('ko-KR') : '';
+      return (
+        '<div class="admin-row" data-request-id="' + escapeHtml(r.id) + '">' +
+          '<div class="admin-row-body">' +
+            '<div class="admin-row-meta">' + escapeHtml(r.streamerName) + ' · ' + when + '</div>' +
+            '<div class="admin-row-reason">후원자 닉네임: ' + escapeHtml(r.nickname) + '</div>' +
+          '</div>' +
+          '<div class="admin-row-actions">' +
+            '<button class="text-link admin-reject-unlock-btn" type="button">거절</button>' +
+            '<button class="text-link admin-approve-unlock-btn" type="button">해금 승인</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function subscribeUnlockRequests() {
+    if (unlocksUnsub) return;
+    var reqRef = window.galFirebase.ref(window.galDb, 'gallery/unlockRequests');
+    unlocksUnsub = window.galFirebase.onValue(reqRef, function (snap) {
+      var data = snap.val() || {};
+      latestUnlockRequests = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
+        .sort(function (a, b) { return (b.requestedAt || 0) - (a.requestedAt || 0); });
+      renderUnlocks();
+    }, function (err) {
+      console.error('해금 신청 목록 구독 실패', err);
+      unlocksPanel.innerHTML = '<p class="empty-msg">해금 신청 목록을 불러오지 못했어요.</p>';
+    });
+  }
+
   function subscribeReports() {
     if (reportsUnsub) return;
     var reportsRef = window.galFirebase.ref(window.galDb, 'gallery/imageReports');
@@ -82,7 +119,7 @@
 
   document.addEventListener('gal-auth-changed', function (e) {
     adminBtn.style.display = e.detail.isAdmin ? '' : 'none';
-    if (e.detail.isAdmin) subscribeReports();
+    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); }
   });
   document.addEventListener('gal-images-updated', function () {
     if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
@@ -92,6 +129,7 @@
     backdrop.classList.add('open');
     renderReports();
     renderImages();
+    renderUnlocks();
   });
   closeBtn.addEventListener('click', function () { backdrop.classList.remove('open'); });
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) backdrop.classList.remove('open'); });
@@ -105,6 +143,7 @@
     var tab = btn.dataset.adminTab;
     reportsPanel.style.display = tab === 'reports' ? '' : 'none';
     imagesPanel.style.display = tab === 'images' ? '' : 'none';
+    unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
   });
 
   async function deleteImage(imageId, btn) {
@@ -142,6 +181,33 @@
     if (!row) return;
     if (e.target.closest('.admin-delete-btn')) {
       deleteImage(row.dataset.imageId, e.target);
+    }
+  });
+
+  unlocksPanel.addEventListener('click', async function (e) {
+    var row = e.target.closest('.admin-row');
+    if (!row) return;
+    var requestId = row.dataset.requestId;
+    if (e.target.closest('.admin-approve-unlock-btn')) {
+      var approveBtn = e.target;
+      approveBtn.disabled = true;
+      try {
+        var approveFn = window.galFirebase.httpsCallable('adminApproveStreamerUnlock');
+        await approveFn({ requestId: requestId });
+      } catch (err) {
+        alert('해금 승인 중 오류: ' + (err && err.message ? err.message : err));
+        approveBtn.disabled = false;
+      }
+    } else if (e.target.closest('.admin-reject-unlock-btn')) {
+      var rejectBtn = e.target;
+      rejectBtn.disabled = true;
+      try {
+        var rejectFn = window.galFirebase.httpsCallable('adminRejectStreamerUnlock');
+        await rejectFn({ requestId: requestId });
+      } catch (err) {
+        alert('해금 거절 중 오류: ' + (err && err.message ? err.message : err));
+        rejectBtn.disabled = false;
+      }
     }
   });
 })();

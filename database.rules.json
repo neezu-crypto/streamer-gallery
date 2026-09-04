@@ -678,6 +678,14 @@
         ".read": "auth != null && root.child('adminCenter/adminUids').child(auth.uid).exists()",
         "$reportId": { ".write": false }
       },
+      "unlockedStreamers": {
+        ".read": true,
+        "$streamerId": { ".write": false }
+      },
+      "unlockRequests": {
+        ".read": "auth != null && root.child('adminCenter/adminUids').child(auth.uid).exists()",
+        "$requestId": { ".write": false }
+      },
       "auditLog": {
         ".read": "auth != null && root.child('adminCenter/adminUids').child(auth.uid).exists()",
         "$entryId": { ".write": false }
