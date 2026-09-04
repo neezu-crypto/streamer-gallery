@@ -35,7 +35,7 @@
       var when = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR') : '';
       return (
         '<div class="admin-row" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '">' +
-          '<div class="admin-row-thumb">' + thumb + '</div>' +
+          '<div class="admin-row-thumb' + (img ? ' clickable' : '') + '" title="' + (img ? '클릭하면 풀이미지로 열어요' : '') + '">' + thumb + '</div>' +
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">' + escapeHtml((img && img.streamerName) || '(삭제된 이미지)') + ' · ' + when + '</div>' +
             '<div class="admin-row-reason">' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
@@ -161,6 +161,11 @@
   reportsPanel.addEventListener('click', async function (e) {
     var row = e.target.closest('.admin-row');
     if (!row) return;
+    if (e.target.closest('.admin-row-thumb.clickable')) {
+      var reportedImg = findImage(row.dataset.imageId);
+      if (reportedImg) window.open(reportedImg.imageUrl || reportedImg.thumbUrl, '_blank', 'noopener');
+      return;
+    }
     if (e.target.closest('.admin-dismiss-btn')) {
       var btn = e.target;
       btn.disabled = true;
