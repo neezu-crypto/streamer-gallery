@@ -117,7 +117,12 @@
 
   function subscribeUnlockRequests() {
     if (unlocksUnsub) return;
-    var reqRef = window.galFirebase.ref(window.galDb, 'gallery/unlockRequests');
+    // 승인/거절되면 바로 목록에서 빠지는 큐라 자연스럽게 작게 유지되지만,
+    // 방어적으로 최근 200건까지만 구독한다.
+    var reqRef = window.galFirebase.query(
+      window.galFirebase.ref(window.galDb, 'gallery/unlockRequests'),
+      window.galFirebase.limitToLast(200)
+    );
     unlocksUnsub = window.galFirebase.onValue(reqRef, function (snap) {
       var data = snap.val() || {};
       latestUnlockRequests = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
@@ -131,7 +136,12 @@
 
   function subscribeReports() {
     if (reportsUnsub) return;
-    var reportsRef = window.galFirebase.ref(window.galDb, 'gallery/imageReports');
+    // reportImage가 이미 유저당-이미지당 1건+전체 500건 상한을 걸어두지만,
+    // 관리자 목록 구독도 방어적으로 같은 상한을 둔다.
+    var reportsRef = window.galFirebase.query(
+      window.galFirebase.ref(window.galDb, 'gallery/imageReports'),
+      window.galFirebase.limitToLast(500)
+    );
     reportsUnsub = window.galFirebase.onValue(reportsRef, function (snap) {
       var data = snap.val() || {};
       latestReports = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })

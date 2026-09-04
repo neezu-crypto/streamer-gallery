@@ -27,6 +27,10 @@
   };
   window.galCategoryLabels = CATEGORY_LABELS;
 
+  var IMAGES_PAGE_SIZE = 60;
+  var imagesLimit = IMAGES_PAGE_SIZE;
+  var imagesUnsub = null;
+  var hasMoreImages = false;
   var allImages = [];
   var activeCategory = 'all';
   var allStreamers = [];
@@ -69,6 +73,11 @@
 
     if (!filtered.length) {
       grid.innerHTML = '<p class="empty-msg">' + (allImages.length ? '조건에 맞는 이미지가 없어요.' : '아직 업로드된 이미지가 없어요. 첫 이미지를 올려보세요!') + '</p>';
+      // 필터에 걸린 게 없어도 아직 안 불러온 더 오래된 이미지 중엔 있을 수 있으니
+      // "더 보기"는 계속 보여준다.
+      if (hasMoreImages) {
+        grid.insertAdjacentHTML('beforeend', '<button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn">더 보기</button>');
+      }
       return;
     }
 
@@ -94,14 +103,27 @@
         '</div>'
       );
     }).join('');
+
+    // 필터링과 무관하게 "더 로드된 원본이 더 있는지"만 보고 노출 여부를 정한다 —
+    // 필터 결과가 적다고 버튼을 숨기면, 아직 안 불러온 원본 중에 필터에 맞는 게
+    // 더 있어도 사용자가 "더 보기"를 누를 방법이 없어진다.
+    if (hasMoreImages) {
+      grid.insertAdjacentHTML('beforeend', '<button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn">더 보기</button>');
+    }
   }
 
   function subscribeImages() {
     if (!window.galFirebase || !window.galDb) { setTimeout(subscribeImages, 200); return; }
-    var imagesRef = window.galFirebase.ref(window.galDb, 'gallery/images');
-    window.galFirebase.onValue(imagesRef, function (snap) {
+    if (imagesUnsub) { imagesUnsub(); imagesUnsub = null; }
+    var imagesRef = window.galFirebase.query(
+      window.galFirebase.ref(window.galDb, 'gallery/images'),
+      window.galFirebase.limitToLast(imagesLimit)
+    );
+    imagesUnsub = window.galFirebase.onValue(imagesRef, function (snap) {
       var data = snap.val() || {};
-      allImages = Object.keys(data).map(function (id) {
+      var keys = Object.keys(data);
+      hasMoreImages = keys.length >= imagesLimit;
+      allImages = keys.map(function (id) {
         return Object.assign({ id: id }, data[id]);
       }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       window.galAllImages = allImages;
@@ -110,6 +132,14 @@
     }, function (err) {
       console.error('갤러리 목록 구독 실패', err);
       grid.innerHTML = '<p class="empty-msg">이미지를 불러오지 못했어요. 새로고침해 주세요.</p>';
+    });
+  }
+
+  if (grid) {
+    grid.addEventListener('click', function (e) {
+      if (!e.target.closest('#gallery-load-more-btn')) return;
+      imagesLimit += IMAGES_PAGE_SIZE;
+      subscribeImages();
     });
   }
 

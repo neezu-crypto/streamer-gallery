@@ -304,6 +304,11 @@ button{ font-family: inherit; cursor: pointer; }
 .gallery-grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;
 }
+.gallery-load-more-btn{
+  grid-column:1 / -1; justify-self:center; margin-top:8px; padding:10px 24px;
+  border:1px solid var(--hairline); border-radius:2px;
+}
+.gallery-load-more-btn:hover{ border-color:var(--gold-line); color:var(--gold-text); }
 .gallery-card{
   background:var(--panel); border:1px solid var(--hairline); border-radius:2px; overflow:hidden;
   display:flex; flex-direction:column; transition: border-color .15s, box-shadow .15s;
