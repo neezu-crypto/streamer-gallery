@@ -443,9 +443,6 @@ button{ font-family: inherit; cursor: pointer; }
   .detail-split{ flex-direction:column; max-height:none; height:100%; }
   .detail-image-wrap{ max-height:42vh; flex:0 0 42vh; }
   .detail-panel{ min-width:0; }
-  /* 댓글 영역만 따로 스크롤되지 않고 패널 전체(.detail-panel의 overflow-y:auto)가
-     한 번에 스크롤되게 — 중첩 스크롤 영역을 없앤다. */
-  .detail-comments{ max-height:none; overflow-y:visible; }
 
   /* 풀이미지 뷰어 — 데스크톱의 "클릭 시 80%->100% 확대" 2단계 대신, 모바일에선
      처음부터 화면 전체를 꽉 채우고 탭하면 바로 닫힌다(js/image-viewer.js). */
@@ -455,6 +452,12 @@ button{ font-family: inherit; cursor: pointer; }
 #detail-like-btn.active{ background: var(--gold-dim); border-color: var(--gold-line); color: var(--gold-text); }
 .detail-report-form{ margin:10px 0 6px; padding:12px; border:1px solid var(--hairline); border-radius:2px; }
 .detail-comments{ margin:14px 0; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+@media (max-width:720px){
+  /* 댓글 영역만 따로 스크롤되지 않고 패널 전체(.detail-panel의 overflow-y:auto)가
+     한 번에 스크롤되게 — 중첩 스크롤 영역을 없앤다. 위의 기본 .detail-comments
+     규칙보다 소스 순서상 뒤에 있어야 이긴다(동일 우선순위라 나중 규칙이 승리). */
+  .detail-comments{ max-height:none; overflow-y:visible; }
+}
 .detail-comment-row{ font-size:13px; color:var(--text); padding:8px 10px; background:var(--panel-raised); border-radius:2px; }
 .detail-comment-form{ display:flex; align-items:flex-end; gap:10px; }
 .detail-comment-form .propose-field{ flex:1; }
