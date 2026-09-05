@@ -99,14 +99,16 @@ button{ font-family: inherit; cursor: pointer; }
 }
 /* 폭 고정(flex:1 + max-width) 대신 내용물(아이콘+placeholder) 크기에 맞춰
    자연스럽게 좁게 — 검색창이 화면 폭에 따라 억지로 늘어나지 않게 한다. */
+/* 페이지(검색행 컨테이너) 폭에 맞춰 늘어난다 — 프로필 아바타 앞까지 남는
+   공간을 전부 채움(내용물 크기로 좁게 두지 않음). */
 .search-pill{
-  width:fit-content; display:flex; align-items:center; gap:10px;
+  flex:1; display:flex; align-items:center; gap:10px;
   background:var(--ink); border-radius:999px; padding:11px 18px; cursor:text;
   color:var(--muted);
 }
 .search-pill svg{ flex-shrink:0; }
 .search-pill input{
-  width:220px; border:none; background:transparent; outline:none; font-size:13.5px;
+  flex:1; width:100%; border:none; background:transparent; outline:none; font-size:13.5px;
   font-family:inherit; color:var(--text); padding:0;
 }
 .search-pill input::placeholder{ color:var(--muted); }
