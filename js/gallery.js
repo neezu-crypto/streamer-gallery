@@ -317,6 +317,12 @@
     }
     if (uploadStatus) uploadStatus.textContent = '';
     resetStreamerPicker();
+    // 같은 스트리머 이미지를 연속으로 올리는 경우가 많아서, 마지막으로
+    // 업로드에 성공한 스트리머를 열 때마다 미리 선택해둔다(2026-09-05 추가).
+    try {
+      var lastStreamer = JSON.parse(localStorage.getItem('galLastUploadStreamer') || 'null');
+      if (lastStreamer && lastStreamer.id && lastStreamer.name) pickStreamer(lastStreamer.name, lastStreamer.id);
+    } catch (e) {}
     uploadBackdrop.classList.add('open');
     window.galPushModal(closeUploadModal);
   }
@@ -406,6 +412,7 @@
         });
 
         uploadStatus.textContent = '✅ 업로드 완료!';
+        try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
         resetStreamerPicker();
         fileInput.value = '';
         setTimeout(closeUploadModal, 700);
