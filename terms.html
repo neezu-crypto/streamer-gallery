@@ -41,9 +41,14 @@
   .hero p{ color:var(--muted); max-width:520px; margin:0 auto; font-size:14.5px; }
 
   .layout{ max-width:1080px; margin:0 auto; padding:36px 24px 80px; display:grid; grid-template-columns:220px 1fr; gap:40px; }
-  @media (max-width:860px){ .layout{ grid-template-columns:1fr; } .toc{ position:static; order:-1; } }
 
   .toc{ position:sticky; top:70px; align-self:start; display:flex; flex-direction:column; gap:2px; }
+  /* .toc 기본 규칙(위)보다 반드시 뒤에 와야 한다 — 미디어쿼리라고 우선순위가
+     자동으로 높아지지 않고, 동일 우선순위면 소스 순서상 나중 규칙이 이긴다.
+     이 순서가 뒤바뀌어 있어서 모바일에서도 position:sticky가 계속 이겨
+     "카테고리 바"(TOC)가 스크롤 안 되고 화면에 고정돼 콘텐츠를 가리던 버그가
+     있었다(2026-09-06 실사용 확인). */
+  @media (max-width:860px){ .layout{ grid-template-columns:1fr; } .toc{ position:static; order:-1; } }
   .toc a{ font-size:13px; color:var(--muted); text-decoration:none; padding:7px 10px; border-radius:7px; }
   .toc a:hover{ color:var(--ink); background:var(--panel); }
   .toc a.num{ font-family:var(--font-mono); color:var(--gold); margin-right:6px; }
