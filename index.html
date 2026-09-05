@@ -123,29 +123,18 @@
     </div>
     <p class="propose-modal-title">🖼️ 이미지 업로드</p>
     <p class="propose-modal-sub">방송 스크린샷이나 AI 일러스트를 올려서 함께 공유해보세요.</p>
-    <div class="propose-field">
-      <input type="text" id="upload-streamer-search" placeholder=" " autocomplete="off">
-      <label for="upload-streamer-search" data-text="스트리머 이름으로 검색">스트리머 이름으로 검색</label>
-    </div>
+    <input type="text" id="upload-streamer-search" placeholder="스트리머 이름으로 검색" autocomplete="off">
     <div class="streamer-search-results" id="upload-streamer-results"></div>
     <p class="propose-modal-sub" id="upload-streamer-selected" style="display:none;"></p>
-    <div class="propose-field">
-      <select id="upload-category">
-        <option value="screenshot">스크린샷</option>
-        <option value="ai-art">AI 일러스트</option>
-        <option value="fan-art">팬아트</option>
-        <option value="meme">밈</option>
-        <option value="etc">기타</option>
-      </select>
-      <label for="upload-category" data-text="카테고리">카테고리</label>
-    </div>
-    <div class="propose-field">
-      <input type="file" id="upload-file" accept="image/*">
-      <label for="upload-file" data-text="이미지 파일">이미지 파일</label>
-    </div>
-    <button class="glitch-btn" id="upload-submit-btn" type="button" data-text="업로드하기">
-      <span class="btn-text">업로드하기</span>
-    </button>
+    <select id="upload-category">
+      <option value="screenshot">스크린샷</option>
+      <option value="ai-art">AI 일러스트</option>
+      <option value="fan-art">팬아트</option>
+      <option value="meme">밈</option>
+      <option value="etc">기타</option>
+    </select>
+    <input type="file" id="upload-file" accept="image/*">
+    <button class="glitch-btn" id="upload-submit-btn" type="button">업로드하기</button>
     <p class="propose-modal-sub" id="upload-status"></p>
   </div>
 </div>
@@ -164,13 +153,8 @@
     </div>
     <p class="propose-modal-title">🔒 스트리머 해금 신청</p>
     <p class="propose-modal-sub"><strong id="unlock-streamer-name"></strong>님은 아직 이미지 업로드/상세보기가 잠겨있어요. 별풍선 <strong id="unlock-balloon-cost">100</strong>개 후원 후 신청하면, 관리자가 확인하고 해금해드려요. 한 번 해금되면 이후 누구나 이 스트리머 이미지를 올리고 볼 수 있어요.</p>
-    <div class="propose-field">
-      <input type="text" id="unlock-nickname" maxlength="20" placeholder=" ">
-      <label for="unlock-nickname" data-text="후원할 때 쓸 닉네임">후원할 때 쓸 닉네임</label>
-    </div>
-    <button class="glitch-btn" id="unlock-submit-btn" type="button" data-text="해금 신청하기">
-      <span class="btn-text">해금 신청하기</span>
-    </button>
+    <input type="text" id="unlock-nickname" maxlength="20" placeholder="후원할 때 쓸 닉네임">
+    <button class="glitch-btn" id="unlock-submit-btn" type="button">해금 신청하기</button>
     <p class="propose-modal-sub" id="unlock-status"></p>
     <button class="text-link" id="unlock-cancel-btn" type="button" style="display:none;">신청 취소</button>
   </div>
@@ -261,10 +245,8 @@
   <div class="propose-modal" style="max-width:380px;text-align:center;">
     <p class="propose-modal-sub" id="app-confirm-message" style="white-space:pre-line;margin:0 0 20px;"></p>
     <div style="display:flex;gap:8px;">
-      <button class="text-link" id="app-confirm-no-btn" type="button" style="flex:1;border:1px solid var(--hairline);border-radius:2px;padding:10px;">취소</button>
-      <button class="glitch-btn" id="app-confirm-yes-btn" type="button" data-text="확인" style="flex:1;margin-top:0;">
-        <span class="btn-text">확인</span>
-      </button>
+      <button class="text-link" id="app-confirm-no-btn" type="button" style="flex:1;">취소</button>
+      <button class="glitch-btn" id="app-confirm-yes-btn" type="button" style="flex:1;margin-top:0;">확인</button>
     </div>
   </div>
 </div>
@@ -287,18 +269,10 @@
       </div>
       <p class="profile-preview-caption">SOOP 아이디를 입력하면<br>프로필 이미지가 자동 설정돼요</p>
     </div>
-    <div class="propose-field">
-      <input type="text" id="profile-nickname" maxlength="12" placeholder=" ">
-      <label for="profile-nickname" data-text="닉네임(선택)">닉네임(선택)</label>
-    </div>
-    <div class="propose-field">
-      <input type="text" id="profile-soopid" maxlength="20" pattern="[a-z0-9]{2,20}" autocomplete="off" placeholder=" ">
-      <label for="profile-soopid" data-text="SOOP 아이디(선택)">SOOP 아이디(선택)</label>
-    </div>
+    <input type="text" id="profile-nickname" maxlength="12" placeholder="닉네임(선택)">
+    <input type="text" id="profile-soopid" maxlength="20" pattern="[a-z0-9]{2,20}" autocomplete="off" placeholder="SOOP 아이디(선택)">
     <p class="profile-error" id="profile-error"></p>
-    <button class="glitch-btn" id="profile-save-btn" type="button" data-text="저장">
-      <span class="btn-text">저장</span>
-    </button>
+    <button class="glitch-btn" id="profile-save-btn" type="button">저장</button>
     <p class="profile-status" id="profile-status"></p>
   </div>
 </div>
@@ -337,23 +311,13 @@
     <p class="propose-modal-title">🎙️ 스트리머 인증</p>
     <p class="propose-modal-sub">방송 닉네임과 SOOP 아이디를 입력해 신청하면 관리자에게 즉시 전달돼요. 인증되면 로그인 없이도 실계정처럼 업로드하고 좋아요·댓글을 남길 수 있어요.</p>
     <div id="verify-form">
-      <div class="propose-field">
-        <input type="text" id="verify-nickname" maxlength="20" placeholder=" ">
-        <label for="verify-nickname" data-text="방송 닉네임">방송 닉네임</label>
-      </div>
-      <div class="propose-field">
-        <input type="text" id="verify-soopid" maxlength="20" placeholder=" ">
-        <label for="verify-soopid" data-text="SOOP 아이디">SOOP 아이디</label>
-      </div>
-      <button class="glitch-btn" id="verify-submit-btn" type="button" data-text="신청하기">
-        <span class="btn-text">신청하기</span>
-      </button>
+      <input type="text" id="verify-nickname" maxlength="20" placeholder="방송 닉네임">
+      <input type="text" id="verify-soopid" maxlength="20" placeholder="SOOP 아이디">
+      <button class="glitch-btn" id="verify-submit-btn" type="button">신청하기</button>
     </div>
     <div id="verify-pending" style="display:none;">
       <p class="propose-modal-sub" id="verify-pending-text"></p>
-      <button class="glitch-btn" id="verify-check-btn" type="button" data-text="🔄 승인됐는지 확인하기">
-        <span class="btn-text">🔄 승인됐는지 확인하기</span>
-      </button>
+      <button class="glitch-btn" id="verify-check-btn" type="button">🔄 승인됐는지 확인하기</button>
     </div>
   </div>
 </div>
