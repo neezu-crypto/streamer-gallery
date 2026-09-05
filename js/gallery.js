@@ -103,6 +103,9 @@
     // 핀터레스트식 매소너리 — 평소엔 이미지만, 마우스를 올리면 좋아요 수가
     // 어두운 그라데이션과 함께 드러난다(호버 리빌). 스트리머명/카테고리는 여전히
     // 클릭해서 상세보기로만 확인 — 그리드에 상시 노출하지 않는다.
+    // "최근에 확인함" 배지(2026-09-05 추가)는 호버와 무관하게 상시 노출 — 스크롤
+    // 하다가 바로 눈에 띄어야 하는 용도라서. localStorage에 마지막 1개만 기록.
+    var lastViewedId = localStorage.getItem('galLastViewedImageId');
     grid.innerHTML = filtered.map(function (img) {
       var locked = !isStreamerUnlocked(img.streamerId);
       var ratio = (img.width && img.height) ? (img.width / img.height) : '';
@@ -110,6 +113,7 @@
         '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
           (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
           (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
+          (img.id === lastViewedId ? '<span class="gallery-recent-badge">최근에 확인함</span>' : '') +
           '<span class="gallery-card-hover-likes">♥ ' + (img.likeCount || 0) + '</span>' +
         '</div>'
       );

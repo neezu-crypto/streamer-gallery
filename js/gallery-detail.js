@@ -68,8 +68,11 @@
     });
   }
 
+  // "최근에 확인함" 표시(2026-09-05 추가) — 계정 동기화가 필요 없는 브라우저 로컬
+  // UX 힌트라 RTDB가 아니라 localStorage에 마지막 1개만 기록한다.
   function openModal(img) {
     currentImageId = img.id;
+    localStorage.setItem('galLastViewedImageId', img.id);
     imageEl.src = img.imageUrl || img.thumbUrl || '';
     streamerEl.textContent = img.streamerName || '익명';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';

@@ -370,6 +370,11 @@ button{ font-family: inherit; cursor: pointer; }
   background:rgba(0,0,0,0.6); color:#fff; border-radius:50%;
   width:26px; height:26px; display:flex; align-items:center; justify-content:center; pointer-events:none;
 }
+/* "최근에 확인함" — 잠금 배지와 반대쪽(우상단)에, 호버와 무관하게 상시 노출 */
+.gallery-recent-badge{
+  position:absolute; top:10px; right:10px; font-size:10px; font-weight:800;
+  background:var(--gold); color:#fff; border-radius:999px; padding:4px 9px; pointer-events:none;
+}
 /* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
    모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */
 .gallery-card-streamer{ font-size:13px; font-weight:700; color:var(--text); }
