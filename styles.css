@@ -46,6 +46,8 @@
 
 *{ box-sizing: border-box; }
 html, body{ margin:0; padding:0; overflow-x:hidden; }
+/* 모달이 하나라도 열려있는 동안(js/modal-stack.js) 배경 페이지 스크롤 잠금 */
+html.gal-modal-open, html.gal-modal-open body{ overflow:hidden; }
 body{
   background: var(--ink);
   color: var(--text);

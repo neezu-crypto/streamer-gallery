@@ -5,15 +5,26 @@
 // 그 방식은 새 모달이 추가될 때마다 기존 모달들이 그 존재를 알아야 하는 문제가
 // 있었다 — 이제 각 모달은 열 때 galPushModal(자기 close 함수), 닫을 때
 // galPopModal(같은 함수)만 호출하면 되고, 서로의 존재를 몰라도 된다.
+//
+// 배경 스크롤 잠금(2026-09-05 추가) — 모달이 하나라도 열려있는 동안(스택이
+// 비어있지 않은 동안) html에 클래스를 붙여 메인 페이지 스크롤을 막는다.
+// 특정 모달 하나만 처리하지 않고 이 공용 스택에 붙여서, 상세보기든 업로드든
+// 관리자 패널이든 로그인이든 전부 동일하게 적용된다.
 (function () {
   var stack = [];
 
+  function syncScrollLock() {
+    document.documentElement.classList.toggle('gal-modal-open', stack.length > 0);
+  }
+
   window.galPushModal = function (closeFn) {
     stack.push(closeFn);
+    syncScrollLock();
   };
   window.galPopModal = function (closeFn) {
     var idx = stack.lastIndexOf(closeFn);
     if (idx !== -1) stack.splice(idx, 1);
+    syncScrollLock();
   };
 
   document.addEventListener('keydown', function (e) {
