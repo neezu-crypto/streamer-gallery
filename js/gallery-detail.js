@@ -123,7 +123,20 @@
     // 테스트로 발견) 직접 다시 그리게 호출 — 상세 패널을 닫았을 때 이미 배지가
     // 옮겨져 있어야 하니 여는 시점에 바로 반영해둔다.
     window.galRenderGrid && window.galRenderGrid();
-    imageEl.src = img.imageUrl || img.thumbUrl || '';
+    // 원본(img.imageUrl)을 바로 <img>에 넣으면, 브라우저가 그 원본을 다 받아오기
+    // 전까지 <img>는 직전에 보고 있던 이전 이미지를 그대로 띄워둔다(새 src를
+    // 설정해도 로드 완료 전엔 화면이 안 바뀜) — 그래서 방금 클릭한 이미지가 아니라
+    // 이전에 보던 이미지가 열린 것처럼 보이는 버그가 있었다(2026-09-06 실사용
+    // 확인). 그리드에서 이미 로드돼 캐시돼있는 썸네일을 먼저 즉시 보여주고, 원본은
+    // 백그라운드에서 불러와 로드가 끝나면 그때 교체한다.
+    imageEl.src = img.thumbUrl || img.imageUrl || '';
+    if (img.imageUrl && img.imageUrl !== img.thumbUrl) {
+      var fullImg = new Image();
+      fullImg.onload = function () {
+        if (currentImageId === img.id) imageEl.src = img.imageUrl;
+      };
+      fullImg.src = img.imageUrl;
+    }
     streamerEl.textContent = img.streamerName || '익명';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
