@@ -199,7 +199,11 @@
 
   window.galPatchImageLikeCount = function (imageId, likeCount) {
     var img = allImages.find(function (i) { return i.id === imageId; });
-    if (img) img.likeCount = likeCount;
+    if (!img) return;
+    img.likeCount = likeCount;
+    // 데이터만 바꾸고 끝내면 그리드 DOM은 다음 전체 재렌더링 전까지 그대로라 카드에
+    // 호버해도 예전 숫자가 보인다(2026-09-06 실사용 테스트로 발견) — 바로 다시 그린다.
+    renderGrid();
   };
 
   function subscribeImages() {
