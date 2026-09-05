@@ -140,49 +140,51 @@
   </div>
 </div>
 
+<!-- 핀터레스트식 상세보기(2026-09-05 개편) — 좌 큰 이미지 / 우 화이트 패널로
+     재구성. 나머지 propose-modal 계열(업로드/해금/관리자)은 터미널 헤더를
+     그대로 유지하지만, 이 모달만 별도 플로팅 닫기 버튼으로 대체한다. -->
 <div class="propose-backdrop" id="detail-backdrop">
   <div class="propose-modal detail-modal">
-    <div class="terminal-header">
-      <span class="terminal-title">IMAGE_DETAIL</span>
-      <div class="terminal-dots">
-        <button class="propose-modal-close" id="detail-modal-close" type="button" aria-label="닫기">✕</button>
+    <button class="detail-close-float" id="detail-modal-close" type="button" aria-label="닫기">✕</button>
+    <div class="detail-split">
+      <div class="detail-image-wrap">
+        <img id="detail-image" alt="">
       </div>
-    </div>
-    <div class="detail-image-wrap">
-      <img id="detail-image" alt="">
-    </div>
-    <div class="detail-meta-row">
-      <span class="gallery-card-streamer" id="detail-streamer"></span>
-      <span class="gallery-badge" id="detail-category"></span>
-    </div>
-    <div class="detail-actions-row">
-      <button class="chip" id="detail-like-btn" type="button">♥ <span id="detail-like-count">0</span></button>
-      <div style="display:flex;gap:10px;">
-        <button class="text-link" id="detail-delete-btn" type="button" style="display:none;">내 이미지 삭제</button>
-        <button class="text-link" id="detail-report-btn" type="button">신고하기</button>
+      <div class="detail-panel">
+        <div class="detail-actions-row">
+          <button class="chip" id="detail-like-btn" type="button">♥ <span id="detail-like-count">0</span></button>
+          <div style="display:flex;gap:10px;">
+            <button class="text-link" id="detail-delete-btn" type="button" style="display:none;">내 이미지 삭제</button>
+            <button class="text-link" id="detail-report-btn" type="button">신고하기</button>
+          </div>
+        </div>
+        <div class="detail-meta-row">
+          <span class="gallery-card-streamer" id="detail-streamer"></span>
+          <span class="gallery-badge" id="detail-category"></span>
+        </div>
+        <div class="detail-report-form" id="detail-report-form" style="display:none;">
+          <div class="propose-field" style="margin-bottom:0.8rem;">
+            <input type="text" id="detail-report-reason" maxlength="300" placeholder=" ">
+            <label for="detail-report-reason" data-text="신고 사유(선택)">신고 사유(선택)</label>
+          </div>
+          <button class="glitch-btn" id="detail-report-submit" type="button" data-text="신고 제출">
+            <span class="btn-text">신고 제출</span>
+          </button>
+          <p class="propose-modal-sub" id="detail-report-status"></p>
+        </div>
+        <div class="detail-comments" id="detail-comments">
+          <p class="empty-msg">댓글을 불러오는 중...</p>
+        </div>
+        <div class="detail-comment-form">
+          <div class="propose-field" style="margin-bottom:0;">
+            <input type="text" id="detail-comment-input" maxlength="300" placeholder=" ">
+            <label for="detail-comment-input" data-text="댓글 남기기">댓글 남기기</label>
+          </div>
+          <button class="glitch-btn" id="detail-comment-submit" type="button" data-text="등록">
+            <span class="btn-text">등록</span>
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="detail-report-form" id="detail-report-form" style="display:none;">
-      <div class="propose-field" style="margin-bottom:0.8rem;">
-        <input type="text" id="detail-report-reason" maxlength="300" placeholder=" ">
-        <label for="detail-report-reason" data-text="신고 사유(선택)">신고 사유(선택)</label>
-      </div>
-      <button class="glitch-btn" id="detail-report-submit" type="button" data-text="신고 제출">
-        <span class="btn-text">신고 제출</span>
-      </button>
-      <p class="propose-modal-sub" id="detail-report-status"></p>
-    </div>
-    <div class="detail-comments" id="detail-comments">
-      <p class="empty-msg">댓글을 불러오는 중...</p>
-    </div>
-    <div class="detail-comment-form">
-      <div class="propose-field" style="margin-bottom:0;">
-        <input type="text" id="detail-comment-input" maxlength="300" placeholder=" ">
-        <label for="detail-comment-input" data-text="댓글 남기기">댓글 남기기</label>
-      </div>
-      <button class="glitch-btn" id="detail-comment-submit" type="button" data-text="등록">
-        <span class="btn-text">등록</span>
-      </button>
     </div>
   </div>
 </div>

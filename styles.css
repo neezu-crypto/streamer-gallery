@@ -382,12 +382,29 @@ button{ font-family: inherit; cursor: pointer; }
 .btn-admin:hover, .btn-admin:focus-visible{ background-color: var(--mint); color:#1a0f00; box-shadow: 0 0 25px rgba(47,111,237,0.45); }
 .btn-admin::before, .btn-admin::after{ background-color: var(--mint); }
 
-/* ---------- 이미지 상세 모달(좋아요/댓글/신고) ---------- */
-.detail-modal{ max-width:520px; max-height:88vh; overflow-y:auto; }
-.detail-image-wrap{ width:100%; border-radius:2px; overflow:hidden; background:var(--panel-raised); margin-bottom:14px; }
-.detail-image-wrap img{ width:100%; max-height:50vh; object-fit:contain; display:block; cursor:zoom-in; }
+/* ---------- 이미지 상세 모달(좋아요/댓글/신고) — 좌 이미지/우 패널 ---------- */
+.detail-modal{ max-width:920px; max-height:88vh; padding:0; overflow:hidden; position:relative; }
+.detail-close-float{
+  position:absolute; top:14px; right:14px; z-index:2;
+  width:32px; height:32px; border-radius:50%; border:none;
+  background:rgba(0,0,0,0.55); color:#fff; font-size:13px;
+  display:flex; align-items:center; justify-content:center;
+}
+.detail-close-float:hover{ background:rgba(0,0,0,0.75); }
+.detail-split{ display:flex; max-height:88vh; }
+.detail-image-wrap{
+  flex:1 1 55%; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.detail-image-wrap img{ width:100%; height:100%; max-height:88vh; object-fit:contain; display:block; cursor:zoom-in; }
+.detail-panel{ flex:1 1 45%; min-width:300px; padding:24px; overflow-y:auto; display:flex; flex-direction:column; }
 .detail-meta-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px; }
 .detail-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+@media (max-width:720px){
+  .detail-modal{ max-width:100%; }
+  .detail-split{ flex-direction:column; max-height:none; }
+  .detail-image-wrap{ max-height:50vh; }
+  .detail-panel{ min-width:0; }
+}
 #detail-like-btn{ display:flex; align-items:center; gap:6px; }
 #detail-like-btn.active{ background: var(--gold-dim); border-color: var(--gold-line); color: var(--gold-text); }
 .detail-report-form{ margin:10px 0 6px; padding:12px; border:1px solid var(--hairline); border-radius:2px; }
