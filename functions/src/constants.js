@@ -13,6 +13,13 @@ const REPORT_REASON_MAX_LENGTH = 300; // 신고 사유는 댓글보다 여유 �
 const COMMENT_COOLDOWN_MS = 8000; // 연속 댓글 도배 방지 — 계정당 8초에 한 번만 작성 가능
 const IMAGE_REPORTS_CAP = 500; // 신고는 유저당-이미지당 1회로 이미 막혀있지만, 방어적으로 상한도 둔다
 
+// 매크로(자동화 스크립트) 방지 쿨다운(2026-09-06 추가, lib/rate-limit.js assertCooldown과
+// 짝) — 좋아요는 정상적인 연속 클릭 UX를 막지 않을 정도로 짧게, 업로드는 이미지 하나씩
+// 순차 업로드하는 정상 흐름엔 안 걸릴 정도로 넉넉하게 잡는다.
+const LIKE_COOLDOWN_MS = 1500;
+const REPORT_COOLDOWN_MS = 5000;
+const UPLOAD_COOLDOWN_MS = 15000;
+
 // 댓글 내 링크 금지(2026-09-05 추가) — http(s)://, www., 흔한 TLD로 끝나는
 // 문자열을 스팸/피싱 링크로 간주해 차단한다. 완벽하진 않지만(축약 URL 등은
 // 못 거를 수 있음) 무작위 도배 링크의 절대다수는 이 패턴에 걸린다.
@@ -44,6 +51,9 @@ module.exports = {
   LINK_RE,
   COMMENT_COOLDOWN_MS,
   IMAGE_REPORTS_CAP,
+  LIKE_COOLDOWN_MS,
+  REPORT_COOLDOWN_MS,
+  UPLOAD_COOLDOWN_MS,
   CATEGORIES,
   PROFILE_NICKNAME_MAX_LENGTH,
   SOOP_ID_RE,

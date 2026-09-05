@@ -5,7 +5,8 @@ const { randomUUID } = require('crypto');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
-const { FORBIDDEN_TEXT_RE, CATEGORIES } = require('./constants');
+const { assertCooldown } = require('./lib/rate-limit');
+const { FORBIDDEN_TEXT_RE, CATEGORIES, UPLOAD_COOLDOWN_MS } = require('./constants');
 
 // R2 크리덴셜은 Firebase Secret Manager로만 주입한다 — 소스에 절대 하드코딩하지 않는다.
 // `firebase functions:secrets:set R2_ACCESS_KEY_ID --project soop-stock-market` /
@@ -82,6 +83,9 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
 const registerImage = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
+  // 매크로/스크립트로 이미지를 연속 대량 업로드하는 것을 막는다 — 이미지 하나씩
+  // 순차로 올리는 정상 사용 흐름엔 걸리지 않을 정도로 넉넉하게 잡았다.
+  await assertCooldown(uid, 'upload', UPLOAD_COOLDOWN_MS);
 
   const { imageId, key, thumbKey, streamerId, streamerName, category, width, height } = request.data || {};
   if (!imageId || !key || typeof key !== 'string' || !key.startsWith(`images/${imageId}.`)) {

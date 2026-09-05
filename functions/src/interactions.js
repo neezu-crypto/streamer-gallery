@@ -2,7 +2,8 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { trimToLast } = require('./lib/capped-log');
-const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP } = require('./constants');
+const { assertCooldown } = require('./lib/rate-limit');
+const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP, LIKE_COOLDOWN_MS, REPORT_COOLDOWN_MS } = require('./constants');
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
@@ -15,6 +16,7 @@ const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH
 const toggleLike = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
+  await assertCooldown(uid, 'like', LIKE_COOLDOWN_MS);
   const { imageId } = request.data || {};
   if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
 
@@ -49,25 +51,15 @@ const postComment = onCall(async (request) => {
   if (FORBIDDEN_TEXT_RE.test(trimmed)) throw new HttpsError('invalid-argument', '허용되지 않는 문자가 포함되어 있습니다.');
   if (LINK_RE.test(trimmed)) throw new HttpsError('invalid-argument', '댓글에 링크는 포함할 수 없어요.');
 
-  const db = getDatabase();
-  // 연속 도배 방지 — 마지막 댓글 작성 시각을 계정별로 기록해두고 쿨다운 내 재작성을 막는다.
-  // 클라이언트가 노출할 필요 없는 서버 내부 상태라 RTDB 규칙에 별도 노드를 두지 않았다
-  // (Admin SDK는 규칙을 우회하므로 기본 deny로도 클라이언트 접근은 이미 막혀있다).
-  const lastCommentRef = db.ref(`gallery/userLastCommentAt/${uid}`);
-  const lastCommentAt = (await lastCommentRef.get()).val() || 0;
-  const now = Date.now();
-  if (now - lastCommentAt < COMMENT_COOLDOWN_MS) {
-    const waitSec = Math.ceil((COMMENT_COOLDOWN_MS - (now - lastCommentAt)) / 1000);
-    throw new HttpsError('resource-exhausted', `댓글은 ${waitSec}초 후에 다시 작성할 수 있어요.`);
-  }
+  await assertCooldown(uid, 'comment', COMMENT_COOLDOWN_MS);
 
+  const db = getDatabase();
   const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
 
   const commentRef = db.ref(`gallery/comments/${imageId}`).push();
-  await commentRef.set({ uid, text: trimmed, createdAt: now });
+  await commentRef.set({ uid, text: trimmed, createdAt: Date.now() });
   await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
-  await lastCommentRef.set(now);
 
   return { commentId: commentRef.key };
 });
@@ -75,6 +67,9 @@ const postComment = onCall(async (request) => {
 const reportImage = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
+  // 이미지당 1회 중복 신고는 아래 dedupRef로 이미 막혀있지만, 짧은 시간에 여러
+  // 이미지를 잇달아 신고하는 매크로/도배는 별도 쿨다운으로 막는다.
+  await assertCooldown(uid, 'report', REPORT_COOLDOWN_MS);
   const { imageId, reason } = request.data || {};
   if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
   const trimmedReason = (reason || '').trim().slice(0, REPORT_REASON_MAX_LENGTH);
