@@ -258,7 +258,7 @@ button{ font-family: inherit; cursor: pointer; }
 .propose-backdrop{
   position: fixed; inset:0; z-index: 500;
   background: rgba(2,2,1,0.82);
-  display:none; align-items:center; justify-content:center; padding:20px;
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px;
   overflow-y:auto;
 }
 .propose-backdrop.open{ display:flex; }
@@ -549,9 +549,13 @@ button{ font-family: inherit; cursor: pointer; }
 
 /* ---------- 모달 바깥 도움말 텍스트(2026-09-05 추가) — 상세 패널/풀이미지
    뷰어 하단 바깥쪽에 키보드·마우스 조작법을 안내. 데스크톱 전용 인터랙션
-   (ESC/휠/드래그)이라 터치 전용인 모바일 레이아웃에서는 숨긴다. ---------- */
+   (ESC/휠/드래그)이라 터치 전용인 모바일 레이아웃에서는 숨긴다.
+   position:absolute+bottom 고정이었을 때는 뷰포트 높이에 따라 카드 하단
+   (댓글 입력창 등)과 겹치는 버그가 있었다(2026-09-06 실사용 확인) — .propose-
+   backdrop을 column flex로 바꾸고 카드 "다음 형제"로 정상 흐름 배치해서
+   겹칠 수 없게 한다. 모바일은 카드가 풀스크린이라 겹칠 배경이 없으므로
+   원래대로 오버레이(절대 위치)를 유지. ---------- */
 .modal-hint{
-  position:absolute; left:50%; bottom:22px; transform:translateX(-50%);
   color:rgba(255,255,255,0.75); font-size:12px; font-weight:600; letter-spacing:0.02em;
   white-space:nowrap; pointer-events:none; text-shadow:0 1px 4px rgba(0,0,0,0.5);
 }
@@ -559,9 +563,11 @@ button{ font-family: inherit; cursor: pointer; }
   .modal-hint{ display:none; }
   /* 모바일 전용 힌트(2026-09-06 추가) — 상세 패널이 풀스크린이라 하단이 밝은
      .detail-panel(웜 크림) 배경일 수 있어서, 데스크톱 힌트처럼 흰 글자만
-     얹으면 안 보인다. 대신 어두운 알약 배지로 어떤 배경 위에서도 읽히게 한다. */
+     얹으면 안 보인다. 대신 어두운 알약 배지로 어떤 배경 위에서도 읽히게 한다.
+     카드가 배경을 꽉 채우므로 정상 흐름이 아니라 절대 위치 오버레이로 띄운다. */
   .modal-hint-mobile{
-    display:block; bottom:14px; color:#fff; background:rgba(23,20,18,0.88);
+    display:block; position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+    color:#fff; background:rgba(23,20,18,0.88);
     padding:7px 14px; border-radius:999px; font-size:11px;
   }
 }
