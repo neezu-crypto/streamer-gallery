@@ -31,6 +31,7 @@
 
   function closeModal() {
     backdrop.classList.remove('open');
+    window.galPopModal(closeModal);
     if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
     currentImageId = null;
   }
@@ -84,6 +85,7 @@
     commentInput.value = '';
     commentsWrap.innerHTML = '<p class="empty-msg">댓글을 불러오는 중...</p>';
     backdrop.classList.add('open');
+    window.galPushModal(closeModal);
     refreshLikedState(img.id);
     subscribeComments(img.id);
   }
@@ -109,11 +111,6 @@
 
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape' || !backdrop.classList.contains('open')) return;
-    if (window.galIsImageViewOpen && window.galIsImageViewOpen()) return;
-    closeModal();
-  });
 
   likeBtn.addEventListener('click', async function () {
     if (!currentImageId) return;

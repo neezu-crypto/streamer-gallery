@@ -180,20 +180,18 @@
     if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
   });
 
+  function closeAdminPanel() { backdrop.classList.remove('open'); window.galPopModal(closeAdminPanel); }
+
   adminBtn.addEventListener('click', function () {
     backdrop.classList.add('open');
+    window.galPushModal(closeAdminPanel);
     renderReports();
     renderImages();
     renderUnlocks();
     renderBans();
   });
-  closeBtn.addEventListener('click', function () { backdrop.classList.remove('open'); });
-  backdrop.addEventListener('click', function (e) { if (e.target === backdrop) backdrop.classList.remove('open'); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape' || !backdrop.classList.contains('open')) return;
-    if (window.galIsImageViewOpen && window.galIsImageViewOpen()) return;
-    backdrop.classList.remove('open');
-  });
+  closeBtn.addEventListener('click', closeAdminPanel);
+  backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeAdminPanel(); });
 
   tabsWrap.addEventListener('click', function (e) {
     var btn = e.target.closest('.chip');

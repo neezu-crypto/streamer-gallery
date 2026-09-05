@@ -33,14 +33,14 @@
     submitBtn.disabled = false;
     cancelBtn.style.display = 'none';
     backdrop.classList.add('open');
+    window.galPushModal(closeModal);
   }
-  function closeModal() { backdrop.classList.remove('open'); }
+  function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
   window.galOpenUnlockModal = openModal;
   window.galCloseUnlockModal = closeModal;
 
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal(); });
 
   submitBtn.addEventListener('click', async function () {
     if (!currentStreamerId) return;

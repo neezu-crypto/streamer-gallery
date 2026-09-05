@@ -81,17 +81,15 @@
     statusEl.classList.remove('show');
     saveBtn.disabled = false;
     backdrop.classList.add('open');
+    window.galPushModal(closeModal);
     nicknameInput.focus();
   }
-  function closeModal() { backdrop.classList.remove('open'); }
+  function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
   window.galOpenProfileModal = openModal;
 
   openBtn.addEventListener('click', openModal);
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
-  });
 
   soopIdInput.addEventListener('input', function () {
     var id = soopIdInput.value.trim();

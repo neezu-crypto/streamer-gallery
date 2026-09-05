@@ -11,10 +11,12 @@
     img.classList.remove('zoomed');
     img.src = url;
     backdrop.classList.add('open');
+    window.galPushModal(close);
   }
   function close() {
     backdrop.classList.remove('open');
     img.src = '';
+    window.galPopModal(close);
   }
   window.galOpenImageView = open;
   window.galCloseImageView = close;
@@ -23,5 +25,4 @@
   img.addEventListener('click', function () { img.classList.toggle('zoomed'); });
   closeBtn.addEventListener('click', close);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && backdrop.classList.contains('open')) close(); });
 })();

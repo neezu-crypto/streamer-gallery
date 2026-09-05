@@ -8,9 +8,15 @@ const AUDIT_LOG_CAP = 200; // "최근 처리 내역" — 이 개수를 넘는 �
 // 서버에서부터 차단(자매 저장소들과 동일 정규식).
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
 
-const COMMENT_MAX_LENGTH = 300;
+const COMMENT_MAX_LENGTH = 150; // 댓글 전용(2026-09-05 300->150로 축소)
+const REPORT_REASON_MAX_LENGTH = 300; // 신고 사유는 댓글보다 여유 있게 유지
 const COMMENT_COOLDOWN_MS = 8000; // 연속 댓글 도배 방지 — 계정당 8초에 한 번만 작성 가능
 const IMAGE_REPORTS_CAP = 500; // 신고는 유저당-이미지당 1회로 이미 막혀있지만, 방어적으로 상한도 둔다
+
+// 댓글 내 링크 금지(2026-09-05 추가) — http(s)://, www., 흔한 TLD로 끝나는
+// 문자열을 스팸/피싱 링크로 간주해 차단한다. 완벽하진 않지만(축약 URL 등은
+// 못 거를 수 있음) 무작위 도배 링크의 절대다수는 이 패턴에 걸린다.
+const LINK_RE = /(https?:\/\/|www\.|\.(com|net|org|co\.kr|kr|io|me|ly|gg|tv|xyz|shop|app)\b)/i;
 
 // 프로필(업로드/좋아요/댓글과 무관한 계정 단위 닉네임/SOOP 아이디) — 둘 다 선택 입력.
 // SOOP_ID_RE는 자매 저장소들과 동일 규칙(영문 소문자/숫자 2~20자)이라야 avatarUrlFor
@@ -34,6 +40,8 @@ module.exports = {
   AUDIT_LOG_CAP,
   FORBIDDEN_TEXT_RE,
   COMMENT_MAX_LENGTH,
+  REPORT_REASON_MAX_LENGTH,
+  LINK_RE,
   COMMENT_COOLDOWN_MS,
   IMAGE_REPORTS_CAP,
   CATEGORIES,

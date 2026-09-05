@@ -21,8 +21,9 @@
     nicknameInput.value = '';
     soopIdInput.value = '';
     backdrop.classList.add('open');
+    window.galPushModal(closeModal);
   }
-  function closeModal() { backdrop.classList.remove('open'); }
+  function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
   window.galOpenVerifyModal = openModal;
 
   document.addEventListener('click', function (e) {
@@ -33,9 +34,6 @@
   });
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
-  });
 
   function showPending(nickname, isSwitch) {
     form.style.display = 'none';

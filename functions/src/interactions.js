@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { trimToLast } = require('./lib/capped-log');
-const { FORBIDDEN_TEXT_RE, COMMENT_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP } = require('./constants');
+const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP } = require('./constants');
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
@@ -46,6 +46,7 @@ const postComment = onCall(async (request) => {
   if (!trimmed) throw new HttpsError('invalid-argument', '댓글 내용을 입력해 주세요.');
   if (trimmed.length > COMMENT_MAX_LENGTH) throw new HttpsError('invalid-argument', `댓글은 ${COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`);
   if (FORBIDDEN_TEXT_RE.test(trimmed)) throw new HttpsError('invalid-argument', '허용되지 않는 문자가 포함되어 있습니다.');
+  if (LINK_RE.test(trimmed)) throw new HttpsError('invalid-argument', '댓글에 링크는 포함할 수 없어요.');
 
   const db = getDatabase();
   // 연속 도배 방지 — 마지막 댓글 작성 시각을 계정별로 기록해두고 쿨다운 내 재작성을 막는다.
@@ -75,7 +76,7 @@ const reportImage = onCall(async (request) => {
   await assertNotBanned(uid);
   const { imageId, reason } = request.data || {};
   if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
-  const trimmedReason = (reason || '').trim().slice(0, COMMENT_MAX_LENGTH);
+  const trimmedReason = (reason || '').trim().slice(0, REPORT_REASON_MAX_LENGTH);
   if (FORBIDDEN_TEXT_RE.test(trimmedReason)) throw new HttpsError('invalid-argument', '허용되지 않는 문자가 포함되어 있습니다.');
 
   const db = getDatabase();

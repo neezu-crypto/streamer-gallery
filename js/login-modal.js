@@ -4,17 +4,14 @@
   var googleBtn = document.getElementById('login-google-btn');
   if (!backdrop) return;
 
-  function openModal() { backdrop.classList.add('open'); }
-  function closeModal() { backdrop.classList.remove('open'); }
+  function openModal() { backdrop.classList.add('open'); window.galPushModal(closeModal); }
+  function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
 
   window.galOpenLoginModal = openModal;
   window.galCloseLoginModal = closeModal;
 
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
-  });
 
   googleBtn.addEventListener('click', function () {
     window.galSignIn && window.galSignIn();

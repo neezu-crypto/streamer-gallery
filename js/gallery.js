@@ -268,15 +268,15 @@
     if (uploadStatus) uploadStatus.textContent = '';
     resetStreamerPicker();
     uploadBackdrop.classList.add('open');
+    window.galPushModal(closeUploadModal);
   }
-  function closeUploadModal() { uploadBackdrop.classList.remove('open'); }
+  function closeUploadModal() { uploadBackdrop.classList.remove('open'); window.galPopModal(closeUploadModal); }
   window.galCloseUploadModal = closeUploadModal;
 
   if (uploadOpenBtn) uploadOpenBtn.addEventListener('click', openUploadModal);
   if (uploadCloseBtn) uploadCloseBtn.addEventListener('click', closeUploadModal);
   if (uploadBackdrop) {
     uploadBackdrop.addEventListener('click', function (e) { if (e.target === uploadBackdrop) closeUploadModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && uploadBackdrop.classList.contains('open')) closeUploadModal(); });
   }
   var ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
   var MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
