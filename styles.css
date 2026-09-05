@@ -26,6 +26,12 @@
   --muted: #6e6e6e;
   --muted-2: #9a9a9a;
 
+  /* 상세보기 패널 전용 네오브루탈리즘 토큰(2026-09-05) — 좋아요/삭제/신고/
+     댓글입력/등록 버튼에만 쓴다. --ink(페이지 배경)와 헷갈리지 않게 --nb- 접두사. */
+  --nb-bg: #fcf7ec;      /* 패널 배경(순백 대신 웜 크림) */
+  --nb-border: #171412;  /* 테두리+하드 섀도우 전용 잉크색 */
+  --nb-muted: #f4eedf;   /* 신고 버튼 등 중립 표면 */
+
   /* 한글이 섞인 텍스트에는 Fira Code를 앞에 두면 안 됨(자매 저장소에서 실측
      확인된 문제 — 한글 글리프가 없어 폴백되면서 자간이 벌어져 보임). 한글이
      나오는 곳(--font-display/--font-body)은 항상 한글 폰트가 최우선이고,
@@ -431,7 +437,7 @@ button{ font-family: inherit; cursor: pointer; }
   flex:1 1 55%; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;
 }
 .detail-image-wrap img{ width:100%; height:100%; max-height:88vh; object-fit:contain; display:block; cursor:zoom-in; }
-.detail-panel{ flex:1 1 45%; min-width:300px; padding:24px; overflow-y:auto; display:flex; flex-direction:column; }
+.detail-panel{ flex:1 1 45%; min-width:300px; padding:24px; overflow-y:auto; display:flex; flex-direction:column; background:var(--nb-bg); }
 .detail-meta-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px; }
 .detail-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
 @media (max-width:720px){
@@ -448,9 +454,35 @@ button{ font-family: inherit; cursor: pointer; }
      처음부터 화면 전체를 꽉 채우고 탭하면 바로 닫힌다(js/image-viewer.js). */
   .image-view-img{ width:100vw; height:100vh; max-width:100vw; max-height:100vh; cursor:default; }
 }
-#detail-like-btn{ display:flex; align-items:center; gap:6px; }
-#detail-like-btn.active{ background: var(--gold-dim); border-color: var(--gold-line); color: var(--gold-text); }
-.detail-report-form{ margin:10px 0 6px; padding:12px; border:1px solid var(--hairline); border-radius:2px; }
+/* ---------- 상세 패널 네오브루탈리즘(2026-09-05) — 좋아요/삭제/신고/댓글
+   입력란/등록 버튼 전부 동일 문법: 두꺼운 잉크 테두리 + 하드 오프셋 섀도우
+   (블러 없음) + 누르면 그림자가 사라지며 눌리는 인터랙션. 데스크톱/모바일
+   공용(.detail-panel 자체가 이미 두 레이아웃에서 재사용되므로 별도
+   미디어쿼리 불필요). ---------- */
+#detail-like-btn{
+  display:flex; align-items:center; gap:6px;
+  background:var(--panel); color:var(--nb-border); border:2.5px solid var(--nb-border); border-radius:999px;
+  padding:9px 16px; font-weight:800; box-shadow:4px 4px 0 var(--nb-border);
+  transition:transform .08s ease, box-shadow .08s ease, background .12s ease, color .12s ease;
+}
+#detail-like-btn:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
+#detail-like-btn.active{ background:var(--gold); border-color:var(--nb-border); color:#fff; }
+
+#detail-delete-btn, #detail-report-btn{
+  font-weight:800; font-size:12.5px; border:2.5px solid var(--nb-border); border-radius:10px;
+  padding:9px 16px; box-shadow:4px 4px 0 var(--nb-border);
+  transition:transform .08s ease, box-shadow .08s ease;
+}
+#detail-delete-btn:active, #detail-report-btn:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
+#detail-delete-btn{ background:var(--nb-border); color:#fff; }
+#detail-report-btn{ background:var(--nb-muted); color:var(--nb-border); }
+
+#detail-category{ background:var(--nb-muted); color:var(--nb-border); border:2px solid var(--nb-border); font-weight:800; }
+
+.detail-report-form{
+  margin:10px 0 6px; padding:14px; border:2px solid var(--nb-border); border-radius:10px; background:var(--panel);
+  display:flex; flex-direction:column; gap:10px;
+}
 .detail-comments{ margin:14px 0; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
 @media (max-width:720px){
   /* 댓글 영역만 따로 스크롤되지 않고 패널 전체(.detail-panel의 overflow-y:auto)가
@@ -458,10 +490,35 @@ button{ font-family: inherit; cursor: pointer; }
      규칙보다 소스 순서상 뒤에 있어야 이긴다(동일 우선순위라 나중 규칙이 승리). */
   .detail-comments{ max-height:none; overflow-y:visible; }
 }
-.detail-comment-row{ font-size:13px; color:var(--text); padding:8px 10px; background:var(--panel-raised); border-radius:2px; }
-.detail-comment-form{ display:flex; align-items:flex-end; gap:10px; }
-.detail-comment-form .propose-field{ flex:1; }
-.detail-comment-form .glitch-btn{ width:auto; min-width:80px; margin-top:0; }
+.detail-comment-row{
+  font-size:13px; color:var(--nb-border); padding:10px 12px; background:var(--panel);
+  border:2px solid var(--nb-border); border-radius:10px; font-weight:600; line-height:1.5;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+}
+.detail-comment-row .detail-comment-text{ flex:1; word-break:break-word; }
+.detail-comment-delete-btn{
+  font-weight:800; font-size:10.5px; border:2px solid var(--nb-border); border-radius:8px;
+  background:var(--panel); color:var(--nb-border); padding:5px 10px; box-shadow:2px 2px 0 var(--nb-border);
+  flex-shrink:0; transition:transform .08s ease, box-shadow .08s ease;
+}
+.detail-comment-delete-btn:active{ transform:translate(2px,2px); box-shadow:0 0 0 var(--nb-border); }
+
+.detail-comment-form{ display:flex; align-items:stretch; gap:10px; }
+.detail-comment-form input, .detail-report-form input{
+  flex:1; width:100%; border:2.5px solid var(--nb-border); border-radius:10px; background:var(--panel);
+  padding:11px 14px; font-size:13.5px; font-weight:600; color:var(--nb-border); font-family:inherit;
+  box-shadow:4px 4px 0 var(--nb-border); outline:none; transition:border-color .12s ease;
+}
+.detail-comment-form input::placeholder, .detail-report-form input::placeholder{ color:var(--muted); font-weight:500; }
+.detail-comment-form input:focus, .detail-report-form input:focus{ border-color:var(--gold); }
+#detail-comment-submit, #detail-report-submit{
+  flex-shrink:0; border-radius:10px; border:2.5px solid var(--nb-border); font-family:inherit;
+  font-weight:800; font-size:13px; padding:0 18px; cursor:pointer;
+  box-shadow:4px 4px 0 var(--nb-border); transition:transform .08s ease, box-shadow .08s ease;
+}
+#detail-comment-submit:active, #detail-report-submit:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
+#detail-comment-submit{ background:var(--gold); color:#fff; }
+#detail-report-submit{ background:var(--nb-muted); color:var(--nb-border); }
 
 /* ---------- 관리자 패널 ---------- */
 .admin-modal{ max-width:560px; max-height:88vh; overflow-y:auto; }
