@@ -29,47 +29,52 @@
   </div>
 </div>
 
-<div class="app">
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">🖼️</span>
-      <span class="brand-name">스트리머 <em>갤러리</em></span>
-    </div>
-    <div class="topbar-actions">
-      <button class="glitch-btn btn-admin" id="open-admin-btn" type="button" style="display:none;" data-text="관리자">
-        <span class="btn-text">관리자</span>
-      </button>
-      <button class="glitch-btn btn-upload" id="open-upload-btn" type="button" data-text="+ 업로드">
-        <span class="btn-text">+ 업로드</span>
-      </button>
-      <button class="avatar avatar-login" id="open-login-btn" type="button" title="로그인">로그인</button>
-    </div>
-  </header>
+<!-- 핀터레스트식 리디자인(2026-09-05) — 상단 브랜드/업로드/관리자 버튼과
+     카테고리 칩은 좌측 사이드바로 옮기고, 이 자리엔 검색+프로필만 남긴다. -->
+<div class="search-row">
+  <label class="search-pill" for="gallery-filter-streamer">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="gallery-filter-streamer" maxlength="20" placeholder="스트리머 이름으로 검색">
+  </label>
+  <button class="avatar avatar-login" id="open-login-btn" type="button" title="로그인">로그인</button>
+</div>
 
-  <div class="gallery-lobby-head">
-    <h1>🖼️ 스트리머 갤러리</h1>
-    <p class="pitch" style="margin:0;">방송 스크린샷과 AI 일러스트를 함께 올리고 구경하는 공간이에요.</p>
-  </div>
-
-  <div class="gallery-filter-bar">
-    <div class="propose-field gallery-filter-search">
-      <input type="text" id="gallery-filter-streamer" maxlength="20" placeholder=" ">
-      <label for="gallery-filter-streamer" data-text="스트리머 이름으로 검색">스트리머 이름으로 검색</label>
-    </div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-mark" title="스트리머 갤러리">🖼️</div>
+    <button class="side-btn active" id="sidebar-home-btn" type="button" title="홈">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      <span class="side-label">홈</span>
+    </button>
+    <button class="side-btn" id="open-upload-btn" type="button" title="업로드">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span class="side-label">업로드</span>
+    </button>
+    <button class="side-btn" id="open-mygallery-btn" type="button" title="내 갤러리">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span class="side-label">내 갤러리</span>
+    </button>
+    <button class="side-btn side-btn-admin" id="open-admin-btn" type="button" style="display:none;" title="관리자">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>
+      <span class="side-label">관리자</span>
+    </button>
+    <div class="side-divider"></div>
     <div class="gallery-category-chips" id="gallery-category-chips">
-      <button class="chip active" type="button" data-category="all">전체</button>
-      <button class="chip" type="button" data-category="screenshot">스크린샷</button>
-      <button class="chip" type="button" data-category="ai-art">AI 일러스트</button>
-      <button class="chip" type="button" data-category="fan-art">팬아트</button>
-      <button class="chip" type="button" data-category="meme">밈</button>
-      <button class="chip" type="button" data-category="etc">기타</button>
+      <button class="chip active" type="button" data-category="all" title="전체">전체</button>
+      <button class="chip" type="button" data-category="screenshot" title="스크린샷">SS</button>
+      <button class="chip" type="button" data-category="ai-art" title="AI 일러스트">AI</button>
+      <button class="chip" type="button" data-category="fan-art" title="팬아트">팬</button>
+      <button class="chip" type="button" data-category="meme" title="밈">밈</button>
+      <button class="chip" type="button" data-category="etc" title="기타">기타</button>
     </div>
-  </div>
+  </aside>
 
-  <div class="gallery-grid" id="gallery-grid">
-    <p class="empty-msg">이미지를 불러오는 중...</p>
-  </div>
-  <button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn" style="display:none;">더 보기</button>
+  <main class="main-content">
+    <div class="gallery-grid" id="gallery-grid">
+      <p class="empty-msg">이미지를 불러오는 중...</p>
+    </div>
+    <button class="text-link gallery-load-more-btn" type="button" id="gallery-load-more-btn" style="display:none;">더 보기</button>
+  </main>
 </div>
 
 <div class="propose-backdrop" id="upload-backdrop">

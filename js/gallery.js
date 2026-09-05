@@ -164,6 +164,21 @@
   }
   if (searchInput) searchInput.addEventListener('input', renderGrid);
 
+  // 홈 버튼 — 검색어/카테고리 필터를 초기 상태로 되돌린다.
+  var sidebarHomeBtn = document.getElementById('sidebar-home-btn');
+  if (sidebarHomeBtn) {
+    sidebarHomeBtn.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      activeCategory = 'all';
+      if (chipsWrap) {
+        chipsWrap.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
+        var allChip = chipsWrap.querySelector('[data-category="all"]');
+        if (allChip) allChip.classList.add('active');
+      }
+      renderGrid();
+    });
+  }
+
   function resetStreamerPicker() {
     selectedStreamerId = null;
     selectedStreamerName = '';
