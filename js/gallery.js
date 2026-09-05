@@ -34,6 +34,7 @@
   var hasMoreImages = false;
   var allImages = [];
   var activeCategory = 'all';
+  var myGalleryOnly = false;
   var allStreamers = [];
   var selectedStreamerId = null;
   var selectedStreamerName = '';
@@ -88,15 +89,20 @@
     if (!grid) return;
     var streamerQuery = (searchInput && searchInput.value || '').trim().toLowerCase();
     var filtered = allImages.filter(function (img) {
+      if (myGalleryOnly && (!window.galUser || img.uploaderUid !== window.galUser.uid)) return false;
       if (activeCategory !== 'all' && img.category !== activeCategory) return false;
       if (streamerQuery && !(img.streamerName || '').toLowerCase().includes(streamerQuery)) return false;
       return true;
     });
 
+    // 더 보기는 "내 갤러리" 모드에선 의미 없다 — uploaderUid 필터링은 클라이언트에서
+    // 하는데, 서버 페이지네이션(limitToLast)은 필터와 무관하게 최근 N개를 이미
+    // 끊어서 가져오므로 "더 보기"를 눌러 페이지를 늘리는 흐름 자체는 그대로 유효하다.
     if (loadMoreBtn) loadMoreBtn.style.display = hasMoreImages ? '' : 'none';
 
     if (!filtered.length) {
-      grid.innerHTML = '<p class="empty-msg">' + (allImages.length ? '조건에 맞는 이미지가 없어요.' : '아직 업로드된 이미지가 없어요. 첫 이미지를 올려보세요!') + '</p>';
+      var emptyMsg = myGalleryOnly ? '아직 업로드한 이미지가 없어요.' : (allImages.length ? '조건에 맞는 이미지가 없어요.' : '아직 업로드된 이미지가 없어요. 첫 이미지를 올려보세요!');
+      grid.innerHTML = '<p class="empty-msg">' + emptyMsg + '</p>';
       return;
     }
 
@@ -169,17 +175,36 @@
   }
   if (searchInput) searchInput.addEventListener('input', renderGrid);
 
-  // 홈 버튼 — 검색어/카테고리 필터를 초기 상태로 되돌린다.
+  var myGalleryBtn = document.getElementById('open-mygallery-btn');
+
+  // 홈 버튼 — 검색어/카테고리/내 갤러리 필터를 전부 초기 상태로 되돌린다.
   var sidebarHomeBtn = document.getElementById('sidebar-home-btn');
   if (sidebarHomeBtn) {
     sidebarHomeBtn.addEventListener('click', function () {
       if (searchInput) searchInput.value = '';
       activeCategory = 'all';
+      myGalleryOnly = false;
+      if (myGalleryBtn) myGalleryBtn.classList.remove('active');
       if (chipsWrap) {
         chipsWrap.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
         var allChip = chipsWrap.querySelector('[data-category="all"]');
         if (allChip) allChip.classList.add('active');
       }
+      renderGrid();
+    });
+  }
+
+  // 내 갤러리 버튼 — 로그인 안 돼있으면 로그인 유도, 돼있으면 uploaderUid로
+  // 그리드를 필터링하는 토글(다시 누르면 해제).
+  if (myGalleryBtn) {
+    myGalleryBtn.addEventListener('click', function () {
+      if (!window.galTrusted) {
+        window.galCloseLoginModal && window.galCloseLoginModal();
+        window.galOpenLoginModal && window.galOpenLoginModal();
+        return;
+      }
+      myGalleryOnly = !myGalleryOnly;
+      myGalleryBtn.classList.toggle('active', myGalleryOnly);
       renderGrid();
     });
   }
