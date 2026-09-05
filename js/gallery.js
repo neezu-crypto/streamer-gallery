@@ -160,6 +160,10 @@
     }).join('');
     applyMasonrySpans();
   }
+  // "최근에 확인함" 배지는 localStorage 값이 바뀐다고 그리드가 저절로 다시 그려지지
+  // 않으므로(2026-09-06 실사용 테스트로 발견 — 상세 패널을 열고 닫아도 배지가 바로
+  // 안 바뀜), gallery-detail.js가 값을 갱신한 직후 이 함수를 불러 즉시 반영한다.
+  window.galRenderGrid = renderGrid;
 
   var masonryResizeTimer = null;
   window.addEventListener('resize', function () {

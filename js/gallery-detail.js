@@ -119,6 +119,10 @@
   function openModal(img) {
     currentImageId = img.id;
     localStorage.setItem('galLastViewedImageId', img.id);
+    // 그리드는 이 값이 바뀐다고 저절로 다시 그려지지 않으므로(2026-09-06 실사용
+    // 테스트로 발견) 직접 다시 그리게 호출 — 상세 패널을 닫았을 때 이미 배지가
+    // 옮겨져 있어야 하니 여는 시점에 바로 반영해둔다.
+    window.galRenderGrid && window.galRenderGrid();
     imageEl.src = img.imageUrl || img.thumbUrl || '';
     streamerEl.textContent = img.streamerName || '익명';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
