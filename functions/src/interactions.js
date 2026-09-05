@@ -99,4 +99,35 @@ const reportImage = onCall(async (request) => {
   return { reportId: reportRef.key };
 });
 
-module.exports = { toggleLike, postComment, reportImage };
+// 썸네일 숨기기(2026-09-05 추가) — 다른 사람에게는 전혀 영향 없이, 이 계정의
+// 메인 그리드에서만 해당 이미지를 안 보이게 하는 개인 취향 필터. userLikes와
+// 동일한 미러 패턴(gallery/hiddenImages/{uid}/{imageId})이라 클라이언트가
+// 자기 uid 목록만 구독해서 그리드를 걸러내면 된다. unhideImage는 지금 UI에서
+// 호출하는 곳은 없지만(관리 화면 없음 — 사용자 결정), ban/unban처럼 되돌리는
+// 대응 함수 없이 한 방향만 만들어두면 나중에 되돌릴 방법이 아예 없어지므로
+// 짝을 맞춰 같이 배포해둔다.
+const hideImage = onCall(async (request) => {
+  const uid = await requireTrustedAccount(request);
+  await assertNotBanned(uid);
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const db = getDatabase();
+  const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
+  if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
+
+  await db.ref(`gallery/hiddenImages/${uid}/${imageId}`).set(true);
+  return { hidden: true };
+});
+
+const unhideImage = onCall(async (request) => {
+  const uid = await requireTrustedAccount(request);
+  await assertNotBanned(uid);
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  await getDatabase().ref(`gallery/hiddenImages/${uid}/${imageId}`).remove();
+  return { hidden: false };
+});
+
+module.exports = { toggleLike, postComment, reportImage, hideImage, unhideImage };

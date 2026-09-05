@@ -422,6 +422,15 @@ button{ font-family: inherit; cursor: pointer; }
   position:absolute; top:10px; right:10px; font-size:10px; font-weight:800;
   background:var(--gold); color:#fff; border-radius:999px; padding:4px 9px; pointer-events:none;
 }
+/* 숨기기 — 좋아요 수(좌하단)와 반대쪽인 우하단, 호버 시에만 노출 */
+.gallery-card-hide-btn{
+  position:absolute; right:10px; bottom:10px; width:24px; height:24px; border-radius:50%;
+  background:rgba(0,0,0,0.55); color:#fff; border:none; font-size:11px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .15s ease, background .15s ease;
+}
+.gallery-card-hide-btn:hover{ background:rgba(0,0,0,0.8); }
+.gallery-card:hover .gallery-card-hide-btn{ opacity:1; }
 /* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
    모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */
 .gallery-card-streamer{ font-size:13px; font-weight:700; color:var(--text); }

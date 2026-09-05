@@ -54,6 +54,25 @@
     }, function (err) { console.error('해금된 스트리머 목록 구독 실패', err); });
   }
 
+  // 썸네일 숨기기(2026-09-05 추가) — 다른 사람에겐 영향 없이 이 계정의 메인
+  // 그리드에서만 안 보이게 하는 개인 취향 필터. userLikes와 동일한 패턴으로
+  // 로그인 상태가 바뀔 때마다 다시 구독한다(로그아웃하면 목록을 비움).
+  window.galHiddenImages = {};
+  var hiddenImagesUnsub = null;
+  document.addEventListener('gal-auth-changed', function (e) {
+    if (hiddenImagesUnsub) { hiddenImagesUnsub(); hiddenImagesUnsub = null; }
+    if (!e.detail.trusted || !e.detail.user) {
+      window.galHiddenImages = {};
+      renderGrid();
+      return;
+    }
+    hiddenImagesUnsub = window.galFirebase.onValue(
+      window.galFirebase.ref(window.galDb, 'gallery/hiddenImages/' + e.detail.user.uid),
+      function (snap) { window.galHiddenImages = snap.val() || {}; renderGrid(); },
+      function (err) { console.error('숨긴 이미지 목록 구독 실패', err); }
+    );
+  });
+
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -95,6 +114,7 @@
     if (myGalleryBanner) myGalleryBanner.style.display = myGalleryOnly ? '' : 'none';
     var streamerQuery = (searchInput && searchInput.value || '').trim().toLowerCase();
     var filtered = allImages.filter(function (img) {
+      if (window.galHiddenImages && window.galHiddenImages[img.id]) return false;
       if (myGalleryOnly && (!window.galUser || img.uploaderUid !== window.galUser.uid)) return false;
       if (activeCategory !== 'all' && img.category !== activeCategory) return false;
       if (streamerQuery && !(img.streamerName || '').toLowerCase().includes(streamerQuery)) return false;
@@ -127,6 +147,7 @@
           (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
           (img.id === lastViewedId ? '<span class="gallery-recent-badge">최근에 확인함</span>' : '') +
           '<span class="gallery-card-hover-likes">♥ ' + (img.likeCount || 0) + '</span>' +
+          '<button class="gallery-card-hide-btn" type="button" data-image-id="' + escapeHtml(img.id) + '" title="이 이미지 숨기기">✕</button>' +
         '</div>'
       );
     }).join('');
@@ -166,6 +187,29 @@
     loadMoreBtn.addEventListener('click', function () {
       imagesLimit += IMAGES_PAGE_SIZE;
       subscribeImages();
+    });
+  }
+
+  // 숨기기 버튼 — 카드 안에 있어서 클릭이 버블링되면 상세보기(gallery-detail.js의
+  // document 클릭 리스너)까지 열려버리므로 stopPropagation으로 막는다. 확인창은
+  // 이 코드베이스에서 이미지/댓글 삭제 때 쓰던 것과 동일하게 네이티브 confirm() 사용.
+  if (grid) {
+    grid.addEventListener('click', function (e) {
+      var hideBtn = e.target.closest('.gallery-card-hide-btn');
+      if (!hideBtn) return;
+      e.stopPropagation();
+      if (!window.galTrusted) {
+        window.galCloseLoginModal && window.galCloseLoginModal();
+        window.galOpenLoginModal && window.galOpenLoginModal();
+        return;
+      }
+      if (!confirm('이 이미지를 숨길까요? 나에게만 안 보이게 돼요.')) return;
+      var imageId = hideBtn.dataset.imageId;
+      hideBtn.disabled = true;
+      window.galFirebase.httpsCallable('hideImage')({ imageId: imageId }).catch(function (err) {
+        alert('숨기기 처리 중 오류: ' + (err && err.message ? err.message : err));
+        hideBtn.disabled = false;
+      });
     });
   }
 
