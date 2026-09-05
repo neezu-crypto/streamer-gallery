@@ -141,6 +141,12 @@ button{ font-family: inherit; cursor: pointer; }
   width:76px; flex-shrink:0; position:sticky; top:0; align-self:flex-start;
   display:flex; flex-direction:column; align-items:center; gap:4px; padding:18px 0;
   border-right:1px solid var(--hairline);
+  /* position:sticky는 z-index를 안 줘도 자체 스태킹 컨텍스트를 만드는데, 이때
+     z-index가 auto(=0 취급)라 갤러리 카드(.gallery-card도 position:relative라
+     같은 0 레벨)와 동률이 되면 DOM에서 나중에 오는 카드가 위에 그려져 카테고리
+     칩 툴팁이 카드 썸네일에 가려진다(2026-09-05 스크린샷으로 확인). 명시적으로
+     더 높은 z-index를 줘서 사이드바 레이어가 항상 위에 그려지게 한다. */
+  z-index:20;
 }
 .sidebar-mark{
   width:44px; height:44px; border-radius:14px; margin-bottom:8px;
