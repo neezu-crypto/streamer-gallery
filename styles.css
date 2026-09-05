@@ -400,6 +400,12 @@ button{ font-family: inherit; cursor: pointer; }
   grid-auto-rows:4px; gap:16px;
 }
 .gallery-load-more-btn{ display:block; margin:24px auto 0; padding:10px 24px; }
+.gallery-footer{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  margin:40px 0 12px; font-size:12px; color:var(--muted-2);
+}
+.gallery-footer a{ color:var(--muted); text-decoration:none; }
+.gallery-footer a:hover{ color:var(--gold-text); }
 .gallery-card{
   background:var(--panel-raised); border-radius:16px; overflow:hidden;
   position:relative; cursor:pointer;
