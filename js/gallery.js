@@ -30,15 +30,22 @@
   window.galCategoryLabels = CATEGORY_LABELS;
 
   var IMAGES_PAGE_SIZE = 60;
-  var imagesLimit = IMAGES_PAGE_SIZE;
+  // recentImages(최신 페이지)만 실시간(onValue) 구독하고, "더 보기"로 추가되는
+  // olderImages는 1회성 get()만 한다(2026-09-06 재설계) — 예전엔 "더 보기"를 누를
+  // 때마다 limit을 60→120→180으로 늘려 매번 처음부터 다시 구독해서 이미 받은 것까지
+  // 통째로 재전송받았다.
+  var recentImages = [];
+  var olderImages = [];
   var imagesUnsub = null;
   var hasMoreImages = false;
+  var isLoadingMore = false;
   var allImages = [];
   var activeCategory = 'all';
   var myGalleryOnly = false;
   var allStreamers = [];
   var selectedStreamerId = null;
   var selectedStreamerName = '';
+  var GRID_CACHE_KEY = 'galGridCache';
 
   fetch('./streamer-names.json').then(function (res) { return res.json(); }).then(function (data) {
     allStreamers = data;
@@ -160,35 +167,104 @@
     masonryResizeTimer = setTimeout(applyMasonrySpans, 150);
   });
 
+  // 좋아요/댓글 수는 gallery/imageStats에 따로 있다(2026-09-06, gallery/images에서
+  // 분리) — 라이브로 또 구독하면 결국 똑같이 "아무 좋아요에나 전체 목록 재전송"
+  // 문제가 재발하므로, 이미지 목록이 구조적으로 바뀔 때만(신규 업로드/더 보기) 1회성
+  // get()으로 읽어와 병합한다. 내가 직접 누른 좋아요는 이 재조회를 기다리지 않고
+  // window.galPatchImageLikeCount로 그 자리에서 바로 반영한다.
+  async function mergeStatsAndRender() {
+    allImages = recentImages.concat(olderImages);
+    window.galAllImages = allImages;
+    if (window.galFirebase && window.galDb) {
+      try {
+        var snap = await window.galFirebase.get(window.galFirebase.ref(window.galDb, 'gallery/imageStats'));
+        var stats = snap.val() || {};
+        allImages.forEach(function (img) {
+          var s = stats[img.id];
+          img.likeCount = (s && s.likeCount) || 0;
+          img.commentCount = (s && s.commentCount) || 0;
+        });
+        window.galAllImages = allImages;
+      } catch (e) {
+        console.error('좋아요/댓글 수 조회 실패', e);
+      }
+    }
+    renderGrid();
+    document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
+    // 초기 로드 체감 속도(2026-09-06 추가) — 최신 페이지만 캐싱해서 다음 방문 때
+    // 실시간 구독 응답을 기다리지 않고 바로 그려준다(용량 방지 위해 olderImages는
+    // 캐싱 안 함).
+    try { localStorage.setItem(GRID_CACHE_KEY, JSON.stringify({ images: recentImages })); } catch (e) {}
+  }
+
+  window.galPatchImageLikeCount = function (imageId, likeCount) {
+    var img = allImages.find(function (i) { return i.id === imageId; });
+    if (img) img.likeCount = likeCount;
+  };
+
   function subscribeImages() {
     if (!window.galFirebase || !window.galDb) { setTimeout(subscribeImages, 200); return; }
     if (imagesUnsub) { imagesUnsub(); imagesUnsub = null; }
+    // orderByChild('createdAt') 없이 limitToLast만 걸면 RTDB 기본 정렬 기준인 키
+    // (imageId가 randomUUID라 생성 순서와 무관)로 마지막 N개를 가져와서, 사실상
+    // 무작위 N개를 "최근 이미지"로 보여주는 버그가 있었다(2026-09-06 발견/수정) —
+    // .indexOn에 createdAt이 이미 있어서 규칙 변경 없이 바로 쓸 수 있다.
     var imagesRef = window.galFirebase.query(
       window.galFirebase.ref(window.galDb, 'gallery/images'),
-      window.galFirebase.limitToLast(imagesLimit)
+      window.galFirebase.orderByChild('createdAt'),
+      window.galFirebase.limitToLast(IMAGES_PAGE_SIZE)
     );
     imagesUnsub = window.galFirebase.onValue(imagesRef, function (snap) {
       var data = snap.val() || {};
       var keys = Object.keys(data);
-      hasMoreImages = keys.length >= imagesLimit;
-      allImages = keys.map(function (id) {
+      hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
+      recentImages = keys.map(function (id) {
         return Object.assign({ id: id }, data[id]);
       }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-      window.galAllImages = allImages;
-      renderGrid();
-      document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
+      // "더 보기"로 이미 불러온 과거 페이지 중 이번 최신 윈도우와 겹치는 항목은
+      // 제거 — 최신 윈도우 쪽이 항상 더 신선한 데이터라 그쪽을 우선한다.
+      var recentIds = {};
+      recentImages.forEach(function (img) { recentIds[img.id] = true; });
+      olderImages = olderImages.filter(function (img) { return !recentIds[img.id]; });
+      mergeStatsAndRender();
     }, function (err) {
       console.error('갤러리 목록 구독 실패', err);
       grid.innerHTML = '<p class="empty-msg">이미지를 불러오지 못했어요. 새로고침해 주세요.</p>';
     });
   }
 
-  if (loadMoreBtn) {
-    loadMoreBtn.addEventListener('click', function () {
-      imagesLimit += IMAGES_PAGE_SIZE;
-      subscribeImages();
-    });
+  // "더 보기" — 커서 기반 페이지네이션(2026-09-06 변경). 예전엔 limit을 60→120→180
+  // 늘려서 매번 처음부터 다시 구독해 이미 받은 데이터까지 통째로 재전송받았는데,
+  // 이제는 지금까지 로드된 것 중 가장 오래된 항목의 createdAt/키를 기준 삼아 그보다
+  // 오래된 PAGE_SIZE개만 1회성으로 읽어와 이어붙인다(과거 페이지는 재구독하지 않음).
+  async function loadMoreImages() {
+    if (isLoadingMore || !hasMoreImages) return;
+    var oldest = allImages[allImages.length - 1];
+    if (!oldest) return;
+    isLoadingMore = true;
+    try {
+      var moreRef = window.galFirebase.query(
+        window.galFirebase.ref(window.galDb, 'gallery/images'),
+        window.galFirebase.orderByChild('createdAt'),
+        window.galFirebase.endBefore(oldest.createdAt || 0, oldest.id),
+        window.galFirebase.limitToLast(IMAGES_PAGE_SIZE)
+      );
+      var snap = await window.galFirebase.get(moreRef);
+      var data = snap.val() || {};
+      var keys = Object.keys(data);
+      hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
+      var page = keys.map(function (id) { return Object.assign({ id: id }, data[id]); })
+        .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      olderImages = olderImages.concat(page);
+      await mergeStatsAndRender();
+    } catch (err) {
+      console.error('추가 이미지 로드 실패', err);
+    } finally {
+      isLoadingMore = false;
+    }
   }
+
+  if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMoreImages);
 
   // 숨기기 버튼 — 카드 안에 있어서 클릭이 버블링되면 상세보기(gallery-detail.js의
   // document 클릭 리스너)까지 열려버리므로 stopPropagation으로 막는다. 확인창은
@@ -423,6 +499,19 @@
   // #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
   // 모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
   // 경합해서 로그인 후에도 항상 로그인 모달만 뜨는 버그가 생긴다).
+
+  // 초기 로드 체감 속도(2026-09-06 추가) — 실시간 구독 응답을 기다리지 않고 지난
+  // 방문 때 캐싱해둔 최신 페이지를 먼저 그린다. subscribeImages()가 곧 실제 데이터로
+  // 교체하므로 여기 값이 stale해도 아주 잠깐만 보인다.
+  try {
+    var cachedGrid = JSON.parse(localStorage.getItem(GRID_CACHE_KEY) || 'null');
+    if (cachedGrid && Array.isArray(cachedGrid.images) && cachedGrid.images.length) {
+      recentImages = cachedGrid.images;
+      allImages = recentImages;
+      window.galAllImages = allImages;
+      renderGrid();
+    }
+  } catch (e) {}
 
   subscribeImages();
   subscribeUnlockedStreamers();

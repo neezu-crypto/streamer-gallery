@@ -21,6 +21,7 @@ import {
   query,
   orderByChild,
   equalTo,
+  endBefore,
   limitToFirst,
   limitToLast,
   serverTimestamp,
@@ -57,7 +58,7 @@ const requestStreamerVerificationFn = httpsCallable(functions, 'requestStreamerV
 const googleProvider = new GoogleAuthProvider();
 
 window.galFirebase = {
-  ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, limitToFirst, limitToLast, serverTimestamp,
+  ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, endBefore, limitToFirst, limitToLast, serverTimestamp,
   httpsCallable: (name) => httpsCallable(functions, name),
   GoogleAuthProvider,
 };

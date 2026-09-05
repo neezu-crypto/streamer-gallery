@@ -31,6 +31,7 @@ async function performImageDeletion(imageId) {
 
   const updates = {};
   updates[`gallery/images/${imageId}`] = null;
+  updates[`gallery/imageStats/${imageId}`] = null;
   updates[`gallery/likes/${imageId}`] = null;
   updates[`gallery/comments/${imageId}`] = null;
   if (likesSnap.exists()) {
@@ -60,7 +61,7 @@ async function performCommentDeletion(imageId, commentId) {
   const snap = await commentRef.get();
   if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
   await commentRef.remove();
-  await db.ref(`gallery/images/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
+  await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
   return snap.val();
 }
 

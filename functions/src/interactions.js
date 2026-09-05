@@ -6,11 +6,12 @@ const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
-// 한 번의 읽기로 하기 위한 미러다. images/{imageId}/likeCount는 트랜잭션으로 증감시켜
-// 동시 클릭에도 카운트가 어긋나지 않게 한다 — 다만 like 플래그 자체는 트랜잭션 밖에서
-// 별도로 쓰기 때문에, 극히 짧은 순간 동시 클릭이 겹치면 카운트와 플래그가 잠깐 어긋날
-// 수 있다(비금전적 좋아요 수치라 허용 가능한 수준으로 판단, 클라이언트에서 버튼을
-// 처리 중 비활성화해 실사용 빈도를 낮춘다).
+// 한 번의 읽기로 하기 위한 미러다. imageStats/{imageId}/likeCount(2026-09-06부로
+// gallery/images에서 분리)는 트랜잭션으로 증감시켜 동시 클릭에도 카운트가 어긋나지
+// 않게 한다 — 다만 like 플래그 자체는 트랜잭션 밖에서 별도로 쓰기 때문에, 극히 짧은
+// 순간 동시 클릭이 겹치면 카운트와 플래그가 잠깐 어긋날 수 있다(비금전적 좋아요
+// 수치라 허용 가능한 수준으로 판단, 클라이언트에서 버튼을 처리 중 비활성화해 실사용
+// 빈도를 낮춘다).
 const toggleLike = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
@@ -25,7 +26,7 @@ const toggleLike = onCall(async (request) => {
   const alreadyLiked = (await likeRef.get()).exists();
   const delta = alreadyLiked ? -1 : 1;
 
-  const countResult = await db.ref(`gallery/images/${imageId}/likeCount`).transaction((current) => Math.max(0, (current || 0) + delta));
+  const countResult = await db.ref(`gallery/imageStats/${imageId}/likeCount`).transaction((current) => Math.max(0, (current || 0) + delta));
   if (!countResult.committed) throw new HttpsError('aborted', '잠시 후 다시 시도해 주세요.');
 
   if (alreadyLiked) {
@@ -65,7 +66,7 @@ const postComment = onCall(async (request) => {
 
   const commentRef = db.ref(`gallery/comments/${imageId}`).push();
   await commentRef.set({ uid, text: trimmed, createdAt: now });
-  await db.ref(`gallery/images/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
+  await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
   await lastCommentRef.set(now);
 
   return { commentId: commentRef.key };

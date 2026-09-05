@@ -115,19 +115,24 @@ const registerImage = onCall(async (request) => {
   // 용도일 뿐 보안과 무관 — 값이 이상하면 그냥 저장 안 하고 클라이언트가 기본 비율로
   // 대체하게 둔다(치명적 오류로 취급하지 않음).
   const hasValidDimensions = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
-  await db.ref(`gallery/images/${imageId}`).set({
-    streamerId,
-    streamerName: name,
-    category,
-    imageUrl,
-    thumbUrl,
-    key,
-    thumbKey,
-    ...(hasValidDimensions ? { width, height } : {}),
-    uploaderUid: uid,
-    createdAt: Date.now(),
-    likeCount: 0,
-    commentCount: 0,
+  // likeCount/commentCount는 gallery/imageStats/{imageId}로 분리해서 별도 노드에 둔다
+  // (2026-09-06) — 안 그러면 좋아요/댓글이 하나 달릴 때마다 gallery/images를 실시간
+  // 구독 중인 모든 클라이언트에 이미지 목록 전체(URL 등 무거운 필드 포함)가 재전송된다.
+  // 두 노드를 하나의 멀티패스 update()로 같이 써서 한쪽만 성공하는 경우를 방지한다.
+  await db.ref().update({
+    [`gallery/images/${imageId}`]: {
+      streamerId,
+      streamerName: name,
+      category,
+      imageUrl,
+      thumbUrl,
+      key,
+      thumbKey,
+      ...(hasValidDimensions ? { width, height } : {}),
+      uploaderUid: uid,
+      createdAt: Date.now(),
+    },
+    [`gallery/imageStats/${imageId}`]: { likeCount: 0, commentCount: 0 },
   });
 
   return { imageId, imageUrl, thumbUrl };

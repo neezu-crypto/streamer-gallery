@@ -177,6 +177,10 @@
       var result = await toggleFn({ imageId: currentImageId });
       likeBtn.classList.toggle('active', result.data.liked);
       likeCountEl.textContent = result.data.likeCount;
+      // 그리드 카드의 좋아요 수는 gallery/imageStats를 라이브 구독하지 않고 이미지
+      // 목록이 구조적으로 바뀔 때만 1회성으로 읽어오므로(js/gallery.js), 내가 방금
+      // 누른 좋아요는 여기서 바로 캐시에 반영해줘야 그리드로 돌아갔을 때도 보인다.
+      window.galPatchImageLikeCount && window.galPatchImageLikeCount(currentImageId, result.data.likeCount);
     } catch (e) {
       likeBtn.classList.toggle('active', wasLiked);
       likeCountEl.textContent = prevCount;
