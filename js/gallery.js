@@ -175,6 +175,17 @@
   }
   if (searchInput) searchInput.addEventListener('input', renderGrid);
 
+  // 모바일 하단 탭바(js/gallery-mobile-nav.js)의 카테고리 제스처가 이 클로저 밖에서
+  // 필터를 바꿀 수 있게 노출하는 창구 — 데스크톱 카테고리 원형 배지와 동일하게
+  // activeCategory를 갱신하고 그 배지의 active 표시도 같이 맞춰준다.
+  window.galSetCategory = function (category) {
+    activeCategory = category;
+    if (chipsWrap) {
+      chipsWrap.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('active', c.dataset.category === category); });
+    }
+    renderGrid();
+  };
+
   var myGalleryBtn = document.getElementById('open-mygallery-btn');
 
   // 홈 버튼 — 검색어/카테고리/내 갤러리 필터를 전부 초기 상태로 되돌린다.

@@ -77,6 +77,41 @@
   </main>
 </div>
 
+<!-- 모바일 하단 탭바(2026-09-05 추가, 720px 이하에서만 CSS로 노출) — 홈/업로드/
+     내갤러리/관리자는 데스크톱 사이드바 버튼을 그대로 .click()으로 위임하고
+     (js/gallery-mobile-nav.js), 카테고리만 터치 제스처(누르는 즉시 칩 등장 →
+     드래그 리액션 → 칩 위에서 떼면 확정)로 별도 구현한다. -->
+<nav class="mobile-tabbar">
+  <button class="mtab-btn" id="mtab-home-btn" type="button" title="홈">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    홈
+  </button>
+  <button class="mtab-btn" id="mtab-upload-btn" type="button" title="업로드">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    업로드
+  </button>
+  <button class="mtab-btn" id="mtab-category-btn" type="button" title="카테고리">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+    <span class="mtab-category-indicator" id="mtab-category-indicator">전체</span>
+  </button>
+  <button class="mtab-btn" id="mtab-mygallery-btn" type="button" title="내 갤러리">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    내 갤러리
+  </button>
+  <button class="mtab-btn" id="mtab-admin-btn" type="button" style="display:none;" title="관리자">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>
+    관리자
+  </button>
+</nav>
+<div class="mtab-chip-fan" id="mtab-chip-fan">
+  <button class="mtab-chip" type="button" data-category="all">전체</button>
+  <button class="mtab-chip" type="button" data-category="screenshot">SS</button>
+  <button class="mtab-chip" type="button" data-category="ai-art">AI</button>
+  <button class="mtab-chip" type="button" data-category="fan-art">팬</button>
+  <button class="mtab-chip" type="button" data-category="meme">밈</button>
+  <button class="mtab-chip" type="button" data-category="etc">기타</button>
+</div>
+
 <div class="propose-backdrop" id="upload-backdrop">
   <div class="propose-modal">
     <div class="terminal-header">
@@ -345,5 +380,6 @@
 <script defer src="js/gallery-unlock.js"></script>
 <script defer src="js/gallery-detail.js"></script>
 <script defer src="js/gallery-admin.js"></script>
+<script defer src="js/gallery-mobile-nav.js"></script>
 </body>
 </html>
