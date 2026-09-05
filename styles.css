@@ -46,8 +46,11 @@
 
 *{ box-sizing: border-box; }
 html, body{ margin:0; padding:0; overflow-x:hidden; }
-/* 모달이 하나라도 열려있는 동안(js/modal-stack.js) 배경 페이지 스크롤 잠금 */
-html.gal-modal-open, html.gal-modal-open body{ overflow:hidden; }
+/* 모달이 하나라도 열려있는 동안(js/modal-stack.js) 배경 페이지 스크롤 잠금.
+   overscroll-behavior-y는 모바일에서 화면 맨 위를 아래로 당길 때 브라우저의
+   당겨서 새로고침 제스처가 겹쳐 뜨는 걸 한 번 더 막아주는 안전장치(주 방어는
+   드래그 중 touchmove에서 preventDefault하는 gallery-detail.js 쪽). */
+html.gal-modal-open, html.gal-modal-open body{ overflow:hidden; overscroll-behavior-y:contain; }
 body{
   background: var(--ink);
   color: var(--text);
@@ -554,6 +557,13 @@ button{ font-family: inherit; cursor: pointer; }
 }
 @media (max-width:720px){
   .modal-hint{ display:none; }
+  /* 모바일 전용 힌트(2026-09-06 추가) — 상세 패널이 풀스크린이라 하단이 밝은
+     .detail-panel(웜 크림) 배경일 수 있어서, 데스크톱 힌트처럼 흰 글자만
+     얹으면 안 보인다. 대신 어두운 알약 배지로 어떤 배경 위에서도 읽히게 한다. */
+  .modal-hint-mobile{
+    display:block; bottom:14px; color:#fff; background:rgba(23,20,18,0.88);
+    padding:7px 14px; border-radius:999px; font-size:11px;
+  }
 }
 
 /* ---------- 관리자 패널 ---------- */

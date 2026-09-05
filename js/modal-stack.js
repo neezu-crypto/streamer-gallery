@@ -10,8 +10,18 @@
 // 비어있지 않은 동안) html에 클래스를 붙여 메인 페이지 스크롤을 막는다.
 // 특정 모달 하나만 처리하지 않고 이 공용 스택에 붙여서, 상세보기든 업로드든
 // 관리자 패널이든 로그인이든 전부 동일하게 적용된다.
+// 뒤로가기 방지(2026-09-06 추가) — 모바일에서 모달이 열려있는 동안 기기
+// 뒤로가기(제스처/버튼)를 누르면 모달만 닫히는 게 아니라 브라우저가 실제로
+// 갤러리 페이지 자체를 벗어나 버리는 문제가 있었다. 모달을 열 때마다
+// history에 상태를 하나 쌓아두고, 뒤로가기로 그 상태가 빠지면(popstate)
+// 페이지 이동 대신 가장 위 모달만 닫는다. X버튼 등으로 모달을 먼저 닫은
+// 경우엔 쌓아뒀던 history 상태가 그대로 남아 다음 뒤로가기가 엉뚱하게
+// 동작하므로 history.back()으로 직접 소비하되, 그때 뒤따라오는 popstate는
+// 진짜 사용자의 뒤로가기가 아니므로 suppressPopCount로 무시한다.
 (function () {
   var stack = [];
+  var handlingPopstate = false;
+  var suppressPopCount = 0;
 
   function syncScrollLock() {
     document.documentElement.classList.toggle('gal-modal-open', stack.length > 0);
@@ -20,15 +30,29 @@
   window.galPushModal = function (closeFn) {
     stack.push(closeFn);
     syncScrollLock();
+    history.pushState({ galModal: true }, '', location.href);
   };
   window.galPopModal = function (closeFn) {
     var idx = stack.lastIndexOf(closeFn);
-    if (idx !== -1) stack.splice(idx, 1);
+    if (idx === -1) return;
+    stack.splice(idx, 1);
     syncScrollLock();
+    if (!handlingPopstate) {
+      suppressPopCount++;
+      history.back();
+    }
   };
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape' || !stack.length) return;
     stack[stack.length - 1]();
+  });
+
+  window.addEventListener('popstate', function () {
+    if (suppressPopCount > 0) { suppressPopCount--; return; }
+    if (!stack.length) return;
+    handlingPopstate = true;
+    stack[stack.length - 1]();
+    handlingPopstate = false;
   });
 })();

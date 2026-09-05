@@ -19,6 +19,9 @@
   var commentInput = document.getElementById('detail-comment-input');
   var commentSubmitBtn = document.getElementById('detail-comment-submit');
   if (!backdrop) return;
+  var modalEl = backdrop.querySelector('.detail-modal');
+
+  function isMobile() { return window.matchMedia('(max-width: 720px)').matches; }
 
   var currentImageId = null;
   var commentsUnsub = null;
@@ -34,7 +37,49 @@
     window.galPopModal(closeModal);
     if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
     currentImageId = null;
+    modalEl.style.transition = '';
+    modalEl.style.transform = '';
   }
+
+  // 모바일 풀스크린 상세 패널을 아래로 드래그해서 닫기(2026-09-06 추가) —
+  // 이미지 영역을 아래로 끌면 패널이 손가락을 따라 내려가고, 일정 거리
+  // 이상 놓으면 닫힌다(모바일 앱의 pull-to-dismiss와 동일한 패턴). 살짝만
+  // 움직이고 뗀 탭은 dragMoved로 구분해 기존 "탭하면 풀이미지 보기" 동작을
+  // 그대로 둔다. 위로 끄는 동작은 무시(아래로 끌 때만 반응).
+  var DRAG_CLOSE_THRESHOLD = 110;
+  var dragStartY = 0, dragCurrentY = 0, isDetailDragging = false, detailDragMoved = false;
+
+  imageEl.addEventListener('touchstart', function (e) {
+    if (!isMobile() || !currentImageId) return;
+    isDetailDragging = true;
+    detailDragMoved = false;
+    dragStartY = dragCurrentY = e.touches[0].clientY;
+    modalEl.style.transition = 'none';
+  }, { passive: true });
+
+  imageEl.addEventListener('touchmove', function (e) {
+    if (!isDetailDragging) return;
+    dragCurrentY = e.touches[0].clientY;
+    var dy = dragCurrentY - dragStartY;
+    if (dy <= 0) { modalEl.style.transform = ''; return; }
+    detailDragMoved = true;
+    e.preventDefault(); // 페이지 스크롤/당겨서 새로고침 잠금
+    modalEl.style.transform = 'translateY(' + dy + 'px)';
+  }, { passive: false });
+
+  function endDetailDrag() {
+    if (!isDetailDragging) return;
+    isDetailDragging = false;
+    var dy = Math.max(0, dragCurrentY - dragStartY);
+    if (dy > DRAG_CLOSE_THRESHOLD) {
+      closeModal();
+      return;
+    }
+    modalEl.style.transition = 'transform .2s ease';
+    modalEl.style.transform = '';
+  }
+  imageEl.addEventListener('touchend', endDetailDrag);
+  imageEl.addEventListener('touchcancel', endDetailDrag);
 
   async function refreshLikedState(imageId) {
     likeBtn.classList.remove('active');
@@ -106,6 +151,7 @@
   });
 
   imageEl.addEventListener('click', function () {
+    if (detailDragMoved) { detailDragMoved = false; return; }
     if (currentImageId) window.galOpenImageView(imageEl.src);
   });
 
