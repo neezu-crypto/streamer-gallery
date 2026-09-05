@@ -113,8 +113,18 @@
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
 
   likeBtn.addEventListener('click', async function () {
-    if (!currentImageId) return;
+    if (!currentImageId || likeBtn.disabled) return;
     if (!window.galTrusted) { closeModal(); window.galOpenLoginModal && window.galOpenLoginModal(); return; }
+
+    // 낙관적 업데이트 — 서버 응답을 기다리지 않고 바로 화면에 반영, 실패하면
+    // 원래 상태로 되돌린다(성공 시엔 서버가 확정한 진짜 값으로 다시 맞춘다 —
+    // 동시에 여러 명이 좋아요를 눌러서 카운트가 낙관값과 다를 수 있어서).
+    var wasLiked = likeBtn.classList.contains('active');
+    var prevCount = parseInt(likeCountEl.textContent, 10) || 0;
+    var optimisticLiked = !wasLiked;
+    likeBtn.classList.toggle('active', optimisticLiked);
+    likeCountEl.textContent = Math.max(0, prevCount + (optimisticLiked ? 1 : -1));
+
     likeBtn.disabled = true;
     try {
       var toggleFn = window.galFirebase.httpsCallable('toggleLike');
@@ -122,6 +132,8 @@
       likeBtn.classList.toggle('active', result.data.liked);
       likeCountEl.textContent = result.data.likeCount;
     } catch (e) {
+      likeBtn.classList.toggle('active', wasLiked);
+      likeCountEl.textContent = prevCount;
       alert('좋아요 처리 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
     } finally {
       likeBtn.disabled = false;
@@ -184,12 +196,29 @@
     if (!window.galTrusted) { closeModal(); window.galOpenLoginModal && window.galOpenLoginModal(); return; }
     var text = commentInput.value.trim();
     if (!text) return;
+
+    // 낙관적 업데이트 — 서버 응답을 기다리지 않고 목록에 바로 추가해 보여준다.
+    // 성공하면 실시간 구독(subscribeComments)이 곧 서버 확정 목록으로 통째로
+    // 다시 그려서 이 임시 항목을 자연스럽게 대체하므로 따로 정리할 필요 없다.
+    // 실패하면 이 임시 항목만 지우고 입력 내용을 복구한다.
+    if (commentsWrap.querySelector('.empty-msg')) commentsWrap.innerHTML = '';
+    var tempRow = document.createElement('div');
+    tempRow.className = 'detail-comment-row';
+    tempRow.style.opacity = '0.55';
+    var textSpan = document.createElement('span');
+    textSpan.className = 'detail-comment-text';
+    textSpan.textContent = text;
+    tempRow.appendChild(textSpan);
+    commentsWrap.appendChild(tempRow);
+    commentInput.value = '';
+
     commentSubmitBtn.disabled = true;
     try {
       var postFn = window.galFirebase.httpsCallable('postComment');
       await postFn({ imageId: currentImageId, text: text });
-      commentInput.value = '';
     } catch (e) {
+      if (tempRow.parentNode) tempRow.parentNode.removeChild(tempRow);
+      commentInput.value = text;
       alert('댓글 등록 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
     } finally {
       commentSubmitBtn.disabled = false;
