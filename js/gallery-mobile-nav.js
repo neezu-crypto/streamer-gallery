@@ -34,7 +34,7 @@
     });
   }
 
-  var CATEGORY_LABELS_SHORT = { all: '전체', screenshot: 'SS', 'ai-art': 'AI', 'fan-art': '팬', meme: '밈', etc: '기타' };
+  var CATEGORY_LABELS_SHORT = { all: '전체', screenshot: 'SS', selfie: '방셀', 'ai-art': 'AI', 'fan-art': '팬', meme: '밈', etc: '기타' };
 
   var fanOpen = false;
 

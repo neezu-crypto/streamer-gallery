@@ -22,6 +22,7 @@
 
   var CATEGORY_LABELS = {
     screenshot: '스크린샷',
+    selfie: '방셀',
     'ai-art': 'AI 일러스트',
     'fan-art': '팬아트',
     meme: '밈',

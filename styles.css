@@ -644,6 +644,7 @@ button{ font-family: inherit; cursor: pointer; }
   .mtab-chip-fan .mtab-chip:nth-child(4){ transition-delay:.09s; }
   .mtab-chip-fan .mtab-chip:nth-child(5){ transition-delay:.12s; }
   .mtab-chip-fan .mtab-chip:nth-child(6){ transition-delay:.15s; }
+  .mtab-chip-fan .mtab-chip:nth-child(7){ transition-delay:.18s; }
   .mtab-chip-fan .mtab-chip.drag-hover{ transform:scale(1.22); background:var(--gold-dim); color:var(--gold-text); transition-delay:0s; }
   .mtab-chip-fan .mtab-chip.confirm-pulse{ animation:mtab-chip-confirm .28s ease; transition-delay:0s; }
 

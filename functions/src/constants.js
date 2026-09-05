@@ -32,7 +32,7 @@ const PROFILE_NICKNAME_MAX_LENGTH = 12;
 const SOOP_ID_RE = /^[a-z0-9]{2,20}$/;
 
 // 카테고리는 고정 목록 — RTDB .indexOn으로 필터링하기 쉽게 문자열 enum으로 둔다.
-const CATEGORIES = ['screenshot', 'ai-art', 'fan-art', 'meme', 'etc'];
+const CATEGORIES = ['screenshot', 'selfie', 'ai-art', 'fan-art', 'meme', 'etc'];
 
 // 스트리머별 업로드 잠금(2026-09-05 추가) — 기본적으로 모든 스트리머는 업로드가
 // 잠겨있고, 별풍선 100개 후원 인증(관리자 수동 확인)을 거쳐야 해금된다. 후원
