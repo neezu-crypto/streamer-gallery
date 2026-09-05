@@ -36,7 +36,7 @@
       var img = findImage(r.imageId);
       var thumb = img ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="">' : '';
       var when = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR') : '';
-      var banBtn = img && img.uploaderUid
+      var banBtn = (img && img.uploaderUid && img.uploaderUid !== (window.galUser && window.galUser.uid))
         ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>'
         : '';
       return (
@@ -69,7 +69,7 @@
             '<div class="admin-row-reason">♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
-            (img.uploaderUid ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +
+            (img.uploaderUid && img.uploaderUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +
             '<button class="text-link admin-delete-btn" type="button">삭제</button>' +
           '</div>' +
         '</div>'

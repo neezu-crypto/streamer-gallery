@@ -144,6 +144,7 @@ const banGalleryAccount = onCall(async (request) => {
   const adminName = (request.auth.token && (request.auth.token.name || request.auth.token.email)) || adminUid;
   const { uid, reason } = request.data || {};
   if (!uid) throw new HttpsError('invalid-argument', '대상 uid를 입력해 주세요.');
+  if (uid === adminUid) throw new HttpsError('invalid-argument', '본인 계정은 정지할 수 없어요.');
   if (!reason || !reason.trim()) throw new HttpsError('invalid-argument', '정지 사유를 입력해 주세요.');
 
   await getDatabase().ref('bannedAccounts/' + uid + '/games/gallery').set({
