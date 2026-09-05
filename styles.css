@@ -91,14 +91,16 @@ button{ font-family: inherit; cursor: pointer; }
   display:flex; align-items:center; gap:14px; padding:14px 24px;
   background:var(--panel); border-bottom:1px solid var(--hairline);
 }
+/* 폭 고정(flex:1 + max-width) 대신 내용물(아이콘+placeholder) 크기에 맞춰
+   자연스럽게 좁게 — 검색창이 화면 폭에 따라 억지로 늘어나지 않게 한다. */
 .search-pill{
-  flex:1; max-width:640px; display:flex; align-items:center; gap:10px;
+  width:fit-content; display:flex; align-items:center; gap:10px;
   background:var(--ink); border-radius:999px; padding:11px 18px; cursor:text;
   color:var(--muted);
 }
 .search-pill svg{ flex-shrink:0; }
 .search-pill input{
-  flex:1; border:none; background:transparent; outline:none; font-size:13.5px;
+  width:220px; border:none; background:transparent; outline:none; font-size:13.5px;
   font-family:inherit; color:var(--text); padding:0;
 }
 .search-pill input::placeholder{ color:var(--muted); }
