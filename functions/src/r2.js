@@ -102,12 +102,9 @@ const registerImage = onCall(async (request) => {
   }
 
   const db = getDatabase();
-  // 스트리머별 업로드 잠금(2026-09-05 추가) — 클라이언트가 이미 잠금 여부를 확인하고
-  // 막지만, 그건 UX 편의일 뿐 보안 경계가 아니다. 실제 차단은 여기 서버에서.
-  const unlockedSnap = await db.ref(`gallery/unlockedStreamers/${streamerId}`).get();
-  if (!unlockedSnap.exists() || unlockedSnap.val() !== true) {
-    throw new HttpsError('permission-denied', '아직 해금되지 않은 스트리머입니다.');
-  }
+  // 스트리머별 업로드 잠금은 2026-09-06부로 폐지 — 이제 로그인(신뢰 계정)한
+  // 누구나 잠긴 스트리머 이미지도 올릴 수 있다. 다만 그 이미지의 상세보기는
+  // 여전히 해금 전까지 막혀있다(js/gallery-detail.js의 잠금 체크는 그대로 유지).
 
   const existing = await db.ref(`gallery/images/${imageId}`).get();
   if (existing.exists()) throw new HttpsError('already-exists', '이미 등록된 이미지입니다.');

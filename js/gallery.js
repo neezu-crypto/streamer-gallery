@@ -286,7 +286,7 @@
     uploadStreamerSearch.value = '';
     var unlocked = isStreamerUnlocked(id);
     uploadStreamerSelected.style.display = '';
-    uploadStreamerSelected.textContent = (unlocked ? '✅ ' : '🔒 ') + '선택됨: ' + name + (unlocked ? '' : ' (아직 잠긴 스트리머예요 — 업로드 시도하면 해금 신청으로 안내돼요)');
+    uploadStreamerSelected.textContent = (unlocked ? '✅ ' : '🔒 ') + '선택됨: ' + name + (unlocked ? '' : ' (아직 잠긴 스트리머예요 — 업로드는 바로 되지만, 해금 전까지는 다른 사람이 상세보기를 열 수 없어요)');
   }
 
   if (uploadStreamerSearch) {
@@ -378,13 +378,8 @@
       if (!ALLOWED_CONTENT_TYPES.has(file.type)) { uploadStatus.textContent = '⚠️ jpg/png/webp/gif 이미지만 업로드할 수 있어요.'; return; }
       if (file.size > MAX_UPLOAD_BYTES) { uploadStatus.textContent = '⚠️ 이미지 용량은 15MB 이하여야 해요.'; return; }
 
-      // 스트리머별 업로드 잠금 — 클라이언트 쪽 확인은 UX용이고, 서버(registerImage)가
-      // 다시 한 번 검증한다. 잠겨있으면 업로드 모달을 닫고 해금 신청 모달로 유도.
-      if (!isStreamerUnlocked(selectedStreamerId)) {
-        closeUploadModal();
-        window.galOpenUnlockModal && window.galOpenUnlockModal(selectedStreamerId, selectedStreamerName);
-        return;
-      }
+      // 스트리머별 업로드 잠금은 폐지(2026-09-06) — 로그인 유저면 잠긴 스트리머도
+      // 바로 업로드 가능. 그 이미지의 상세보기 자체는 여전히 해금 전까지 막힌다.
 
       uploadSubmitBtn.disabled = true;
       uploadStatus.textContent = '⏳ 썸네일 생성 중...';
