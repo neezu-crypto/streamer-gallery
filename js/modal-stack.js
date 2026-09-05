@@ -31,6 +31,7 @@
     stack.push(closeFn);
     syncScrollLock();
     history.pushState({ galModal: true }, '', location.href);
+    window.galSound && window.galSound.modalOpen();
   };
   window.galPopModal = function (closeFn) {
     var idx = stack.lastIndexOf(closeFn);
@@ -41,6 +42,7 @@
       suppressPopCount++;
       history.back();
     }
+    window.galSound && window.galSound.modalClose();
   };
 
   document.addEventListener('keydown', function (e) {

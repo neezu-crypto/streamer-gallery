@@ -487,12 +487,14 @@
         });
 
         uploadStatus.textContent = '✅ 업로드 완료!';
+        window.galSound && window.galSound.uploadSuccess();
         try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
         resetStreamerPicker();
         fileInput.value = '';
         setTimeout(closeUploadModal, 700);
       } catch (err) {
         console.error('이미지 업로드 실패', err);
+        window.galSound && window.galSound.error(err);
         uploadStatus.textContent = '❌ 업로드 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
       } finally {
         uploadSubmitBtn.disabled = false;

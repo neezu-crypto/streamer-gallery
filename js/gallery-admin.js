@@ -213,8 +213,10 @@
     try {
       var fn = window.galFirebase.httpsCallable('banGalleryAccount');
       await fn({ uid: uid, reason: reason.trim() });
+      window.galSound && window.galSound.adminAction();
       alert('✅ 정지 처리했어요.');
     } catch (e) {
+      window.galSound && window.galSound.error(e);
       alert('정지 처리 중 오류: ' + (e && e.message ? e.message : e));
     } finally {
       btn.disabled = false;
@@ -227,7 +229,9 @@
     try {
       var fn = window.galFirebase.httpsCallable('adminDeleteImage');
       await fn({ imageId: imageId });
+      window.galSound && window.galSound.adminAction();
     } catch (e) {
+      window.galSound && window.galSound.error(e);
       alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
       btn.disabled = false;
     }
@@ -249,7 +253,9 @@
       try {
         var fn = window.galFirebase.httpsCallable('adminDismissImageReport');
         await fn({ reportId: row.dataset.reportId });
+        window.galSound && window.galSound.adminAction();
       } catch (err) {
+        window.galSound && window.galSound.error(err);
         alert('신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
         btn.disabled = false;
       }
@@ -282,7 +288,9 @@
       try {
         var fn = window.galFirebase.httpsCallable('unbanGalleryAccount');
         await fn({ uid: row.dataset.uid });
+        window.galSound && window.galSound.adminAction();
       } catch (err) {
+        window.galSound && window.galSound.error(err);
         alert('정지 해제 중 오류: ' + (err && err.message ? err.message : err));
         btn.disabled = false;
       }
@@ -299,7 +307,9 @@
       try {
         var approveFn = window.galFirebase.httpsCallable('adminApproveStreamerUnlock');
         await approveFn({ requestId: requestId });
+        window.galSound && window.galSound.adminAction();
       } catch (err) {
+        window.galSound && window.galSound.error(err);
         alert('해금 승인 중 오류: ' + (err && err.message ? err.message : err));
         approveBtn.disabled = false;
       }
@@ -309,7 +319,9 @@
       try {
         var rejectFn = window.galFirebase.httpsCallable('adminRejectStreamerUnlock');
         await rejectFn({ requestId: requestId });
+        window.galSound && window.galSound.adminAction();
       } catch (err) {
+        window.galSound && window.galSound.error(err);
         alert('해금 거절 중 오류: ' + (err && err.message ? err.message : err));
         rejectBtn.disabled = false;
       }

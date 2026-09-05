@@ -170,6 +170,7 @@
     var optimisticLiked = !wasLiked;
     likeBtn.classList.toggle('active', optimisticLiked);
     likeCountEl.textContent = Math.max(0, prevCount + (optimisticLiked ? 1 : -1));
+    if (window.galSound) { if (optimisticLiked) window.galSound.likeOn(); else window.galSound.likeOff(); }
 
     likeBtn.disabled = true;
     try {
@@ -184,6 +185,7 @@
     } catch (e) {
       likeBtn.classList.toggle('active', wasLiked);
       likeCountEl.textContent = prevCount;
+      window.galSound && window.galSound.error(e);
       alert('좋아요 처리 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
     } finally {
       likeBtn.disabled = false;
@@ -197,8 +199,10 @@
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnImage');
       await fn({ imageId: currentImageId });
+      window.galSound && window.galSound.deleteConfirm();
       closeModal();
     } catch (e) {
+      window.galSound && window.galSound.error(e);
       alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
     } finally {
       deleteBtn.disabled = false;
@@ -214,7 +218,9 @@
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnComment');
       await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
+      window.galSound && window.galSound.deleteConfirm();
     } catch (e2) {
+      window.galSound && window.galSound.error(e2);
       alert('댓글 삭제 중 오류: ' + (e2 && e2.message ? e2.message : e2));
       btn.disabled = false;
     }
@@ -233,8 +239,10 @@
       var reportFn = window.galFirebase.httpsCallable('reportImage');
       await reportFn({ imageId: currentImageId, reason: reportReasonInput.value });
       reportStatus.textContent = '✅ 신고가 접수됐어요. 검토 후 조치할게요.';
+      window.galSound && window.galSound.reportSubmitted();
       setTimeout(function () { reportForm.style.display = 'none'; }, 1200);
     } catch (e) {
+      window.galSound && window.galSound.error(e);
       reportStatus.textContent = '❌ 신고 처리 중 오류: ' + (e && e.message ? e.message : e);
     } finally {
       reportSubmitBtn.disabled = false;
@@ -261,6 +269,7 @@
     tempRow.appendChild(textSpan);
     commentsWrap.appendChild(tempRow);
     commentInput.value = '';
+    window.galSound && window.galSound.commentSuccess();
 
     commentSubmitBtn.disabled = true;
     try {
@@ -269,6 +278,7 @@
     } catch (e) {
       if (tempRow.parentNode) tempRow.parentNode.removeChild(tempRow);
       commentInput.value = text;
+      window.galSound && window.galSound.error(e);
       alert('댓글 등록 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
     } finally {
       commentSubmitBtn.disabled = false;
