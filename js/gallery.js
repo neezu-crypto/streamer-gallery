@@ -7,6 +7,7 @@
 // 차이로 같은 스트리머가 다르게 취급되면 해금 여부 판별 자체가 무의미해지기 때문.
 (function () {
   var grid = document.getElementById('gallery-grid');
+  var myGalleryBanner = document.getElementById('mygallery-banner');
   var loadMoreBtn = document.getElementById('gallery-load-more-btn');
   var chipsWrap = document.getElementById('gallery-category-chips');
   var searchInput = document.getElementById('gallery-filter-streamer');
@@ -87,6 +88,11 @@
 
   function renderGrid() {
     if (!grid) return;
+    // 내 갤러리 필터는 같은 그리드를 그대로 걸러서 보여주는 것뿐이라("다른 탭으로
+    // 이동"이 아님), 헷갈리지 않게 켜져 있는 동안 그리드 위에 안내 띠를 띄운다.
+    // renderGrid()가 상태 변경마다 항상 호출되는 지점이라 여기서 동기화하면
+    // 켜고 끄는 모든 경로(버튼 토글, 홈 버튼 리셋)를 따로 챙기지 않아도 된다.
+    if (myGalleryBanner) myGalleryBanner.style.display = myGalleryOnly ? '' : 'none';
     var streamerQuery = (searchInput && searchInput.value || '').trim().toLowerCase();
     var filtered = allImages.filter(function (img) {
       if (myGalleryOnly && (!window.galUser || img.uploaderUid !== window.galUser.uid)) return false;
