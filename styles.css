@@ -122,13 +122,16 @@ button{ font-family: inherit; cursor: pointer; }
    자체를 가운데 정렬하면 넓은 화면에서 사이드바 왼쪽에 여백이 생겨버린다.
    본문(.main-content)은 폭 제한 없이 남은 공간을 그대로 꽉 채운다. */
 .app-shell{ display:flex; align-items:flex-start; }
+/* overflow-y:auto(세로 넘침 방지)를 걸면 브라우저가 overflow-x도 자동으로
+   clip 처리해버려서, 카테고리 칩의 오른쪽으로 튀어나가는 툴팁이 사이드바 폭
+   안에 잘려 보이는 실제 버그가 있었다(2026-09-05, 스크린샷으로 확인). 세로
+   넘침은 확인된 적 없는 가상의 케이스였던 반면 이 잘림은 실제 버그라 —
+   overflow 제거로 툴팁을 우선한다. */
 .sidebar{
   width:76px; flex-shrink:0; position:sticky; top:0; align-self:flex-start;
   display:flex; flex-direction:column; align-items:center; gap:4px; padding:18px 0;
-  max-height:100vh; overflow-y:auto; scrollbar-width:none;
   border-right:1px solid var(--hairline);
 }
-.sidebar::-webkit-scrollbar{ display:none; }
 .sidebar-mark{
   width:44px; height:44px; border-radius:14px; margin-bottom:8px;
   display:flex; align-items:center; justify-content:center; font-size:20px;
