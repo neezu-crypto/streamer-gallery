@@ -342,15 +342,25 @@ button{ font-family: inherit; cursor: pointer; }
 }
 .gallery-load-more-btn:hover{ border-color:var(--gold-line); color:var(--gold-text); }
 .gallery-card{
-  background:var(--panel-raised); border:1px solid var(--hairline); border-radius:2px; overflow:hidden;
-  position:relative; cursor:pointer; transition: border-color .15s, box-shadow .15s;
+  background:var(--panel-raised); border-radius:16px; overflow:hidden;
+  position:relative; cursor:pointer;
 }
-.gallery-card:hover{ border-color:var(--gold-line); box-shadow: 0 0 20px rgba(230,0,35,0.1); }
 .gallery-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-card::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0) 45%);
+  opacity:0; transition:opacity .15s ease;
+}
+.gallery-card:hover::after{ opacity:1; }
+.gallery-card-hover-likes{
+  position:absolute; left:10px; bottom:10px; color:#fff; font-size:12px; font-weight:700;
+  opacity:0; transition:opacity .15s ease; pointer-events:none;
+}
+.gallery-card:hover .gallery-card-hover-likes{ opacity:1; }
 .gallery-lock-badge{
-  position:absolute; top:8px; right:8px; font-size:14px; line-height:1;
-  background:rgba(5,5,5,0.72); border:1px solid var(--gold-line); border-radius:2px;
-  padding:5px 6px; pointer-events:none;
+  position:absolute; top:10px; left:10px; font-size:13px; line-height:1;
+  background:rgba(0,0,0,0.6); color:#fff; border-radius:50%;
+  width:26px; height:26px; display:flex; align-items:center; justify-content:center; pointer-events:none;
 }
 /* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
    모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */

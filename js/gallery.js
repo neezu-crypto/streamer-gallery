@@ -100,9 +100,9 @@
       return;
     }
 
-    // 핀터레스트식 매소너리(2026-09-05 변경) — 카드는 이미지만 보여준다(스트리머명/
-    // 카테고리/좋아요 수는 클릭해서 상세보기로 확인). 잠금 배지만 예외 — 업로드/상세보기가
-    // 막혀있다는 걸 알려주는 기능적 표시라 그대로 둔다.
+    // 핀터레스트식 매소너리 — 평소엔 이미지만, 마우스를 올리면 좋아요 수가
+    // 어두운 그라데이션과 함께 드러난다(호버 리빌). 스트리머명/카테고리는 여전히
+    // 클릭해서 상세보기로만 확인 — 그리드에 상시 노출하지 않는다.
     grid.innerHTML = filtered.map(function (img) {
       var locked = !isStreamerUnlocked(img.streamerId);
       var ratio = (img.width && img.height) ? (img.width / img.height) : '';
@@ -110,6 +110,7 @@
         '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
           (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
           (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
+          '<span class="gallery-card-hover-likes">♥ ' + (img.likeCount || 0) + '</span>' +
         '</div>'
       );
     }).join('');
