@@ -68,6 +68,19 @@ async function isVerifiedStreamerUid(uid) {
   return snap.exists();
 }
 
+// 인증된 스트리머 본인의 닉네임을 가져온다 — gallery/images에는 스트리머의 uid가
+// 아니라 streamerName(문자열)만 있어서, "이 이미지가 나를 대상으로 한 것"을
+// 판별하려면 인증 닉네임과 이름 문자열을 대조하는 것 외엔 방법이 없다(streamer-
+// names.json/stocks 어디에도 soopId-스트리머ID 매핑이 없음, 2026-09-06 확인).
+async function getVerifiedStreamerNickname(uid) {
+  const db = getDatabase();
+  const snap = await db.ref('streamerVerifications').orderByChild('uid').equalTo(uid).limitToFirst(1).get();
+  if (!snap.exists()) return null;
+  let nickname = null;
+  snap.forEach((child) => { nickname = child.val().nickname || null; });
+  return nickname;
+}
+
 // 구글·카카오 로그인을 꺼리는 스트리머도 관리자 검수만 통과하면 익명 세션이어도
 // 실계정과 완전히 동일하게 업로드/좋아요/댓글을 쓸 수 있어야 한다(자매 저장소들과
 // 동일 원칙).
@@ -95,6 +108,7 @@ module.exports = {
   isAdminUid,
   isAdmin,
   isVerifiedStreamerUid,
+  getVerifiedStreamerNickname,
   isTrustedAccount,
   requireTrustedAccount,
 };

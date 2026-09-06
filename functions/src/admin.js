@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
-const { requireAuth, isAdmin, assertNotBanned } = require('./lib/auth');
+const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -77,6 +77,10 @@ const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_K
 
 // 본인이 업로드한 이미지 셀프 삭제(2026-09-05 추가) — 관리자 승인 없이도 본인
 // 콘텐츠는 직접 지울 수 있어야 한다.
+// 인증 스트리머 본인 대상 이미지 삭제(2026-09-06 추가) — 팬이 올린 자신의
+// 팬아트/스크린샷도 스트리머 본인이 원하면 지울 수 있어야 한다. gallery/images엔
+// 스트리머의 uid가 아니라 streamerName(문자열)만 있어서, 인증 시 등록한 닉네임과
+// 이름이 일치하는지로 판별한다(soopId-스트리머ID 매핑이 별도로 없어 이 방법뿐).
 const deleteOwnImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   const uid = requireAuth(request);
   await assertNotBanned(uid);
@@ -85,8 +89,15 @@ const deleteOwnImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 
   const imageSnap = await getDatabase().ref(`gallery/images/${imageId}`).get();
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
-  if (imageSnap.val().uploaderUid !== uid) {
-    throw new HttpsError('permission-denied', '본인이 업로드한 이미지만 삭제할 수 있어요.');
+  const image = imageSnap.val();
+
+  const isUploader = image.uploaderUid === uid;
+  if (!isUploader) {
+    const verifiedNickname = await getVerifiedStreamerNickname(uid);
+    const isDepictedStreamer = !!verifiedNickname && verifiedNickname === image.streamerName;
+    if (!isDepictedStreamer) {
+      throw new HttpsError('permission-denied', '본인이 업로드했거나, 본인을 대상으로 한 이미지만 삭제할 수 있어요.');
+    }
   }
 
   await performImageDeletion(imageId);
