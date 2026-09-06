@@ -48,6 +48,7 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app);
 const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
+const logGalleryVisitFn = httpsCallable(functions, 'logGalleryVisit');
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -
@@ -193,6 +194,11 @@ async function checkVerifiedStreamer(uid) {
     const record = snap.exists() ? Object.values(snap.val())[0] : null;
     window.galVerifiedStreamerNickname = record ? (record.nickname || null) : null;
     if (record) await autoFillProfileFromVerification(uid, record.nickname, record.soopId);
+    // 인증 스트리머 접속 시 관리자 디스코드 알림(2026-09-06 추가) — 하루 한 번
+    // 제한 등 실제 발송 여부는 서버(logGalleryVisit)가 판단한다.
+    if (window.galIsVerifiedStreamer) {
+      logGalleryVisitFn().catch((e) => console.error('접속 로그 실패', e));
+    }
   } catch (e) {
     console.error('스트리머 인증 여부 확인 실패', e);
     window.galIsVerifiedStreamer = false;
