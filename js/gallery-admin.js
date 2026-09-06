@@ -11,6 +11,7 @@
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
   var bansPanel = document.getElementById('admin-bans-panel');
+  var linksPanel = document.getElementById('admin-links-panel');
   if (!backdrop) return;
 
   var reportsUnsub = null;
@@ -19,6 +20,10 @@
   var latestUnlockRequests = [];
   var bansUnsub = null;
   var latestBans = [];
+  var verificationsUnsub = null;
+  var accountLinksUnsub = null;
+  var latestVerifications = [];
+  var latestAccountLinks = {};
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -93,6 +98,62 @@
         '</div>'
       );
     }).join('');
+  }
+
+  // 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — deleteOwnImage의
+  // 이름 자동 대조가 표기 차이(오타·띄어쓰기 등)로 실패하는 경우를 관리자가 직접
+  // 보정한다. streamerVerifications는 공개 노드라 여기서도 그대로 읽을 수 있다.
+  function renderLinks() {
+    if (!latestVerifications.length) { linksPanel.innerHTML = '<p class="empty-msg">인증된 스트리머가 없어요.</p>'; return; }
+    linksPanel.innerHTML = latestVerifications.map(function (v) {
+      var link = latestAccountLinks[v.uid];
+      var statusText = link
+        ? ('✅ 연결됨: ' + escapeHtml(link.streamerName))
+        : '⚠️ 미연결(이름 자동 대조만 적용)';
+      return (
+        '<div class="admin-row" data-uid="' + escapeHtml(v.uid) + '" style="flex-direction:column; align-items:stretch;">' +
+          '<div style="display:flex; align-items:center; gap:12px;">' +
+            '<div class="admin-row-body">' +
+              '<div class="admin-row-meta">' + escapeHtml(v.nickname) + ' · ' + escapeHtml(v.soopId) + '</div>' +
+              '<div class="admin-row-reason">' + statusText + '</div>' +
+            '</div>' +
+            '<div class="admin-row-actions">' +
+              '<button class="text-link admin-link-btn" type="button">' + (link ? '변경' : '연결') + '</button>' +
+              (link ? '<button class="text-link admin-unlink-btn" type="button">연결 해제</button>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="admin-link-search" style="display:none; margin-top:10px;">' +
+            '<input type="text" class="admin-link-search-input" placeholder="스트리머 이름으로 검색">' +
+            '<div class="streamer-search-results admin-link-search-results"></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function subscribeVerifications() {
+    if (verificationsUnsub) return;
+    var vRef = window.galFirebase.ref(window.galDb, 'streamerVerifications');
+    verificationsUnsub = window.galFirebase.onValue(vRef, function (snap) {
+      var data = snap.val() || {};
+      latestVerifications = Object.keys(data).map(function (id) { return data[id]; })
+        .sort(function (a, b) { return (b.verifiedAt || 0) - (a.verifiedAt || 0); });
+      renderLinks();
+    }, function (err) {
+      console.error('인증 스트리머 목록 구독 실패', err);
+      linksPanel.innerHTML = '<p class="empty-msg">인증 스트리머 목록을 불러오지 못했어요.</p>';
+    });
+  }
+
+  function subscribeAccountLinks() {
+    if (accountLinksUnsub) return;
+    var lRef = window.galFirebase.ref(window.galDb, 'gallery/streamerAccountLinks');
+    accountLinksUnsub = window.galFirebase.onValue(lRef, function (snap) {
+      latestAccountLinks = snap.val() || {};
+      renderLinks();
+    }, function (err) {
+      console.error('스트리머 연결 목록 구독 실패', err);
+    });
   }
 
   function renderUnlocks() {
@@ -174,7 +235,7 @@
 
   document.addEventListener('gal-auth-changed', function (e) {
     adminBtn.style.display = e.detail.isAdmin ? '' : 'none';
-    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); subscribeBans(); }
+    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); subscribeBans(); subscribeVerifications(); subscribeAccountLinks(); }
   });
   document.addEventListener('gal-images-updated', function () {
     if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
@@ -189,6 +250,7 @@
     renderImages();
     renderUnlocks();
     renderBans();
+    renderLinks();
   });
   closeBtn.addEventListener('click', closeAdminPanel);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeAdminPanel(); });
@@ -203,6 +265,7 @@
     imagesPanel.style.display = tab === 'images' ? '' : 'none';
     unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
     bansPanel.style.display = tab === 'bans' ? '' : 'none';
+    linksPanel.style.display = tab === 'links' ? '' : 'none';
   });
 
   async function banUploader(uid, btn) {
@@ -326,5 +389,61 @@
         rejectBtn.disabled = false;
       }
     }
+  });
+
+  linksPanel.addEventListener('click', async function (e) {
+    var row = e.target.closest('.admin-row');
+    if (!row) return;
+    var uid = row.dataset.uid;
+
+    if (e.target.closest('.admin-link-btn')) {
+      var searchBox = row.querySelector('.admin-link-search');
+      var isOpen = searchBox.style.display !== 'none';
+      searchBox.style.display = isOpen ? 'none' : '';
+      if (!isOpen) row.querySelector('.admin-link-search-input').focus();
+      return;
+    }
+
+    if (e.target.closest('.admin-unlink-btn')) {
+      if (!confirm('이 계정의 스트리머 연결을 해제할까요?')) return;
+      var unlinkBtn = e.target;
+      unlinkBtn.disabled = true;
+      try {
+        var unlinkFn = window.galFirebase.httpsCallable('adminUnlinkStreamerAccount');
+        await unlinkFn({ uid: uid });
+        window.galSound && window.galSound.adminAction();
+      } catch (err) {
+        window.galSound && window.galSound.error(err);
+        alert('연결 해제 중 오류: ' + (err && err.message ? err.message : err));
+        unlinkBtn.disabled = false;
+      }
+      return;
+    }
+
+    var pickedRow = e.target.closest('.streamer-row');
+    if (pickedRow) {
+      try {
+        var linkFn = window.galFirebase.httpsCallable('adminLinkStreamerAccount');
+        await linkFn({ uid: uid, streamerId: pickedRow.dataset.streamerId, streamerName: pickedRow.dataset.streamerName });
+        window.galSound && window.galSound.adminAction();
+      } catch (err) {
+        window.galSound && window.galSound.error(err);
+        alert('스트리머 연결 중 오류: ' + (err && err.message ? err.message : err));
+      }
+    }
+  });
+
+  linksPanel.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('admin-link-search-input')) return;
+    var row = e.target.closest('.admin-row');
+    var resultsEl = row.querySelector('.admin-link-search-results');
+    var q = e.target.value.trim();
+    resultsEl.innerHTML = '';
+    if (!q) return;
+    var matches = (window.galAllStreamers || []).filter(function (s) { return s.name.includes(q); }).slice(0, 12);
+    if (!matches.length) { resultsEl.innerHTML = '<p class="empty-msg">일치하는 스트리머가 없어요.</p>'; return; }
+    resultsEl.innerHTML = matches.map(function (s) {
+      return '<div class="streamer-row" data-streamer-id="' + escapeHtml(s.id) + '" data-streamer-name="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</div>';
+    }).join('');
   });
 })();

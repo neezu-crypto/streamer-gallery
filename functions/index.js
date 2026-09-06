@@ -4,7 +4,7 @@ initializeApp();
 const { galleryCheckAdmin } = require('./src/whoami');
 const { requestImageUpload, registerImage } = require('./src/r2');
 const { toggleLike, postComment, reportImage, hideImage, unhideImage } = require('./src/interactions');
-const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount } = require('./src/admin');
+const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount } = require('./src/admin');
 const { updateGalleryProfile } = require('./src/profile');
 const { requestStreamerUnlock, cancelStreamerUnlockRequest, adminApproveStreamerUnlock, adminRejectStreamerUnlock } = require('./src/unlock');
 
@@ -27,6 +27,8 @@ module.exports = {
   adminDismissImageReport,
   banGalleryAccount,
   unbanGalleryAccount,
+  adminLinkStreamerAccount,
+  adminUnlinkStreamerAccount,
   updateGalleryProfile,
   requestStreamerUnlock,
   cancelStreamerUnlockRequest,

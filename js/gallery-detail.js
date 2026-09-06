@@ -140,10 +140,14 @@
     streamerEl.textContent = img.streamerName || '익명';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
-    // 본인이 업로드했거나(uploaderUid), 인증 스트리머 본인을 대상으로 한 이미지면
-    // (2026-09-06 추가) 삭제 버튼을 보여준다 — 서버(deleteOwnImage)도 동일하게 검증.
+    // 본인이 업로드했거나, 인증 스트리머 본인을 대상으로 한 이미지면(2026-09-06
+    // 추가) 삭제 버튼을 보여준다 — 서버(deleteOwnImage)도 동일하게 검증. 이름 대신
+    // 관리자가 수동 연결해둔 streamerId(galLinkedStreamerId)가 있으면 그쪽을
+    // 우선하고, 없으면 인증 닉네임과 이름을 대조한다(표기 차이로 실패할 수 있음).
     var isUploader = !!(window.galUser && img.uploaderUid === window.galUser.uid);
-    var isDepictedStreamer = !!(window.galVerifiedStreamerNickname && window.galVerifiedStreamerNickname === img.streamerName);
+    var isDepictedByLink = !!(window.galLinkedStreamerId && window.galLinkedStreamerId === img.streamerId);
+    var isDepictedByName = !!(window.galVerifiedStreamerNickname && window.galVerifiedStreamerNickname === img.streamerName);
+    var isDepictedStreamer = isDepictedByLink || isDepictedByName;
     deleteBtn.style.display = (isUploader || isDepictedStreamer) ? '' : 'none';
     deleteBtn.textContent = isUploader ? '내 이미지 삭제' : '내 사진 삭제(스트리머 인증)';
     reportForm.style.display = 'none';

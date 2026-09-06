@@ -50,6 +50,7 @@
 
   fetch('./streamer-names.json').then(function (res) { return res.json(); }).then(function (data) {
     allStreamers = data;
+    window.galAllStreamers = allStreamers; // 관리자 패널의 스트리머 연결 검색이 재사용
   }).catch(function (e) { console.error('스트리머 이름 목록을 불러오지 못했습니다:', e); });
 
   window.galUnlockedStreamers = {};

@@ -74,6 +74,7 @@ window.galIsAdmin = false;
 // isTrustedAccount와 짝을 이루는 클라이언트 쪽 판정).
 window.galIsVerifiedStreamer = false;
 window.galVerifiedStreamerNickname = null;
+window.galLinkedStreamerId = null;
 window.galTrusted = false;
 function updateTrusted() {
   window.galTrusted = !!(window.galRealUser || window.galIsAdmin || window.galIsVerifiedStreamer);
@@ -196,6 +197,17 @@ async function checkVerifiedStreamer(uid) {
     console.error('스트리머 인증 여부 확인 실패', e);
     window.galIsVerifiedStreamer = false;
     window.galVerifiedStreamerNickname = null;
+  }
+
+  // 관리자가 수동으로 연결해둔 streamerId(2026-09-06 추가) — 이름 표기 차이로
+  // galVerifiedStreamerNickname 대조가 실패하는 경우의 보정 수단. 본인 uid
+  // 아래에서만 읽을 수 있게 규칙이 스코프돼 있다.
+  try {
+    const linkSnap = await get(ref(db, 'gallery/streamerAccountLinks/' + uid));
+    window.galLinkedStreamerId = linkSnap.exists() ? linkSnap.val().streamerId : null;
+  } catch (e) {
+    console.error('연결된 스트리머ID 확인 실패', e);
+    window.galLinkedStreamerId = null;
   }
 }
 

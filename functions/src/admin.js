@@ -79,23 +79,35 @@ const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_K
 // 콘텐츠는 직접 지울 수 있어야 한다.
 // 인증 스트리머 본인 대상 이미지 삭제(2026-09-06 추가) — 팬이 올린 자신의
 // 팬아트/스크린샷도 스트리머 본인이 원하면 지울 수 있어야 한다. gallery/images엔
-// 스트리머의 uid가 아니라 streamerName(문자열)만 있어서, 인증 시 등록한 닉네임과
-// 이름이 일치하는지로 판별한다(soopId-스트리머ID 매핑이 별도로 없어 이 방법뿐).
+// 스트리머의 uid가 아니라 streamerName(문자열)만 있어서, 기본적으로는 인증 시
+// 등록한 닉네임과 이름이 일치하는지로 판별한다(soopId-스트리머ID 매핑이 별도로
+// 없어 이 방법뿐). 다만 표기 차이(오타·띄어쓰기 등)로 이름이 안 맞을 수 있어서,
+// 관리자가 gallery/streamerAccountLinks/{uid}로 특정 streamerId를 수동 연결해두면
+// 그 연결을 이름 일치보다 우선 신뢰한다.
 const deleteOwnImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   const uid = requireAuth(request);
   await assertNotBanned(uid);
   const { imageId } = request.data || {};
   if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
 
-  const imageSnap = await getDatabase().ref(`gallery/images/${imageId}`).get();
+  const db = getDatabase();
+  const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
   const image = imageSnap.val();
 
   const isUploader = image.uploaderUid === uid;
   if (!isUploader) {
-    const verifiedNickname = await getVerifiedStreamerNickname(uid);
-    const isDepictedStreamer = !!verifiedNickname && verifiedNickname === image.streamerName;
-    if (!isDepictedStreamer) {
+    const linkSnap = await db.ref(`gallery/streamerAccountLinks/${uid}`).get();
+    const link = linkSnap.exists() ? linkSnap.val() : null;
+    const isDepictedByLink = !!link && link.streamerId === image.streamerId;
+
+    let isDepictedByName = false;
+    if (!isDepictedByLink) {
+      const verifiedNickname = await getVerifiedStreamerNickname(uid);
+      isDepictedByName = !!verifiedNickname && verifiedNickname === image.streamerName;
+    }
+
+    if (!isDepictedByLink && !isDepictedByName) {
       throw new HttpsError('permission-denied', '본인이 업로드했거나, 본인을 대상으로 한 이미지만 삭제할 수 있어요.');
     }
   }
@@ -180,4 +192,50 @@ const unbanGalleryAccount = onCall(async (request) => {
   return { status: 'unbanned' };
 });
 
-module.exports = { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, banGalleryAccount, unbanGalleryAccount };
+// 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — deleteOwnImage의
+// 이름 일치 판별이 표기 차이(오타·띄어쓰기 등)로 실패하는 경우를 관리자가 직접
+// 보정할 수 있게 한다. 대상 uid가 실제로 인증된 스트리머인지도 같이 검증한다
+// (인증 안 된 계정에 연결해봐야 isTrustedAccount 등 다른 권한 체계와 안 맞음).
+const adminLinkStreamerAccount = onCall(async (request) => {
+  const adminUid = await requireAdmin(request);
+  const adminName = (request.auth.token && (request.auth.token.name || request.auth.token.email)) || adminUid;
+  const { uid, streamerId, streamerName } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', '대상 uid를 입력해 주세요.');
+  if (!streamerId || !streamerName) throw new HttpsError('invalid-argument', '연결할 스트리머를 선택해 주세요.');
+
+  const isVerified = await getVerifiedStreamerNickname(uid);
+  if (!isVerified) throw new HttpsError('failed-precondition', '스트리머 인증이 완료된 계정만 연결할 수 있어요.');
+
+  await getDatabase().ref(`gallery/streamerAccountLinks/${uid}`).set({
+    streamerId,
+    streamerName,
+    linkedAt: Date.now(),
+    linkedBy: adminUid,
+    linkedByName: adminName,
+  });
+  await logAudit(adminUid, adminName, 'gallery.linkStreamerAccount', `${uid} → ${streamerName} (${streamerId})`);
+  return { linked: true };
+});
+
+const adminUnlinkStreamerAccount = onCall(async (request) => {
+  const adminUid = await requireAdmin(request);
+  const adminName = (request.auth.token && (request.auth.token.name || request.auth.token.email)) || adminUid;
+  const { uid } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', '대상 uid를 입력해 주세요.');
+
+  await getDatabase().ref(`gallery/streamerAccountLinks/${uid}`).remove();
+  await logAudit(adminUid, adminName, 'gallery.unlinkStreamerAccount', uid);
+  return { unlinked: true };
+});
+
+module.exports = {
+  adminDeleteImage,
+  deleteOwnImage,
+  adminDeleteComment,
+  deleteOwnComment,
+  adminDismissImageReport,
+  banGalleryAccount,
+  unbanGalleryAccount,
+  adminLinkStreamerAccount,
+  adminUnlinkStreamerAccount,
+};

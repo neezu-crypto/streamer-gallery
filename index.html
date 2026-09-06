@@ -222,6 +222,7 @@
       <button class="chip" type="button" data-admin-tab="images">전체 이미지</button>
       <button class="chip" type="button" data-admin-tab="unlocks">해금 신청</button>
       <button class="chip" type="button" data-admin-tab="bans">정지 관리</button>
+      <button class="chip" type="button" data-admin-tab="links">스트리머 연결</button>
     </div>
     <div class="admin-panel-body" id="admin-reports-panel">
       <p class="empty-msg">신고 목록을 불러오는 중...</p>
@@ -234,6 +235,11 @@
     </div>
     <div class="admin-panel-body" id="admin-bans-panel" style="display:none;">
       <p class="empty-msg">정지된 계정을 불러오는 중...</p>
+    </div>
+    <!-- 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — 이름 표기
+         차이로 자동 판별이 실패하는 경우를 관리자가 직접 보정한다. -->
+    <div class="admin-panel-body" id="admin-links-panel" style="display:none;">
+      <p class="empty-msg">인증 스트리머 목록을 불러오는 중...</p>
     </div>
   </div>
 </div>
