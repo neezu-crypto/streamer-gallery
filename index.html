@@ -143,6 +143,15 @@
     </select>
     <input type="file" id="upload-file" accept="image/*">
     <button class="glitch-btn" id="upload-submit-btn" type="button">업로드하기</button>
+    <div class="upload-progress" id="upload-progress" style="display:none;">
+      <div class="upload-progress-row">
+        <span class="upload-progress-stage" id="upload-progress-stage"></span>
+        <span class="upload-progress-pct" id="upload-progress-pct"></span>
+      </div>
+      <div class="upload-progress-track">
+        <div class="upload-progress-fill" id="upload-progress-fill" style="width:0%"></div>
+      </div>
+    </div>
     <p class="propose-modal-sub" id="upload-status"></p>
   </div>
 </div>

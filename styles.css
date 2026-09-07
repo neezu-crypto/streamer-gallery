@@ -324,6 +324,35 @@ button{ font-family: inherit; cursor: pointer; }
 }
 .glitch-btn:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
 .glitch-btn:disabled{ background:var(--nb-muted); color:var(--muted); border-color:var(--hairline); box-shadow:none; }
+
+/* ---------- 업로드 진행바(2026-09-07) — "업로드중입니다" 텍스트 한 줄
+   대신 단계별(썸네일/준비/업로드/등록 4단계, 25%씩) 계단식 진행바로 대체.
+   업로드 모달과 같은 잉크 테두리+하드 섀도우+레드 액센트 문법을 그대로 써서
+   같은 카드 안 다른 컴포넌트(입력창·버튼)와 한 세트로 보이게 했다. */
+.upload-progress{ margin-top:14px; }
+.upload-progress-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; gap:10px; }
+.upload-progress-stage{ font-size:12px; font-weight:700; color:var(--nb-border); }
+.upload-progress-pct{ font-size:12px; font-weight:800; color:var(--gold); font-variant-numeric:tabular-nums; }
+.upload-progress-track{
+  width:100%; height:14px; border:2.5px solid var(--nb-border); border-radius:7px;
+  background:var(--panel); box-shadow:3px 3px 0 var(--nb-border); overflow:hidden;
+}
+.upload-progress-fill{
+  height:100%; background:var(--gold); width:0%; position:relative;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* 채워진 부분에 흐르는 사선 스트라이프 - "멈춘 게 아니라 진행 중"임을 알림 */
+.upload-progress-fill::after{
+  content:''; position:absolute; inset:0;
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.28) 0 6px, transparent 6px 12px);
+  animation: upload-progress-stripe 0.9s linear infinite;
+}
+@keyframes upload-progress-stripe{ from{ background-position:0 0; } to{ background-position:17px 0; } }
+@media (prefers-reduced-motion: reduce){
+  .upload-progress-fill{ transition:none; }
+  .upload-progress-fill::after{ animation:none; }
+}
+
 @media (prefers-reduced-motion: reduce){
   #gallery-category-chips .chip:hover .chip-label{ animation:none; }
 }

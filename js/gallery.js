@@ -20,6 +20,26 @@
   var uploadStreamerResults = document.getElementById('upload-streamer-results');
   var uploadStreamerSelected = document.getElementById('upload-streamer-selected');
 
+  // 업로드 진행바(2026-09-07) — "⏳ ~~ 중..." 텍스트 한 줄 대신 4단계
+  // 계단식 진행바로 대체. 검증 실패(⚠️)/에러(❌) 메시지는 그대로 uploadStatus
+  // 텍스트로 남기고, "진행 중" 상태만 이쪽으로 옮겼다.
+  var uploadProgress = document.getElementById('upload-progress');
+  var uploadProgressStage = document.getElementById('upload-progress-stage');
+  var uploadProgressPct = document.getElementById('upload-progress-pct');
+  var uploadProgressFill = document.getElementById('upload-progress-fill');
+  function setUploadProgress(stageLabel, pct) {
+    if (!uploadProgress) return;
+    uploadProgress.style.display = '';
+    uploadProgressStage.textContent = stageLabel;
+    uploadProgressPct.textContent = pct + '%';
+    uploadProgressFill.style.width = pct + '%';
+  }
+  function hideUploadProgress() {
+    if (!uploadProgress) return;
+    uploadProgress.style.display = 'none';
+    uploadProgressFill.style.width = '0%';
+  }
+
   var CATEGORY_LABELS = {
     screenshot: '스크린샷',
     selfie: '방셀',
@@ -402,6 +422,7 @@
       return;
     }
     if (uploadStatus) uploadStatus.textContent = '';
+    hideUploadProgress();
     resetStreamerPicker();
     // 같은 스트리머 이미지를 연속으로 올리는 경우가 많아서, 마지막으로
     // 업로드에 성공한 스트리머를 열 때마다 미리 선택해둔다(2026-09-05 추가).
@@ -468,23 +489,24 @@
       // 바로 업로드 가능. 그 이미지의 상세보기 자체는 여전히 해금 전까지 막힌다.
 
       uploadSubmitBtn.disabled = true;
-      uploadStatus.textContent = '⏳ 썸네일 생성 중...';
+      uploadStatus.textContent = '';
+      setUploadProgress('썸네일 생성 중…', 15);
       try {
         var thumb = await makeThumbnailBlob(file);
 
-        uploadStatus.textContent = '⏳ 업로드 준비 중...';
+        setUploadProgress('업로드 준비 중…', 35);
         var requestUploadFn = window.galFirebase.httpsCallable('requestImageUpload');
         var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size });
         var uploadUrl = prepared.data.uploadUrl, thumbUploadUrl = prepared.data.thumbUploadUrl;
         var imageId = prepared.data.imageId, key = prepared.data.key, thumbKey = prepared.data.thumbKey;
 
-        uploadStatus.textContent = '⏳ 이미지 업로드 중...';
+        setUploadProgress('이미지 업로드 중…', 60);
         var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
         if (!putRes.ok) throw new Error('R2 업로드 실패 (status ' + putRes.status + ')');
         var thumbPutRes = await fetch(thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
         if (!thumbPutRes.ok) throw new Error('썸네일 업로드 실패 (status ' + thumbPutRes.status + ')');
 
-        uploadStatus.textContent = '⏳ 등록 중...';
+        setUploadProgress('등록 중…', 85);
         var registerFn = window.galFirebase.httpsCallable('registerImage');
         await registerFn({
           imageId: imageId, key: key, thumbKey: thumbKey,
@@ -492,6 +514,7 @@
           width: thumb.width, height: thumb.height,
         });
 
+        setUploadProgress('완료!', 100);
         uploadStatus.textContent = '✅ 업로드 완료!';
         window.galSound && window.galSound.uploadSuccess();
         try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
@@ -501,6 +524,7 @@
       } catch (err) {
         console.error('이미지 업로드 실패', err);
         window.galSound && window.galSound.error(err);
+        hideUploadProgress();
         uploadStatus.textContent = '❌ 업로드 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
       } finally {
         uploadSubmitBtn.disabled = false;
