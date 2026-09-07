@@ -594,6 +594,12 @@ button{ font-family: inherit; cursor: pointer; }
   color:rgba(255,255,255,0.75); font-size:12px; font-weight:600; letter-spacing:0.02em;
   white-space:nowrap; pointer-events:none; text-shadow:0 1px 4px rgba(0,0,0,0.5);
 }
+/* 모바일 전용 힌트는 기본(데스크톱)에서 아예 숨겨야 한다 - 이 규칙이 없으면
+   .modal-hint-mobile도 위 .modal-hint 스타일만 그대로 물려받아 데스크톱에서
+   "이미지를 아래로 밀어서 닫기" 문구가 그대로 노출된다(2026-09-08 실사용
+   확인된 버그 - 아래 미디어쿼리 안에서만 표시 방법을 정의하고, 바깥에서
+   숨기는 걸 빠뜨렸었음). */
+.modal-hint-mobile{ display:none; }
 @media (max-width:720px){
   .modal-hint{ display:none; }
   /* 모바일 전용 힌트(2026-09-06 추가) — 상세 패널이 풀스크린이라 하단이 밝은
