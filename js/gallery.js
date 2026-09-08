@@ -184,8 +184,31 @@
   }
   // "최근에 확인함" 배지는 localStorage 값이 바뀐다고 그리드가 저절로 다시 그려지지
   // 않으므로(2026-09-06 실사용 테스트로 발견 — 상세 패널을 열고 닫아도 배지가 바로
-  // 안 바뀜), gallery-detail.js가 값을 갱신한 직후 이 함수를 불러 즉시 반영한다.
+  // 안 바뀜), gallery-detail.js가 값을 갱신한 직후 이 함수를 불러 즉시 반영했었다.
   window.galRenderGrid = renderGrid;
+
+  // 배지 하나 옮기자고 그리드 전체를 innerHTML로 통째로 다시 그리면(renderGrid())
+  // 새 카드들이 masonry span(grid-row-end)을 다시 계산받기 전까지 한순간 전부
+  // 기본 높이로 쪼그라들어 문서 전체 높이가 스크롤 위치보다 짧아지는 순간이
+  // 생기고, 브라우저가 그 순간 스크롤을 강제로 클램프해버린다 - applyMasonrySpans()가
+  // 같은 틱에 바로 이어져도 한 번 내려간 스크롤 위치는 자동으로 안 돌아온다.
+  // "썸네일 탭하면 페이지가 최상단으로 튄다"는 실제 버그(2026-09-08 제보)의 진짜
+  // 원인이 이거였다 - modal-stack.js 스크롤 잠금과는 무관. 배지 두 개(이전 위치·
+  // 새 위치)만 DOM에서 직접 옮기면 그리드 재배치/reflow 자체가 안 생겨서 이 문제가
+  // 구조적으로 발생할 수 없다.
+  function updateRecentBadge(newId) {
+    if (!grid) return;
+    var prevBadge = grid.querySelector('.gallery-recent-badge');
+    if (prevBadge) prevBadge.remove();
+    var newCard = grid.querySelector('.gallery-card[data-image-id="' + CSS.escape(newId) + '"]');
+    if (newCard && !newCard.querySelector('.gallery-recent-badge')) {
+      var badge = document.createElement('span');
+      badge.className = 'gallery-recent-badge';
+      badge.textContent = '최근에 확인함';
+      newCard.appendChild(badge);
+    }
+  }
+  window.galUpdateRecentBadge = updateRecentBadge;
 
   var masonryResizeTimer = null;
   window.addEventListener('resize', function () {

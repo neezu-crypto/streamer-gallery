@@ -120,9 +120,12 @@
     currentImageId = img.id;
     localStorage.setItem('galLastViewedImageId', img.id);
     // 그리드는 이 값이 바뀐다고 저절로 다시 그려지지 않으므로(2026-09-06 실사용
-    // 테스트로 발견) 직접 다시 그리게 호출 — 상세 패널을 닫았을 때 이미 배지가
-    // 옮겨져 있어야 하니 여는 시점에 바로 반영해둔다.
-    window.galRenderGrid && window.galRenderGrid();
+    // 테스트로 발견) 배지를 직접 옮겨서 여는 시점에 바로 반영해둔다. 예전엔
+    // window.galRenderGrid()로 그리드 전체를 다시 그렸는데, masonry 레이아웃이라
+    // 재배치 도중 문서 높이가 순간 짧아지면서 스크롤이 강제로 튀는 버그가 있었다
+    // (2026-09-08 제보) - 배지 두 개만 옮기면 그리드 자체는 안 건드리므로 이 문제가
+    // 없다.
+    window.galUpdateRecentBadge && window.galUpdateRecentBadge(img.id);
     // 원본(img.imageUrl)을 바로 <img>에 넣으면, 브라우저가 그 원본을 다 받아오기
     // 전까지 <img>는 직전에 보고 있던 이전 이미지를 그대로 띄워둔다(새 src를
     // 설정해도 로드 완료 전엔 화면이 안 바뀜) — 그래서 방금 클릭한 이미지가 아니라
