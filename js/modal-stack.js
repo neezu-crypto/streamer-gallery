@@ -24,38 +24,26 @@
   var suppressPopCount = 0;
   var savedScrollY = 0;
 
-  // 상세 패널을 닫으면 스크롤이 맨 위로 튀는 버그(2026-09-08 제보). 원인 두 가지가
-  // 겹친 것으로 보임: (1) pushState로 쌓은 가짜 히스토리 엔트리를 history.back()으로
-  // 소비할 때, URL이 안 바뀌는 pushState+back() 조합에서는 브라우저 기본 스크롤
-  // 복원이 크로스브라우저로 신뢰할 수 없음(0으로 복원되거나 아예 복원 안 되는
-  // 경우가 흔함) - scrollRestoration을 manual로 바꿔서 브라우저 자체 복원 시도를
-  // 끄고 우리가 직접 처리한다. (2) 배경 스크롤 잠금을 overflow:hidden만으로 하면
-  // 일부 브라우저(특히 iOS Safari)가 html+body에 동시에 overflow:hidden을 걸 때
-  // 실제 스크롤 오프셋 자체를 잃어버리는 경우가 있음 - body를 position:fixed로
-  // 그 자리에 고정시키는(스크롤 위치를 top 음수값으로 시각적으로만 유지) 더
-  // 확실한 방식으로 바꿨다. 헤드리스 크롬 테스트에서는 원래 방식도 재현이 안 돼서
-  // (이 버그 자체가 브라우저별 편차가 큰 종류라) 실제 재현 환경 없이도 안전하게
-  // 통하는 이 업계 표준 기법으로 교체.
+  // 상세 패널을 닫으면 스크롤이 맨 위로 튀는 버그(2026-09-08 제보) - pushState로
+  // 쌓은 가짜 히스토리 엔트리를 history.back()으로 소비할 때, URL이 안 바뀌는
+  // pushState+back() 조합은 브라우저 기본 스크롤 복원이 크로스브라우저로
+  // 신뢰할 수 없다(0으로 복원되거나 아예 복원 안 되는 경우가 흔함). scrollRestoration을
+  // manual로 바꿔서 브라우저 자체 복원 시도를 끄고, 잠글 때 scrollY를 저장해뒀다가
+  // 풀 때 직접 복원한다.
+  //
+  // body를 position:fixed로 그 자리에 고정하는 방식도 시도해봤으나(스크롤 오프셋을
+  // 아예 안 잃어버리게 하려는 목적), 모바일에서 그걸 걸 때 브라우저 툴바(주소창)
+  // 상태가 갑자기 바뀌면서 "썸네일 누르자마자 페이지가 튀어오른다"는 새 버그를
+  // 만들어서(2026-09-08 제보, 이 기법의 잘 알려진 부작용) 되돌렸다 - 그냥
+  // overflow:hidden + 명시적 scrollY 복원만으로 원래 버그는 이미 해결된다.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
   function syncScrollLock() {
     var wasLocked = document.documentElement.classList.contains('gal-modal-open');
     var willLock = stack.length > 0;
-    if (willLock && !wasLocked) {
-      savedScrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = '-' + savedScrollY + 'px';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.documentElement.classList.add('gal-modal-open');
-    } else if (!willLock && wasLocked) {
-      document.documentElement.classList.remove('gal-modal-open');
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      window.scrollTo(0, savedScrollY);
-    }
+    if (willLock && !wasLocked) savedScrollY = window.scrollY;
+    document.documentElement.classList.toggle('gal-modal-open', willLock);
+    if (!willLock && wasLocked) window.scrollTo(0, savedScrollY);
   }
 
   window.galPushModal = function (closeFn) {
