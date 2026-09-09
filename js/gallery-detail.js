@@ -18,13 +18,17 @@
   var commentsWrap = document.getElementById('detail-comments');
   var commentInput = document.getElementById('detail-comment-input');
   var commentSubmitBtn = document.getElementById('detail-comment-submit');
+  var relatedWrap = document.getElementById('detail-related');
+  var relatedGrid = document.getElementById('detail-related-grid');
   if (!backdrop) return;
   var modalEl = backdrop.querySelector('.detail-modal');
 
   function isMobile() { return window.matchMedia('(max-width: 720px)').matches; }
 
   var currentImageId = null;
+  var currentStreamerName = '';
   var commentsUnsub = null;
+  var relatedItems = [];
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -114,6 +118,62 @@
     });
   }
 
+  // 동일 스트리머의 다른 사진(기능 A, 2026-09-10) — gallery/images에
+  // streamerId 인덱스(.indexOn에 이미 등록돼 있음)로 1회성 조회. 이미 그리드에서
+  // 로드해둔 항목(window.galAllImages)이 있으면 그 캐시(likeCount 등 merge된 값
+  // 포함)를 우선 쓰고, 없으면 이 조회로 받은 원본 필드만 쓴다.
+  async function loadRelatedPhotos(img) {
+    relatedItems = [];
+    relatedWrap.style.display = 'none';
+    relatedGrid.innerHTML = '';
+    if (!img.streamerId) return;
+    try {
+      var q = window.galFirebase.query(
+        window.galFirebase.ref(window.galDb, 'gallery/images'),
+        window.galFirebase.orderByChild('streamerId'),
+        window.galFirebase.equalTo(img.streamerId)
+      );
+      var snap = await window.galFirebase.get(q);
+      var data = snap.val() || {};
+      var list = Object.keys(data)
+        .filter(function (id) { return id !== img.id && !(window.galHiddenImages && window.galHiddenImages[id]); })
+        .map(function (id) {
+          var cached = (window.galAllImages || []).find(function (i) { return i.id === id; });
+          return cached || Object.assign({ id: id }, data[id]);
+        })
+        .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      if (!list.length || currentImageId !== img.id) return; // 조회 중 모달이 닫히거나 다른 이미지로 바뀌면 버림
+      relatedItems = list;
+      relatedGrid.innerHTML = list.map(function (r) {
+        return '<button type="button" class="detail-related-thumb" data-image-id="' + escapeHtml(r.id) + '"><img src="' + escapeHtml(r.thumbUrl || r.imageUrl || '') + '" alt=""></button>';
+      }).join('');
+      relatedWrap.style.display = '';
+    } catch (e) { console.error('관련 사진 조회 실패', e); }
+  }
+
+  relatedGrid.addEventListener('click', function (e) {
+    var btn = e.target.closest('.detail-related-thumb');
+    if (!btn) return;
+    var found = relatedItems.find(function (i) { return i.id === btn.dataset.imageId; });
+    // 이미 해금된(=지금 상세보기가 열려있는) 스트리머의 다른 썸네일이므로 잠금
+    // 재확인 없이 바로 연다(사용자 확정 — 업로드는 누구나 가능, 상세보기 열람만
+    // 해금 여부로 막히고 이미 연 상세보기 안에서는 추가 제한이 없어야 함).
+    if (found) openModal(found);
+  });
+
+  // 닉네임 클릭 → 검색창 자동 입력(기능 B, 2026-09-10) — '익명'(streamerName
+  // 없음)일 땐 검색해도 의미가 없으므로 currentStreamerName이 비어있으면 무시.
+  streamerEl.addEventListener('click', function () {
+    if (!currentImageId || !currentStreamerName) return;
+    var searchInput = document.getElementById('gallery-filter-streamer');
+    closeModal();
+    if (searchInput) {
+      searchInput.value = currentStreamerName;
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
   // "최근에 확인함" 표시(2026-09-05 추가) — 계정 동기화가 필요 없는 브라우저 로컬
   // UX 힌트라 RTDB가 아니라 localStorage에 마지막 1개만 기록한다.
   function openModal(img) {
@@ -141,6 +201,7 @@
       fullImg.src = img.imageUrl;
     }
     streamerEl.textContent = img.streamerName || '익명';
+    currentStreamerName = img.streamerName || '';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
     // 본인이 업로드했거나, 인증 스트리머 본인을 대상으로 한 이미지면(2026-09-06
@@ -162,6 +223,7 @@
     window.galPushModal(closeModal);
     refreshLikedState(img.id);
     subscribeComments(img.id);
+    loadRelatedPhotos(img);
   }
 
   document.addEventListener('click', function (e) {

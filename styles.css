@@ -2,29 +2,37 @@
   font-family: 'ui-sans-fallback';
   src: local('Apple SD Gothic Neo');
 }
-/* 핀터레스트식 라이트 리디자인(2026-09-05) — 사이버펑크 터미널/앰버 다크
-   테마를 라이트 뉴트럴+레드 단일 포인트 체계로 교체. 변수명(--gold/--mint 등)은
-   자매 저장소·기존 컴포넌트 CSS와의 호환을 위해 그대로 두고 "값"만 바꿨다 —
-   --gold가 이제 앰버가 아니라 핀터레스트 레드라는 점에 주의. --mint은 이제
-   "보조 포인트(블루)"로 재정의해 관리자 전용 강조에만 한정해서 쓴다(좋아요는
-   전부 --gold/레드로 통일 — 포인트는 한 곳에만 몰아 쓴다는 설계 원칙). */
+/* 파스텔 뉴모피즘 리디자인(2026-09-10) — 핀터레스트식 화이트/레드 체계를
+   연분홍 소프트 UI로 교체. 변수명(--gold/--panel/--hairline 등)은 자매
+   저장소·기존 컴포넌트 CSS와의 호환을 위해 그대로 두고 "값"만 바꿨다 —
+   --gold가 이제 레드가 아니라 로즈 핑크라는 점에 주의. 상세보기 패널의
+   네오브루탈리즘(--nb- 접두사) 토큰은 이 리디자인 범위 밖이라 값을 건드리지
+   않았다(단, --panel/--gold를 재사용하는 일부 버튼은 자연히 로즈 톤으로
+   바뀐다 — 의도된 것). 사진이 들어가는 영역(갤러리 카드) 배경은 사용자 요청대로
+   페이지 배경(--ink)과 동일한 값을 쓰고, 카드를 구분하는 건 색 차이가 아니라
+   아래 --shadow-light/--shadow-dark 이중 그림자(뉴모피즘 raised 효과)다. */
 :root{
   color-scheme: light;
-  --ink: #e9e9e6;
-  --panel: #ffffff;
-  --panel-raised: #f2f2ef;
-  --hairline: #dfdfda;
-  --gold: #e60023;            /* 주 액센트(핀터레스트 레드) */
-  --gold-dim: #fde8ea;
-  --gold-line: #f3b3bb;
+  --ink: #fbf1f5;
+  --panel: #fdf7f9;
+  --panel-raised: #f8ecf1;
+  --hairline: #f0d7e1;
+  --gold: #e0789e;            /* 주 액센트(로즈 핑크) */
+  --gold-dim: #fbe3ec;
+  --gold-line: #f2b9cd;
   --gold-text: var(--gold);
   --mint: #2f6fed;            /* 보조 액센트(블루) — 관리자 전용 강조로 한정 */
   --mint-dim: rgba(47,111,237,0.12);
-  --coral: #d92d20;           /* 에러 전용 — 브랜드 액센트(레드)와 헷갈리지 않게 톤을 살짝 다르게 */
+  --coral: #d92d20;           /* 에러 전용 — 브랜드 액센트(로즈)와 헷갈리지 않게 톤을 살짝 다르게 */
   --coral-dim: rgba(217,45,32,0.1);
-  --text: #111111;
-  --muted: #6e6e6e;
-  --muted-2: #9a9a9a;
+  --text: #6b4757;
+  --muted: #a9808f;
+  --muted-2: #c7a4b1;
+  /* 뉴모피즘 이중 그림자 — 밝은 쪽(좌상단)/어두운 쪽(우하단)을 base 색조(핑크)로
+     틴트해야 무채색 회색 그림자처럼 탁해 보이지 않는다. raised는 두 그림자를
+     그대로, pressed(눌림/sunken)는 순서를 뒤집은 inset으로 쓴다. */
+  --shadow-light: #ffffff;
+  --shadow-dark: #ecd3de;
 
   /* 상세보기 패널 전용 네오브루탈리즘 토큰(2026-09-05) — 좋아요/삭제/신고/
      댓글입력/등록 버튼에만 쓴다. --ink(페이지 배경)와 헷갈리지 않게 --nb- 접두사. */
@@ -110,6 +118,8 @@ button{ font-family: inherit; cursor: pointer; }
   flex:1; display:flex; align-items:center; gap:10px;
   background:var(--ink); border-radius:999px; padding:11px 18px; cursor:text;
   color:var(--muted);
+  /* 검색창은 뉴모피즘 sunken(눌린) 느낌 — inset 이중 그림자로 화면에 파묻힌 듯 보이게. */
+  box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
 }
 .search-pill svg{ flex-shrink:0; }
 .search-pill input{
@@ -119,16 +129,18 @@ button{ font-family: inherit; cursor: pointer; }
 .search-pill input::placeholder{ color:var(--muted); }
 .avatar{
   width:36px; height:36px; border-radius:50%; background: var(--panel-raised);
-  border:1px solid var(--hairline); display:flex; align-items:center; justify-content:center;
+  border:none; display:flex; align-items:center; justify-content:center;
   font-size:12px; font-weight:700; color: var(--mint); font-family: inherit; cursor:pointer; padding:0;
   flex-shrink:0; overflow:hidden; margin-left:auto;
+  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+  transition: box-shadow .12s ease;
 }
-.avatar:hover{ border-color: var(--gold-line); }
+.avatar:hover{ box-shadow: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light); }
 .avatar.avatar-login{
   width:auto; height:auto; border-radius:999px; padding:9px 18px;
-  font-size:13px; font-weight:700; white-space:nowrap; background:var(--gold); color:#fff; border-color:transparent;
+  font-size:13px; font-weight:700; white-space:nowrap; background:var(--gold); color:#fff;
 }
-.avatar.avatar-login:hover{ background:var(--gold-text); filter:brightness(0.92); }
+.avatar.avatar-login:hover{ background:var(--gold-text); filter:brightness(0.94); }
 
 /* ---------- 좌측 아이콘 사이드바 + 메인 콘텐츠 ---------- */
 /* 사이드바는 화면 실제 왼쪽 끝에 붙인다(핀터레스트 실제 동작) — app-shell
@@ -159,12 +171,19 @@ button{ font-family: inherit; cursor: pointer; }
 .side-btn{
   width:52px; height:52px; border-radius:14px; border:none; background:transparent;
   color:var(--text); display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:3px; cursor:pointer;
+  gap:3px; cursor:pointer; transition: background .12s ease, box-shadow .12s ease;
 }
 .side-btn svg{ width:22px; height:22px; }
 .side-label{ font-size:9px; font-weight:700; color:var(--muted); }
-.side-btn:hover{ background:var(--panel-raised); }
-.side-btn.active{ background:var(--gold-dim); }
+.side-btn:hover{
+  background:var(--panel-raised);
+  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+}
+/* 선택된 상태는 raised가 아니라 pressed(inset) — "지금 눌려서 고정된" 느낌. */
+.side-btn.active{
+  background:var(--gold-dim);
+  box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+}
 .side-btn.active svg{ color:var(--gold-text); }
 .side-btn.active .side-label{ color:var(--gold-text); }
 .side-btn-admin svg{ color:var(--mint); }
@@ -381,11 +400,23 @@ button{ font-family: inherit; cursor: pointer; }
    위의 기본 .chip 가로 필 스타일 그대로 유지(같은 클래스를 공유하지만 id로 구분). */
 #gallery-category-chips{ flex-direction:column; flex-wrap:nowrap; gap:6px; padding-top:2px; }
 #gallery-category-chips .chip{
-  width:38px; height:38px; padding:0; border-radius:50%;
+  width:38px; height:38px; padding:0; border-radius:50%; border:none;
   display:flex; align-items:center; justify-content:center;
   font-size:10.5px; font-weight:800; position:relative;
-  box-shadow:0 2px 6px rgba(0,0,0,0.08);
-  transition:background-color .3s, border-color .3s, color .3s;
+  background:var(--panel);
+  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+  transition:background-color .3s, color .3s, box-shadow .2s ease;
+}
+/* 선택된 카테고리만 눌린(pressed) 뉴모피즘으로 — 나머지 raised 칩들과 대비되게. */
+#gallery-category-chips .chip.active{
+  box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+}
+/* 기본 .chip:active(neo-brutalist, 대각선으로 튀는 눌림)를 원형 필터에서는
+   무효화 — transform 없이 같은 inset 그림자로만 눌림을 표현해 원 모양이 어긋나지
+   않게 한다. */
+#gallery-category-chips .chip:active{
+  transform:none;
+  box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
 }
 /* Uiverse.io(vinodjangid07) 호버 패턴 참고 — 컬러만 기존 골드/레드 액센트로 교체.
    라벨이 위에서 슬라이드인 + 오른쪽에 전체 카테고리명 툴팁이 뜬다. */
@@ -436,9 +467,14 @@ button{ font-family: inherit; cursor: pointer; }
 .gallery-footer a{ color:var(--muted); text-decoration:none; }
 .gallery-footer a:hover{ color:var(--gold-text); }
 .gallery-card{
-  background:var(--panel-raised); border-radius:16px; overflow:hidden;
+  /* 배경색은 페이지 배경(--ink)과 동일하게 — 카드를 구분하는 건 색 차이가 아니라
+     아래 이중 그림자(뉴모피즘 raised)다. */
+  background:var(--ink); border-radius:16px; overflow:hidden;
   position:relative; cursor:pointer;
+  box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
+  transition: box-shadow .15s ease, transform .15s ease;
 }
+.gallery-card:hover{ transform:translateY(-2px); box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light); }
 .gallery-card img{ width:100%; height:100%; object-fit:cover; display:block; }
 .gallery-card::after{
   content:""; position:absolute; inset:0; pointer-events:none;
@@ -463,12 +499,13 @@ button{ font-family: inherit; cursor: pointer; }
 }
 /* 숨기기 — 좋아요 수(좌하단)와 반대쪽인 우하단, 호버 시에만 노출 */
 .gallery-card-hide-btn{
-  position:absolute; right:10px; bottom:10px; width:24px; height:24px; border-radius:50%;
-  background:rgba(0,0,0,0.55); color:#fff; border:none; font-size:11px; line-height:1;
+  position:absolute; right:10px; bottom:10px; width:26px; height:26px; border-radius:50%;
+  background:var(--panel); color:var(--muted); border:none; font-size:11px; line-height:1;
   display:flex; align-items:center; justify-content:center;
-  opacity:0; transition:opacity .15s ease, background .15s ease;
+  box-shadow: 2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light);
+  opacity:0; transition:opacity .15s ease, color .15s ease, box-shadow .15s ease;
 }
-.gallery-card-hide-btn:hover{ background:rgba(0,0,0,0.8); }
+.gallery-card-hide-btn:hover{ color:var(--gold-text); box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light); }
 .gallery-card:hover .gallery-card-hide-btn{ opacity:1; }
 /* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
    모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */
@@ -537,6 +574,28 @@ button{ font-family: inherit; cursor: pointer; }
 #detail-report-btn{ background:var(--nb-muted); color:var(--nb-border); }
 
 #detail-category{ background:var(--nb-muted); color:var(--nb-border); border:2px solid var(--nb-border); font-weight:800; }
+
+/* 닉네임 클릭 → 검색창에 자동 입력(기능 B, 2026-09-10) — 스트리머명이 없는
+   ('익명') 경우엔 gallery-detail.js가 아예 클릭 리스너를 무시하므로 커서만
+   기본값(text)이어도 되지만, 항상 pointer로 두는 게 "눌러도 되는 것 같다"는
+   기대를 배신하지 않는다. */
+.detail-streamer-link{ cursor:pointer; transition:color .12s ease; }
+.detail-streamer-link:hover{ color:var(--gold-text); text-decoration:underline; }
+
+/* 동일 스트리머의 다른 사진(기능 A, 2026-09-10) — 핀터레스트의 "더 보기" 줄과
+   같은 자리, 가로 스크롤 썸네일 스트립. 이미지가 하나도 없으면(다른 사진 없음)
+   gallery-detail.js가 이 블록 자체를 display:none으로 숨긴다. */
+.detail-related{ margin:2px 0 14px; }
+.detail-related-title{ font-size:11.5px; font-weight:800; color:var(--muted); margin:0 0 8px; }
+.detail-related-grid{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+.detail-related-thumb{
+  flex:0 0 auto; width:60px; height:60px; border-radius:12px; overflow:hidden; padding:0; border:none;
+  background:var(--ink); cursor:pointer;
+  box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+  transition: box-shadow .12s ease;
+}
+.detail-related-thumb:hover{ box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
+.detail-related-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
 
 .detail-report-form{
   margin:10px 0 6px; padding:14px; border:2px solid var(--nb-border); border-radius:10px; background:var(--panel);
