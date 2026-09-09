@@ -41,7 +41,17 @@
 
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="sidebar-mark" title="스트리머 갤러리">🖼️</div>
+    <div class="sidebar-mark" title="스트리머 갤러리">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+        <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+        <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+        <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+        <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+        <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+      </svg>
+    </div>
     <button class="side-btn active" id="sidebar-home-btn" type="button" title="홈">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
       <span class="side-label">홈</span>
@@ -61,7 +71,7 @@
     <div class="side-divider"></div>
     <div class="gallery-category-chips" id="gallery-category-chips">
       <button class="chip active" type="button" data-category="all" aria-label="전체"><span class="chip-label">전체</span><span class="chip-tooltip">전체</span></button>
-      <button class="chip" type="button" data-category="screenshot" aria-label="스크린샷"><span class="chip-label">SS</span><span class="chip-tooltip">스크린샷</span></button>
+      <button class="chip" type="button" data-category="screenshot" aria-label="스크린샷"><span class="chip-label">스샷</span><span class="chip-tooltip">스크린샷</span></button>
       <button class="chip" type="button" data-category="ai-art" aria-label="AI 일러스트"><span class="chip-label">AI</span><span class="chip-tooltip">AI 일러스트</span></button>
       <button class="chip" type="button" data-category="fan-art" aria-label="팬아트"><span class="chip-label">팬</span><span class="chip-tooltip">팬아트</span></button>
       <button class="chip" type="button" data-category="meme" aria-label="밈"><span class="chip-label">밈</span><span class="chip-tooltip">밈</span></button>
@@ -111,7 +121,7 @@
 </nav>
 <div class="mtab-chip-fan" id="mtab-chip-fan">
   <button class="mtab-chip" type="button" data-category="all">전체<span class="mtab-chip-tooltip">전체</span></button>
-  <button class="mtab-chip" type="button" data-category="screenshot">SS<span class="mtab-chip-tooltip">스크린샷</span></button>
+  <button class="mtab-chip" type="button" data-category="screenshot">스샷<span class="mtab-chip-tooltip">스크린샷</span></button>
   <button class="mtab-chip" type="button" data-category="ai-art">AI<span class="mtab-chip-tooltip">AI 일러스트</span></button>
   <button class="mtab-chip" type="button" data-category="fan-art">팬<span class="mtab-chip-tooltip">팬아트</span></button>
   <button class="mtab-chip" type="button" data-category="meme">밈<span class="mtab-chip-tooltip">밈</span></button>
