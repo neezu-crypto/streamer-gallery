@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { getDatabase } = require('firebase-admin/database');
 const { randomUUID } = require('crypto');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { assertCooldown } = require('./lib/rate-limit');
@@ -142,4 +142,40 @@ const registerImage = onCall(async (request) => {
   return { imageId, imageUrl, thumbUrl };
 });
 
-module.exports = { requestImageUpload, registerImage, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+// 이미지 다운로드(2026-09-10 추가) — 클라이언트가 공개 도메인(pub-*.r2.dev)을 직접
+// fetch해서 blob으로 강제 다운로드하려 했으나, 그 공개 도메인의 엣지 캐시가 CORS
+// 헤더 포함 여부에서 일관되지 않아(같은 URL인데 어떤 엣지 응답엔 있고 어떤 엣지
+// 응답엔 없음 — 실사용 중 재현 확인) 실패가 잦았다. presigned GET URL에
+// ResponseContentDisposition을 실어서 발급하면, 브라우저가 fetch/CORS 없이 그냥 그
+// URL로 이동(navigation)만 해도 R2가 강제로 "다운로드"로 응답하게 만들 수 있어
+// CORS 문제 자체를 완전히 회피한다. 게다가 presigned URL은 서명·만료시각이 매번
+// 달라 캐시가 안 되므로 그 엣지 캐시 불일치 문제도 같이 사라진다.
+const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const db = getDatabase();
+  const snap = await db.ref(`gallery/images/${imageId}`).get();
+  if (!snap.exists()) throw new HttpsError('not-found', '이미지를 찾을 수 없습니다.');
+  const { key, streamerName } = snap.val();
+  if (!key || typeof key !== 'string') throw new HttpsError('failed-precondition', '이미지 파일 정보를 찾을 수 없습니다.');
+
+  const ext = key.includes('.') ? key.slice(key.lastIndexOf('.') + 1) : 'jpg';
+  // 파일명에 스트리머명(한글)을 넣되, Content-Disposition 헤더는 원래 ASCII만
+  // 안전하게 지원하므로 RFC 5987(filename*=UTF-8''퍼센트인코딩) 방식을 filename=
+  // ASCII 폴백과 같이 써서 구형 브라우저에서도 깨지지 않게 한다.
+  const filenameAscii = `image_${imageId}.${ext}`;
+  const filenameUtf8 = `${streamerName || '이미지'}_${imageId}.${ext}`;
+  const contentDisposition = `attachment; filename="${filenameAscii}"; filename*=UTF-8''${encodeURIComponent(filenameUtf8)}`;
+
+  const client = getR2Client();
+  const downloadUrl = await getSignedUrl(client, new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ResponseContentDisposition: contentDisposition,
+  }), { expiresIn: 300 });
+
+  return { downloadUrl };
+});
+
+module.exports = { requestImageUpload, registerImage, getImageDownloadUrl, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };

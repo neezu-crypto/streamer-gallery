@@ -74,32 +74,31 @@
     commentsLabel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  // 이미지 다운로드(2026-09-10 추가) — 원본(currentImageUrl)을 fetch해 blob으로
-  // 받아 강제 다운로드. 이미지가 사이트와 다른 오리진(R2 공개 도메인, pub-*.r2.dev)
-  // 에서 오기 때문에 그 버킷이 크로스오리진 fetch를 막아두면 실패할 수 있다 —
-  // 이 경우 새 탭에서 열어 우클릭 저장을 유도하는 것으로 대체(에러로 끝내지 않음).
+  // 이미지 다운로드(2026-09-10, presigned URL 방식으로 교체) — 클라이언트에서 직접
+  // 원본(R2 공개 도메인, pub-*.r2.dev)을 fetch해 blob으로 받는 방식은 그 공개
+  // 도메인의 엣지 캐시가 CORS 헤더 포함 여부에서 일관되지 않아(같은 URL인데 어떤
+  // 응답엔 있고 어떤 응답엔 없음 — 실사용 중 재현 확인) 실패가 잦았다. 대신 서버
+  // (getImageDownloadUrl)가 R2 S3 API로 직접 서명한 presigned GET URL을 발급해
+  // 주면, 그 URL엔 서버가 이미 "강제 다운로드" 응답 헤더(Content-Disposition)를
+  // 실어뒀기 때문에 fetch/CORS 없이 그냥 그 URL로 이동만 해도 다운로드된다 —
+  // CORS 문제 자체를 회피. 서명이 매 호출 새로 발급돼 캐시도 안 되니 엣지 불일치
+  // 문제도 같이 사라진다.
   downloadBtn.addEventListener('click', async function () {
-    if (!currentImageUrl) return;
+    if (!currentImageId) return;
     var originalText = downloadBtn.textContent;
     downloadBtn.disabled = true;
     downloadBtn.textContent = '다운로드 중...';
     try {
-      var res = await fetch(currentImageUrl);
-      if (!res.ok) throw new Error('이미지를 불러오지 못했습니다');
-      var blob = await res.blob();
-      var ext = (currentImageUrl.split('.').pop() || 'jpg').split('?')[0];
-      var safeName = (currentStreamerName || '이미지').replace(/[\\/:*?"<>|]/g, '_');
-      var objectUrl = URL.createObjectURL(blob);
+      var getUrlFn = window.galFirebase.httpsCallable('getImageDownloadUrl');
+      var result = await getUrlFn({ imageId: currentImageId });
       var a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = safeName + '_' + (currentImageId || 'image') + '.' + ext;
+      a.href = result.data.downloadUrl;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(objectUrl);
     } catch (e) {
       console.error('이미지 다운로드 실패, 새 탭 열기로 대체', e);
-      window.open(currentImageUrl, '_blank');
+      if (currentImageUrl) window.open(currentImageUrl, '_blank');
     } finally {
       downloadBtn.disabled = false;
       downloadBtn.textContent = originalText;
