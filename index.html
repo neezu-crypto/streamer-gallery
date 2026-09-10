@@ -148,7 +148,13 @@
       <option value="meme">밈</option>
       <option value="etc">기타</option>
     </select>
-    <input type="file" id="upload-file" accept="image/*">
+    <label class="upload-dropzone" id="upload-dropzone" for="upload-file">
+      <input type="file" id="upload-file" accept="image/*" hidden>
+      <div class="upload-dropzone-content" id="upload-dropzone-content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p class="upload-dropzone-text">클릭하거나 이미지를 끌어다 놓으세요</p>
+      </div>
+    </label>
     <button class="glitch-btn" id="upload-submit-btn" type="button">업로드하기</button>
     <div class="upload-progress" id="upload-progress" style="display:none;">
       <div class="upload-progress-row">
@@ -208,6 +214,7 @@
               <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>
             </button>
             <div class="detail-more-menu" id="detail-more-menu" style="display:none;">
+              <button class="detail-more-item" id="detail-download-btn" type="button">이미지 다운로드</button>
               <button class="detail-more-item" id="detail-delete-btn" type="button" style="display:none;">내 이미지 삭제</button>
               <button class="detail-more-item" id="detail-report-btn" type="button">신고하기</button>
             </div>

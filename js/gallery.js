@@ -19,6 +19,8 @@
   var uploadStreamerSearch = document.getElementById('upload-streamer-search');
   var uploadStreamerResults = document.getElementById('upload-streamer-results');
   var uploadStreamerSelected = document.getElementById('upload-streamer-selected');
+  var uploadDropzone = document.getElementById('upload-dropzone');
+  var uploadDropzoneContent = document.getElementById('upload-dropzone-content');
 
   // 업로드 진행바(2026-09-07) — "⏳ ~~ 중..." 텍스트 한 줄 대신 4단계
   // 계단식 진행바로 대체. 검증 실패(⚠️)/에러(❌) 메시지는 그대로 uploadStatus
@@ -437,6 +439,59 @@
     });
   }
 
+  // 업로드 드롭존(2026-09-10 추가) — 클릭 선택/드래그앤드롭 둘 다 최종적으로는
+  // 실제 input[type=file]의 files를 채우고 그 input의 change 이벤트를 발생시키는
+  // 한 경로로 합류시킨다 — 그래야 검증/업로드(uploadSubmitBtn 핸들러)를 그대로
+  // 재사용하고 두 경로를 따로 검증하지 않아도 된다.
+  var uploadFileInput = document.getElementById('upload-file');
+  var dropzoneDefaultHtml = uploadDropzoneContent ? uploadDropzoneContent.innerHTML : '';
+  var dropzonePreviewUrl = null;
+
+  function resetDropzonePreview() {
+    if (!uploadDropzoneContent) return;
+    if (dropzonePreviewUrl) { URL.revokeObjectURL(dropzonePreviewUrl); dropzonePreviewUrl = null; }
+    uploadDropzoneContent.innerHTML = dropzoneDefaultHtml;
+  }
+  function showDropzonePreview(file) {
+    if (!uploadDropzoneContent) return;
+    if (dropzonePreviewUrl) URL.revokeObjectURL(dropzonePreviewUrl);
+    dropzonePreviewUrl = URL.createObjectURL(file);
+    uploadDropzoneContent.innerHTML =
+      '<img class="upload-dropzone-thumb" src="' + dropzonePreviewUrl + '" alt="">' +
+      '<p class="upload-dropzone-filename">' + escapeHtml(file.name) + '</p>';
+  }
+
+  if (uploadFileInput) {
+    uploadFileInput.addEventListener('change', function () {
+      var f = uploadFileInput.files && uploadFileInput.files[0];
+      if (f) showDropzonePreview(f); else resetDropzonePreview();
+    });
+  }
+  if (uploadDropzone && uploadFileInput) {
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      uploadDropzone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        uploadDropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'dragend'].forEach(function (evt) {
+      uploadDropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        uploadDropzone.classList.remove('dragover');
+      });
+    });
+    uploadDropzone.addEventListener('drop', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      uploadDropzone.classList.remove('dragover');
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      var dt = new DataTransfer();
+      dt.items.add(f);
+      uploadFileInput.files = dt.files;
+      uploadFileInput.dispatchEvent(new Event('change'));
+    });
+  }
+
   function openUploadModal() {
     if (!window.galTrusted) {
       window.galCloseLoginModal && window.galCloseLoginModal();
@@ -446,6 +501,7 @@
     if (uploadStatus) uploadStatus.textContent = '';
     hideUploadProgress();
     resetStreamerPicker();
+    resetDropzonePreview();
     // 같은 스트리머 이미지를 연속으로 올리는 경우가 많아서, 마지막으로
     // 업로드에 성공한 스트리머를 열 때마다 미리 선택해둔다(2026-09-05 추가).
     try {
@@ -542,6 +598,7 @@
         try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
         resetStreamerPicker();
         fileInput.value = '';
+        resetDropzonePreview();
         setTimeout(closeUploadModal, 700);
       } catch (err) {
         console.error('이미지 업로드 실패', err);

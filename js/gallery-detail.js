@@ -24,6 +24,7 @@
   var relatedGrid = document.getElementById('detail-related-grid');
   var moreBtn = document.getElementById('detail-more-btn');
   var moreMenu = document.getElementById('detail-more-menu');
+  var downloadBtn = document.getElementById('detail-download-btn');
   if (!backdrop) return;
   var modalEl = backdrop.querySelector('.detail-modal');
 
@@ -31,6 +32,7 @@
 
   var currentImageId = null;
   var currentStreamerName = '';
+  var currentImageUrl = '';
   var commentsUnsub = null;
   var relatedItems = [];
 
@@ -70,6 +72,38 @@
   // .detail-panel 안, 별도 페이지 이동 아님) scrollIntoView로 충분하다.
   commentJumpBtn.addEventListener('click', function () {
     commentsLabel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // 이미지 다운로드(2026-09-10 추가) — 원본(currentImageUrl)을 fetch해 blob으로
+  // 받아 강제 다운로드. 이미지가 사이트와 다른 오리진(R2 공개 도메인, pub-*.r2.dev)
+  // 에서 오기 때문에 그 버킷이 크로스오리진 fetch를 막아두면 실패할 수 있다 —
+  // 이 경우 새 탭에서 열어 우클릭 저장을 유도하는 것으로 대체(에러로 끝내지 않음).
+  downloadBtn.addEventListener('click', async function () {
+    if (!currentImageUrl) return;
+    var originalText = downloadBtn.textContent;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = '다운로드 중...';
+    try {
+      var res = await fetch(currentImageUrl);
+      if (!res.ok) throw new Error('이미지를 불러오지 못했습니다');
+      var blob = await res.blob();
+      var ext = (currentImageUrl.split('.').pop() || 'jpg').split('?')[0];
+      var safeName = (currentStreamerName || '이미지').replace(/[\\/:*?"<>|]/g, '_');
+      var objectUrl = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = safeName + '_' + (currentImageId || 'image') + '.' + ext;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      console.error('이미지 다운로드 실패, 새 탭 열기로 대체', e);
+      window.open(currentImageUrl, '_blank');
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = originalText;
+    }
   });
 
   // 모바일 풀스크린 상세 패널을 아래로 드래그해서 닫기(2026-09-06 추가) —
@@ -230,6 +264,7 @@
     }
     streamerEl.textContent = img.streamerName || '익명';
     currentStreamerName = img.streamerName || '';
+    currentImageUrl = img.imageUrl || img.thumbUrl || '';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
     // 본인이 업로드했거나, 인증 스트리머 본인을 대상으로 한 이미지면(2026-09-06

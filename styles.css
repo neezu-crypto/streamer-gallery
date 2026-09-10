@@ -311,7 +311,7 @@ button{ font-family: inherit; cursor: pointer; }
 
 /* ---------- 입력창(공용 모달) — 플로팅 라벨 대신 상세 패널과 동일한
    잉크 테두리+하드 섀도우+placeholder 방식으로 통일. ---------- */
-.propose-modal input[type="text"], .propose-modal input[type="file"], .propose-modal select,
+.propose-modal input[type="text"], .propose-modal select,
 .profile-modal input[type="text"]{
   width:100%; border:2.5px solid var(--nb-border); border-radius:10px; background:var(--panel);
   padding:11px 14px; font-size:13.5px; font-weight:600; color:var(--nb-border); font-family:inherit;
@@ -319,19 +319,29 @@ button{ font-family: inherit; cursor: pointer; }
   transition:border-color .12s ease;
 }
 .propose-modal input::placeholder, .profile-modal input::placeholder{ color:var(--muted); font-weight:500; }
-.propose-modal input[type="file"]{ font-size:12.5px; padding:9px 12px; color:var(--muted); }
-/* 파일 입력의 "파일 선택" 부분은 브라우저 기본 회색 버튼이라 그대로 두면 이
-   네오브루탈리즘 톤과 충돌한다 — file-selector-button 의사 요소를 같은
-   잉크 테두리+하드 섀도우 문법으로 다시 그린다. */
-.propose-modal input[type="file"]::file-selector-button{
-  margin-right:12px; border:2px solid var(--nb-border); border-radius:8px; font-family:inherit;
-  background:var(--nb-muted); color:var(--nb-border); font-weight:800; font-size:12px;
-  padding:7px 12px; cursor:pointer; box-shadow:2px 2px 0 var(--nb-border);
-  transition:transform .08s ease, box-shadow .08s ease, background .12s ease;
-}
-.propose-modal input[type="file"]::file-selector-button:hover{ background:var(--panel); }
-.propose-modal input[type="file"]::file-selector-button:active{ transform:translate(2px,2px); box-shadow:0 0 0 var(--nb-border); }
 .propose-modal input:focus, .profile-modal input:focus{ border-color:var(--gold); }
+
+/* ---------- 이미지 업로드 드롭존(2026-09-10 추가) — 실제 <input type="file">는
+   hidden으로 숨기고 <label>로 감싸 클릭 시 파일 선택창이 열리게 하는 동시에
+   드래그앤드롭도 받을 수 있게 한다. 나머지 업로드 모달 요소와 같은
+   네오브루탈리즘(잉크 테두리+하드 섀도우) 문법을 그대로 따른다. */
+.upload-dropzone{ display:flex; cursor:pointer; margin-bottom:16px; }
+.upload-dropzone-content{
+  width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  border:2.5px dashed var(--nb-border); border-radius:10px; background:var(--panel);
+  box-shadow:4px 4px 0 var(--nb-border);
+  padding:22px 14px; text-align:center;
+  transition:background .12s ease, border-color .12s ease, border-style .12s ease;
+}
+.upload-dropzone-content svg{ width:26px; height:26px; color:var(--muted); }
+.upload-dropzone-text{ font-size:12.5px; font-weight:700; color:var(--muted); margin:0; }
+/* 드래그 중(파일을 이 영역 위로 끌고 온 상태) — 점선→실선 + 골드 톤으로 "여기에
+   놓으면 된다"는 걸 명확히 표시. gallery.js가 dragenter/dragover에서 이 클래스를 붙인다. */
+.upload-dropzone.dragover .upload-dropzone-content{
+  background:var(--gold-dim); border-color:var(--gold); border-style:solid;
+}
+.upload-dropzone-thumb{ width:64px; height:64px; object-fit:cover; border-radius:8px; border:2px solid var(--nb-border); }
+.upload-dropzone-filename{ font-size:12px; font-weight:700; color:var(--nb-border); margin:0; word-break:break-all; max-width:100%; }
 
 /* ---------- 솔리드 버튼(공용 CTA) — 예전엔 호버 시 텍스트가 두 겹으로
    어긋나 보이는 글리치 애니메이션이었지만, 상세 패널과 통일하면서 잉크
