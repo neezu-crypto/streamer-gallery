@@ -139,6 +139,17 @@ const registerImage = onCall(async (request) => {
     [`gallery/imageStats/${imageId}`]: { likeCount: 0, commentCount: 0 },
   });
 
+  // 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 이 스트리머의 첫 업로드
+  // 시각을 1회만 기록한다(이후 무료체험 만료 계산 기준). 트랜잭션으로 감싸는
+  // 이유: 같은 스트리머의 이미지 두 장이 정말 동시에 처음 올라오는 경합이
+  // 이론상 가능한데, read-then-write로 짜면 둘 다 "없음"을 보고 둘 다 쓰려고
+  // 해서 나중 것이 먼저 것을 덮어쓸 수 있다 - transaction이면 둘 중 하나만
+  // 실제로 값을 쓰고 나머지는 그대로 둔다.
+  await db.ref(`gallery/streamerFirstUpload/${streamerId}`).transaction((current) => {
+    if (current !== null) return; // 이미 있으면 트랜잭션 중단(undefined 반환) - 덮어쓰지 않음
+    return Date.now();
+  });
+
   return { imageId, imageUrl, thumbUrl };
 });
 

@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
 const { requireAuth, requireTrustedAccount, assertNotBanned, isAdmin } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
-const { FORBIDDEN_TEXT_RE, UNLOCK_NICKNAME_MAX_LENGTH } = require('./constants');
+const { FORBIDDEN_TEXT_RE, UNLOCK_NICKNAME_MAX_LENGTH, UNLOCK_DURATION_MS } = require('./constants');
 
 async function requireAdmin(request) {
   const uid = requireAuth(request);
@@ -11,6 +11,24 @@ async function requireAdmin(request) {
     throw new HttpsError('permission-denied', '관리자만 사용할 수 있습니다.');
   }
   return uid;
+}
+
+// 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 지금 이 순간 이 스트리머의
+// 이미지를 열람할 수 있는지 판정. 두 조건 중 하나라도 맞으면 접근 가능:
+// (1) 첫 업로드로부터 UNLOCK_DURATION_MS(30일) 이내(무료체험), (2) 별풍선 후원
+// 갱신으로 얻은 streamerUnlockedUntil이 아직 안 지남. js/gallery.js의
+// isStreamerUnlocked(클라이언트 쪽 동일 공식)와 반드시 같은 로직을 유지할 것.
+async function isStreamerAccessible(db, streamerId) {
+  const [firstUploadSnap, unlockedUntilSnap] = await Promise.all([
+    db.ref(`gallery/streamerFirstUpload/${streamerId}`).get(),
+    db.ref(`gallery/streamerUnlockedUntil/${streamerId}`).get(),
+  ]);
+  const now = Date.now();
+  const firstUpload = firstUploadSnap.val();
+  if (firstUpload && now < firstUpload + UNLOCK_DURATION_MS) return true;
+  const unlockedUntil = unlockedUntilSnap.val();
+  if (unlockedUntil && now < unlockedUntil) return true;
+  return false;
 }
 
 // 스트리머별 업로드 잠금 해금 신청 — 별풍선 100개 후원 후 신청, 관리자가 방송에서
@@ -33,8 +51,7 @@ const requestStreamerUnlock = onCall(async (request) => {
   }
 
   const db = getDatabase();
-  const unlockedSnap = await db.ref(`gallery/unlockedStreamers/${streamerId}`).get();
-  if (unlockedSnap.exists() && unlockedSnap.val() === true) {
+  if (await isStreamerAccessible(db, streamerId)) {
     return { action: 'already-unlocked' };
   }
 
@@ -78,8 +95,16 @@ const adminApproveStreamerUnlock = onCall(async (request) => {
   if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 신청입니다.');
   const data = snap.val();
 
+  // 연장 방식(2026-09, 사용자 확정 결정) - max(지금, 기존 만료 시각) + 30일.
+  // 미리 갱신해도 남은 기간이 그대로 이어지고 그 위에 30일이 더해져서 손해가
+  // 없다. 동시에 두 관리자가 같은 스트리머를 승인하는 경합을 막기 위해
+  // transaction으로 처리(read-then-write면 둘 다 옛 값을 보고 계산해 한쪽
+  // 연장분이 유실될 수 있음).
+  const now = Date.now();
+  await db.ref(`gallery/streamerUnlockedUntil/${data.streamerId}`).transaction((current) => {
+    return Math.max(now, current || 0) + UNLOCK_DURATION_MS;
+  });
   await db.ref().update({
-    [`gallery/unlockedStreamers/${data.streamerId}`]: true,
     [`gallery/unlockRequests/${requestId}/status`]: 'approved',
     [`gallery/unlockRequests/${requestId}/reviewedAt`]: Date.now(),
   });

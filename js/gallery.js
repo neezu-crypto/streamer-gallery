@@ -103,14 +103,28 @@
   }
   loadStreamerNames();
 
-  window.galUnlockedStreamers = {};
+  // 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
+  // 열림이고, streamerFirstUpload(첫 업로드 시각)로부터 30일 무료체험, 이후
+  // streamerUnlockedUntil(별풍선 갱신으로 연장된 만료 시각)이 지금보다 미래면
+  // 접근 가능. 두 노드 다 작고(스트리머당 숫자 하나) 새 업로드/갱신 승인 때만
+  // 드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
+  // 노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
+  // 반드시 같은 공식을 유지할 것.
+  var UNLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 - 서버 UNLOCK_DURATION_MS와 동일해야 함
+  window.galStreamerFirstUpload = {};
+  window.galStreamerUnlockedUntil = {};
   function subscribeUnlockedStreamers() {
     if (!window.galFirebase || !window.galDb) { setTimeout(subscribeUnlockedStreamers, 200); return; }
-    window.galFirebase.onValue(window.galFirebase.ref(window.galDb, 'gallery/unlockedStreamers'), function (snap) {
-      window.galUnlockedStreamers = snap.val() || {};
+    window.galFirebase.onValue(window.galFirebase.ref(window.galDb, 'gallery/streamerFirstUpload'), function (snap) {
+      window.galStreamerFirstUpload = snap.val() || {};
       renderGrid();
       document.dispatchEvent(new CustomEvent('gal-unlocked-updated'));
-    }, function (err) { console.error('해금된 스트리머 목록 구독 실패', err); });
+    }, function (err) { console.error('스트리머 첫 업로드 목록 구독 실패', err); });
+    window.galFirebase.onValue(window.galFirebase.ref(window.galDb, 'gallery/streamerUnlockedUntil'), function (snap) {
+      window.galStreamerUnlockedUntil = snap.val() || {};
+      renderGrid();
+      document.dispatchEvent(new CustomEvent('gal-unlocked-updated'));
+    }, function (err) { console.error('스트리머 구독 갱신 목록 구독 실패', err); });
   }
 
   // 썸네일 숨기기(2026-09-05 추가) — 다른 사람에겐 영향 없이 이 계정의 메인
@@ -139,7 +153,13 @@
   }
 
   function isStreamerUnlocked(streamerId) {
-    return !!(streamerId && window.galUnlockedStreamers && window.galUnlockedStreamers[streamerId] === true);
+    if (!streamerId) return false;
+    var now = Date.now();
+    var firstUpload = window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId];
+    if (firstUpload && now < firstUpload + UNLOCK_DURATION_MS) return true;
+    var unlockedUntil = window.galStreamerUnlockedUntil && window.galStreamerUnlockedUntil[streamerId];
+    if (unlockedUntil && now < unlockedUntil) return true;
+    return false;
   }
   window.galIsStreamerUnlocked = isStreamerUnlocked;
 
@@ -203,7 +223,7 @@
       return (
         '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
           (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
-          (locked ? '<span class="gallery-lock-badge" title="해금 필요">🔒</span>' : '') +
+          (locked ? '<span class="gallery-lock-badge" title="열람 기간 만료 - 갱신 필요">🔒</span>' : '') +
           (img.id === lastViewedId ? '<span class="gallery-recent-badge">최근에 확인함</span>' : '') +
           '<span class="gallery-card-hover-likes">♥ ' + (img.likeCount || 0) + '</span>' +
           '<button class="gallery-card-hide-btn" type="button" data-image-id="' + escapeHtml(img.id) + '" title="이 이미지 숨기기">✕</button>' +
@@ -445,7 +465,7 @@
     uploadStreamerSearch.value = '';
     var unlocked = isStreamerUnlocked(id);
     uploadStreamerSelected.style.display = '';
-    uploadStreamerSelected.textContent = (unlocked ? '✅ ' : '🔒 ') + '선택됨: ' + name + (unlocked ? '' : ' (아직 잠긴 스트리머예요 — 업로드는 바로 되지만, 해금 전까지는 다른 사람이 상세보기를 열 수 없어요)');
+    uploadStreamerSelected.textContent = (unlocked ? '✅ ' : '🔒 ') + '선택됨: ' + name + (unlocked ? '' : ' (열람 기간이 만료된 스트리머예요 — 업로드는 바로 되지만, 갱신 전까지는 다른 사람이 상세보기를 열 수 없어요)');
   }
 
   if (uploadStreamerSearch) {
