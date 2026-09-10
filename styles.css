@@ -510,8 +510,10 @@ button{ font-family: inherit; cursor: pointer; }
 .gallery-card-hide-btn:hover{ color:var(--gold-text); box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light); }
 .gallery-card:hover .gallery-card-hide-btn{ opacity:1; }
 /* gallery-card-streamer/gallery-badge는 카드 자체에서는 더 안 쓰지만, 상세보기
-   모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다. */
-.gallery-card-streamer{ font-size:13px; font-weight:700; color:var(--text); }
+   모달(#detail-streamer/#detail-category)이 그대로 재사용하므로 삭제하지 않는다.
+   2026-09-10: 핀터레스트 참고 리디자인에서 #detail-streamer가 "제목" 역할을
+   맡게 되어 폰트 크기를 대폭 키움. */
+.gallery-card-streamer{ font-size:19px; font-weight:800; color:var(--text); }
 .gallery-badge{
   font-size:10px; padding:3px 8px; border-radius:2px; font-weight:700; white-space:nowrap; letter-spacing:0.04em;
   background: var(--gold-dim); color: var(--gold-text); border:1px solid var(--gold-line);
@@ -521,8 +523,16 @@ button{ font-family: inherit; cursor: pointer; }
 .btn-admin:hover, .btn-admin:focus-visible{ background-color: var(--mint); color:#1a0f00; box-shadow: 0 0 25px rgba(47,111,237,0.45); }
 .btn-admin::before, .btn-admin::after{ background-color: var(--mint); }
 
-/* ---------- 이미지 상세 모달(좋아요/댓글/신고) — 좌 이미지/우 패널 ---------- */
-.detail-modal{ max-width:920px; max-height:88vh; padding:0; overflow:hidden; position:relative; }
+/* ---------- 이미지 상세 모달(좋아요/댓글/신고) — 좌 이미지/우 패널 ----------
+   2026-09-10: 다른 propose-modal 계열(업로드/해금/관리자)은 네오브루탈리즘을
+   유지하지만, 이 모달만 핀터레스트 참고 리디자인으로 뉴모피즘으로 전환 —
+   .propose-modal의 굵은 잉크 테두리+하드 오프셋 그림자를 여기서 명시적으로
+   덮어써 부드러운 이중 그림자로 바꾼다. */
+.detail-modal{
+  max-width:920px; max-height:88vh; padding:0; overflow:hidden; position:relative;
+  background:var(--panel); border:none; border-radius:24px;
+  box-shadow: 8px 8px 22px var(--shadow-dark), -8px -8px 22px var(--shadow-light);
+}
 .detail-close-float{
   position:absolute; top:14px; right:14px; z-index:2;
   width:32px; height:32px; border-radius:50%; border:none;
@@ -535,7 +545,7 @@ button{ font-family: inherit; cursor: pointer; }
   flex:1 1 55%; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;
 }
 .detail-image-wrap img{ width:100%; height:100%; max-height:88vh; object-fit:contain; display:block; cursor:zoom-in; }
-.detail-panel{ flex:1 1 45%; min-width:300px; padding:24px; overflow-y:auto; display:flex; flex-direction:column; background:var(--nb-bg); }
+.detail-panel{ flex:1 1 45%; min-width:300px; padding:24px; overflow-y:auto; display:flex; flex-direction:column; background:var(--panel); }
 .detail-meta-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px; }
 .detail-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
 @media (max-width:720px){
@@ -552,30 +562,35 @@ button{ font-family: inherit; cursor: pointer; }
      처음부터 화면 전체를 꽉 채우고 탭하면 바로 닫힌다(js/image-viewer.js). */
   .image-view-img{ width:100vw; height:100vh; max-width:100vw; max-height:100vh; cursor:default; }
 }
-/* ---------- 상세 패널 네오브루탈리즘(2026-09-05) — 좋아요/삭제/신고/댓글
-   입력란/등록 버튼 전부 동일 문법: 두꺼운 잉크 테두리 + 하드 오프셋 섀도우
-   (블러 없음) + 누르면 그림자가 사라지며 눌리는 인터랙션. 데스크톱/모바일
-   공용(.detail-panel 자체가 이미 두 레이아웃에서 재사용되므로 별도
-   미디어쿼리 불필요). ---------- */
-#detail-like-btn{
-  display:flex; align-items:center; gap:6px;
-  background:var(--panel); color:var(--nb-border); border:2.5px solid var(--nb-border); border-radius:999px;
-  padding:9px 16px; font-weight:800; box-shadow:4px 4px 0 var(--nb-border);
-  transition:transform .08s ease, box-shadow .08s ease, background .12s ease, color .12s ease;
+/* ---------- 상세 패널 액션 줄(2026-09-10, 핀터레스트 참고 리디자인) —
+   테두리 있는 칩 버튼 대신 테두리 없는 원형 아이콘 버튼으로, 삭제/신고는
+   더보기(⋯) 드롭다운 안으로 옮겨 액션 줄을 단순하게 유지한다. ---------- */
+.detail-icon-btn{
+  display:flex; align-items:center; gap:5px; background:none; border:none;
+  color:var(--text); font-weight:700; font-size:13px; padding:9px; border-radius:50%;
+  transition: background .12s ease, color .12s ease;
 }
-#detail-like-btn:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
-#detail-like-btn.active{ background:var(--gold); border-color:var(--nb-border); color:#fff; }
+.detail-icon-btn svg{ width:20px; height:20px; display:block; }
+.detail-icon-btn:hover{ background:var(--panel-raised); }
+#detail-like-btn.active{ color:var(--gold-text); }
+#detail-like-btn.active svg{ fill:currentColor; }
 
-#detail-delete-btn, #detail-report-btn{
-  font-weight:800; font-size:12.5px; border:2.5px solid var(--nb-border); border-radius:10px;
-  padding:9px 16px; box-shadow:4px 4px 0 var(--nb-border);
-  transition:transform .08s ease, box-shadow .08s ease;
+.detail-more-wrap{ position:relative; margin-left:auto; }
+.detail-more-menu{
+  position:absolute; top:calc(100% + 6px); right:0; z-index:5; min-width:150px;
+  background:var(--panel); border-radius:14px; padding:6px;
+  box-shadow: 5px 5px 16px var(--shadow-dark), -5px -5px 16px var(--shadow-light);
+  display:flex; flex-direction:column; gap:2px;
 }
-#detail-delete-btn:active, #detail-report-btn:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
-#detail-delete-btn{ background:var(--nb-border); color:#fff; }
-#detail-report-btn{ background:var(--nb-muted); color:var(--nb-border); }
+.detail-more-item{
+  background:none; border:none; text-align:left; padding:10px 12px; border-radius:9px;
+  font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap;
+}
+.detail-more-item:hover{ background:var(--panel-raised); }
+#detail-delete-btn.detail-more-item{ color:var(--coral); }
 
-#detail-category{ background:var(--nb-muted); color:var(--nb-border); border:2px solid var(--nb-border); font-weight:800; }
+/* 카테고리 배지는 다른 곳의 .gallery-badge(파스텔 필)를 그대로 재사용 —
+   과거 네오브루탈리즘 전용 override(테두리+nb-muted 배경)는 제거. */
 
 /* 닉네임 클릭 → 검색창에 자동 입력(기능 B, 2026-09-10) — 스트리머명이 없는
    ('익명') 경우엔 gallery-detail.js가 아예 클릭 리스너를 무시하므로 커서만
@@ -584,14 +599,17 @@ button{ font-family: inherit; cursor: pointer; }
 .detail-streamer-link{ cursor:pointer; transition:color .12s ease; }
 .detail-streamer-link:hover{ color:var(--gold-text); text-decoration:underline; }
 
-/* 동일 스트리머의 다른 사진(기능 A, 2026-09-10) — 핀터레스트의 "더 보기" 줄과
-   같은 자리, 가로 스크롤 썸네일 스트립. 이미지가 하나도 없으면(다른 사진 없음)
+/* 동일 스트리머의 다른 사진(기능 A, 2026-09-10) — 핀터레스트의 "더 많은 핀"
+   영역처럼 패널 폭에 맞춰 여러 줄로 이어지는 격자. 가로 스크롤 한 줄 대신
+   3열 wrap 그리드로 바꿔서, 사진이 많으면 패널 자체의 세로 스크롤을 따라
+   계속 내려가며 보이게 한다(2026-09-10 변경, 이전엔 flex+overflow-x:auto
+   한 줄짜리 스트립이었다). 이미지가 하나도 없으면(다른 사진 없음)
    gallery-detail.js가 이 블록 자체를 display:none으로 숨긴다. */
 .detail-related{ margin:2px 0 14px; }
 .detail-related-title{ font-size:11.5px; font-weight:800; color:var(--muted); margin:0 0 8px; }
-.detail-related-grid{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+.detail-related-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
 .detail-related-thumb{
-  flex:0 0 auto; width:60px; height:60px; border-radius:12px; overflow:hidden; padding:0; border:none;
+  width:100%; aspect-ratio:1; border-radius:12px; overflow:hidden; padding:0; border:none;
   background:var(--ink); cursor:pointer;
   box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
   transition: box-shadow .12s ease;
@@ -600,10 +618,11 @@ button{ font-family: inherit; cursor: pointer; }
 .detail-related-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
 
 .detail-report-form{
-  margin:10px 0 6px; padding:14px; border:2px solid var(--nb-border); border-radius:10px; background:var(--panel);
+  margin:10px 0 6px; padding:14px; border-radius:14px; background:var(--panel-raised);
   display:flex; flex-direction:column; gap:10px;
 }
-.detail-comments{ margin:14px 0; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.detail-comments-label{ font-size:11.5px; font-weight:800; color:var(--muted); margin:4px 0 8px; }
+.detail-comments{ margin:0 0 14px; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
 @media (max-width:720px){
   /* 댓글 영역만 따로 스크롤되지 않고 패널 전체(.detail-panel의 overflow-y:auto)가
      한 번에 스크롤되게 — 중첩 스크롤 영역을 없앤다. 위의 기본 .detail-comments
@@ -611,37 +630,39 @@ button{ font-family: inherit; cursor: pointer; }
   .detail-comments{ max-height:none; overflow-y:visible; }
 }
 .detail-comment-row{
-  font-size:13px; color:var(--nb-border); padding:10px 12px; background:var(--panel);
-  border:2px solid var(--nb-border); border-radius:10px; font-weight:600; line-height:1.5;
+  font-size:13px; color:var(--text); padding:10px 12px; background:var(--panel-raised);
+  border:none; border-radius:12px; font-weight:600; line-height:1.5;
   display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
 }
 .detail-comment-row .detail-comment-text{ flex:1; word-break:break-word; }
 .detail-comment-delete-btn{
-  font-weight:800; font-size:10.5px; border:2px solid var(--nb-border); border-radius:8px;
-  background:var(--panel); color:var(--nb-border); padding:5px 10px; box-shadow:2px 2px 0 var(--nb-border);
-  flex-shrink:0; transition:transform .08s ease, box-shadow .08s ease;
+  font-weight:800; font-size:10.5px; border:none; border-radius:8px;
+  background:var(--panel); color:var(--muted); padding:5px 10px;
+  box-shadow: 2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light);
+  flex-shrink:0; transition: box-shadow .1s ease;
 }
-.detail-comment-delete-btn:active{ transform:translate(2px,2px); box-shadow:0 0 0 var(--nb-border); }
+.detail-comment-delete-btn:active{ box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light); }
 
 .detail-comment-form{ display:flex; align-items:stretch; gap:10px; }
 .detail-comment-form input, .detail-report-form input{
-  flex:1; width:100%; border:2.5px solid var(--nb-border); border-radius:10px; background:var(--panel);
-  padding:11px 14px; font-size:13.5px; font-weight:600; color:var(--nb-border); font-family:inherit;
-  box-shadow:4px 4px 0 var(--nb-border); outline:none; transition:border-color .12s ease;
+  flex:1; width:100%; border:none; border-radius:999px; background:var(--ink);
+  padding:11px 16px; font-size:13.5px; font-weight:600; color:var(--text); font-family:inherit;
+  box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+  outline:none; transition: box-shadow .12s ease;
 }
 .detail-comment-form input::placeholder, .detail-report-form input::placeholder{ color:var(--muted); font-weight:500; }
-.detail-comment-form input:focus, .detail-report-form input:focus{ border-color:var(--gold); }
-#detail-comment-submit, #detail-report-submit{
-  flex-shrink:0; border-radius:10px; border:2.5px solid var(--nb-border); font-family:inherit;
-  font-weight:800; font-size:13px; padding:0 18px; cursor:pointer;
-  box-shadow:4px 4px 0 var(--nb-border); transition:transform .08s ease, box-shadow .08s ease;
+.detail-comment-form input:focus, .detail-report-form input:focus{
+  box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light), 0 0 0 2px var(--gold-line);
 }
-#detail-comment-submit:active, #detail-report-submit:active{ transform:translate(4px,4px); box-shadow:0 0 0 var(--nb-border); }
-#detail-comment-submit{ background:var(--gold); color:#fff; }
-/* 신고 사유 입력창과 나란히 flex-direction:column으로 쌓이다 보니 배경이
-   nb-muted(중립)라 입력창과 거의 구분이 안 됐다(2026-09-05 스크린샷) — 실제
-   제출을 실행하는 버튼이니 댓글 등록과 같은 골드 톤으로 눈에 띄게 한다. */
-#detail-report-submit{ background:var(--gold); color:#fff; width:100%; margin-top:2px; }
+#detail-comment-submit, #detail-report-submit{
+  flex-shrink:0; border-radius:999px; border:none; font-family:inherit;
+  font-weight:800; font-size:13px; padding:0 20px; cursor:pointer; color:#fff; background:var(--gold);
+  box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+  transition: box-shadow .1s ease, filter .12s ease;
+}
+#detail-comment-submit:hover, #detail-report-submit:hover{ filter:brightness(0.95); }
+#detail-comment-submit:active, #detail-report-submit:active{ box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
+#detail-report-submit{ width:100%; margin-top:2px; }
 
 /* ---------- 모달 바깥 도움말 텍스트(2026-09-05 추가) — 상세 패널/풀이미지
    뷰어 하단 바깥쪽에 키보드·마우스 조작법을 안내. 데스크톱 전용 인터랙션

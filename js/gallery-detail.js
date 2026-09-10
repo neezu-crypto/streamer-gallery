@@ -16,10 +16,14 @@
   var reportSubmitBtn = document.getElementById('detail-report-submit');
   var reportStatus = document.getElementById('detail-report-status');
   var commentsWrap = document.getElementById('detail-comments');
+  var commentsLabel = document.getElementById('detail-comments-label');
   var commentInput = document.getElementById('detail-comment-input');
   var commentSubmitBtn = document.getElementById('detail-comment-submit');
+  var commentJumpBtn = document.getElementById('detail-comment-jump-btn');
   var relatedWrap = document.getElementById('detail-related');
   var relatedGrid = document.getElementById('detail-related-grid');
+  var moreBtn = document.getElementById('detail-more-btn');
+  var moreMenu = document.getElementById('detail-more-menu');
   if (!backdrop) return;
   var modalEl = backdrop.querySelector('.detail-modal');
 
@@ -43,7 +47,30 @@
     currentImageId = null;
     modalEl.style.transition = '';
     modalEl.style.transform = '';
+    moreMenu.style.display = 'none';
   }
+
+  // 더보기(⋯) 메뉴 — 삭제/신고를 액션 줄에서 드롭다운 안으로 옮겼다(2026-09-10,
+  // 핀터레스트 참고 리디자인). 메뉴 바깥을 클릭하면 닫히고, 안의 버튼(삭제/신고)을
+  // 누르면 그 버튼 고유 동작이 실행된 뒤 메뉴도 같이 닫는다.
+  moreBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    moreMenu.style.display = moreMenu.style.display === 'none' ? '' : 'none';
+  });
+  document.addEventListener('click', function (e) {
+    if (moreMenu.style.display !== 'none' && !e.target.closest('.detail-more-wrap')) {
+      moreMenu.style.display = 'none';
+    }
+  });
+  moreMenu.addEventListener('click', function (e) {
+    if (e.target.closest('.detail-more-item')) moreMenu.style.display = 'none';
+  });
+
+  // 댓글 아이콘 — 패널 안에서 댓글 영역까지 스크롤 이동만 하면 되므로(같은
+  // .detail-panel 안, 별도 페이지 이동 아님) scrollIntoView로 충분하다.
+  commentJumpBtn.addEventListener('click', function () {
+    commentsLabel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   // 모바일 풀스크린 상세 패널을 아래로 드래그해서 닫기(2026-09-06 추가) —
   // 이미지 영역을 아래로 끌면 패널이 손가락을 따라 내려가고, 일정 거리
@@ -95,6 +122,7 @@
   }
 
   function renderComments(list) {
+    commentsLabel.textContent = '댓글 ' + list.length + '개';
     if (!list.length) { commentsWrap.innerHTML = '<p class="empty-msg">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</p>'; return; }
     var myUid = window.galUser && window.galUser.uid;
     commentsWrap.innerHTML = list.map(function (c) {
