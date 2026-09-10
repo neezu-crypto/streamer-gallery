@@ -69,10 +69,39 @@
   var selectedStreamerName = '';
   var GRID_CACHE_KEY = 'galGridCache';
 
-  fetch('./streamer-names.json').then(function (res) { return res.json(); }).then(function (data) {
-    allStreamers = data;
-    window.galAllStreamers = allStreamers; // 관리자 패널의 스트리머 연결 검색이 재사용
-  }).catch(function (e) { console.error('스트리머 이름 목록을 불러오지 못했습니다:', e); });
+  // 스트리머 이름 목록 - 정적 파일(수동 스크립트로만 갱신)에서 RTDB 파생 노드로
+  // 전환(2026-09). /stocks 변경을 감시하는 Cloud Function 트리거
+  // (soop-stock-market의 syncStreamerNameOnStockChange)가 이름만 뽑은 가벼운
+  // 파생 노드(streamerNames)를 자동으로 최신화한다 - 새 종목이 등록돼도 사람이
+  // 스크립트를 수동 실행 안 하면 검색에 며칠씩 안 나타나던 문제가 이제 없다.
+  // stocks를 직접 구독하지 않는 이유는 그대로 유효(가격·거래량이 거래마다 바뀌는
+  // 무거운 노드). streamerNamesMeta/updatedAt(작은 값 하나)만 먼저 확인해서
+  // localStorage 캐시와 같으면 재다운로드 없이 캐시를 쓰고, 다를 때만 전체를 다시
+  // 받는다 - onValue(실시간 구독)는 쓰지 않는다(거래마다 재전송되는 문제 재발 방지).
+  var STREAMER_NAMES_CACHE_KEY = 'galStreamerNamesCache';
+  function loadStreamerNames() {
+    if (!window.galFirebase || !window.galDb) { setTimeout(loadStreamerNames, 200); return; }
+    var metaRef = window.galFirebase.ref(window.galDb, 'streamerNamesMeta/updatedAt');
+    window.galFirebase.get(metaRef).then(function (snap) {
+      var remoteUpdatedAt = snap.val();
+      var cached = null;
+      try { cached = JSON.parse(localStorage.getItem(STREAMER_NAMES_CACHE_KEY) || 'null'); } catch (e) {}
+      if (cached && cached.updatedAt === remoteUpdatedAt && Array.isArray(cached.names)) {
+        allStreamers = cached.names;
+        window.galAllStreamers = allStreamers;
+        return;
+      }
+      var namesRef = window.galFirebase.ref(window.galDb, 'streamerNames');
+      return window.galFirebase.get(namesRef).then(function (namesSnap) {
+        var data = namesSnap.val() || {};
+        var names = Object.keys(data).map(function (id) { return { id: id, name: data[id] }; });
+        allStreamers = names;
+        window.galAllStreamers = allStreamers; // 관리자 패널의 스트리머 연결 검색이 재사용
+        try { localStorage.setItem(STREAMER_NAMES_CACHE_KEY, JSON.stringify({ updatedAt: remoteUpdatedAt, names: names })); } catch (e) {}
+      });
+    }).catch(function (e) { console.error('스트리머 이름 목록을 불러오지 못했습니다:', e); });
+  }
+  loadStreamerNames();
 
   window.galUnlockedStreamers = {};
   function subscribeUnlockedStreamers() {
