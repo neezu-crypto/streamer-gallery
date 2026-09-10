@@ -1,0 +1,8 @@
+# 구독제 BM 전환 전 스냅샷 (2026-09-11 05:57:27 KST)
+
+streamer-gallery: adffff11b0a80624b0de62813b4541e00dc929d1
+StreamBet-Market: 08943b9aae7e7a98412ca9013688f97512f67c4a
+soop-stock-market: e325244594322e64882205f6db6363a5153a3830
+interior-3d-viewer: d8712265477806c21753a95ac931a98cb69457e9
+streamer-life-game: d4fba791279e921b7fcad4842d4806f6f18dc89b
+rocket-game: 570c6b6a773f2c197ee9362b6e71de1af6a99e2a
