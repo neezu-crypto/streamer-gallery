@@ -45,7 +45,7 @@
   submitBtn.addEventListener('click', async function () {
     if (!currentStreamerId) return;
     var nickname = nicknameInput.value.trim();
-    if (!nickname) { statusEl.textContent = '⚠️ 후원할 때 쓸 닉네임을 입력해 주세요.'; return; }
+    if (!nickname) { statusEl.textContent = '⚠️ 신청자 SOOP 닉네임을 입력해 주세요.'; return; }
 
     submitBtn.disabled = true;
     statusEl.textContent = '⏳ 신청 처리 중...';
