@@ -537,11 +537,15 @@ button{ font-family: inherit; cursor: pointer; }
    2026-09-10: 다른 propose-modal 계열(업로드/해금/관리자)은 네오브루탈리즘을
    유지하지만, 이 모달만 핀터레스트 참고 리디자인으로 뉴모피즘으로 전환 —
    .propose-modal의 굵은 잉크 테두리+하드 오프셋 그림자를 여기서 명시적으로
-   덮어써 부드러운 이중 그림자로 바꾼다. */
+   덮어쓴다. 다만 뉴모피즘 이중 그림자(--shadow-light가 흰색)는 이 모달만
+   유일하게 어두운 백드롭(.propose-backdrop, rgba(2,2,1,0.82)) 위에 떠 있어서
+   흰색 쪽이 글로우처럼 도드라져 보이는 문제가 있었다(2026-09-11 지적) - 다른
+   뉴모피즘 요소들은 전부 페이지와 같은 배경 위에 있어 문제없지만, 이 모달만
+   예외적으로 일반적인 어두운 드롭섀도우로 교체. */
 .detail-modal{
   max-width:920px; max-height:88vh; padding:0; overflow:hidden; position:relative;
   background:var(--panel); border:none; border-radius:24px;
-  box-shadow: 8px 8px 22px var(--shadow-dark), -8px -8px 22px var(--shadow-light);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 .detail-close-float{
   position:absolute; top:14px; right:14px; z-index:2;
@@ -552,7 +556,11 @@ button{ font-family: inherit; cursor: pointer; }
 .detail-close-float:hover{ background:rgba(0,0,0,0.75); }
 .detail-split{ display:flex; max-height:88vh; }
 .detail-image-wrap{
-  flex:1 1 55%; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  /* 레터박스(이미지 비율이 안 맞을 때 남는 여백) 배경 - 검정 대신 페이지 톤에
+     맞는 파스텔로(2026-09-11 지적). 옆 정보 패널(--panel)과는 톤 차이가 나서
+     경계가 자연스럽게 구분된다. 전체화면 이미지 뷰어(.image-view-backdrop)는
+     의도적으로 검정을 유지하는 별개의 몰입형 뷰어라 여기 포함되지 않는다. */
+  flex:1 1 55%; background:var(--panel-raised); display:flex; align-items:center; justify-content:center; overflow:hidden;
   position:relative;
 }
 .detail-image-wrap img{ width:100%; height:100%; max-height:88vh; object-fit:contain; display:block; cursor:zoom-in; }
