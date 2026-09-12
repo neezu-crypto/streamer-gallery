@@ -163,6 +163,13 @@
   }
   window.galIsStreamerUnlocked = isStreamerUnlocked;
 
+  // isStreamerUnlocked()는 "만료됨"과 "애초에 업로드가 한 번도 없었음"을 둘 다
+  // false로 뭉뚱그린다(firstUpload가 falsy면 둘 다 같은 경로) — 업로드 모달에서
+  // 이 둘을 구분해 보여주려면 firstUpload 존재 여부를 따로 확인해야 한다.
+  function hasStreamerEverUploaded(streamerId) {
+    return !!(streamerId && window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId]);
+  }
+
   // 매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
   // 반드시 같은 값이어야 한다(둘 중 하나만 바꾸면 span 계산이 어긋난다).
   var MASONRY_ROW_UNIT = 4;
@@ -465,7 +472,13 @@
     uploadStreamerSearch.value = '';
     var unlocked = isStreamerUnlocked(id);
     uploadStreamerSelected.style.display = '';
-    uploadStreamerSelected.textContent = (unlocked ? '✅ ' : '🔒 ') + '선택됨: ' + name + (unlocked ? '' : ' (열람 기간이 만료된 스트리머예요 — 업로드는 바로 되지만, 갱신 전까지는 다른 사람이 상세보기를 열 수 없어요)');
+    if (unlocked) {
+      uploadStreamerSelected.textContent = '✅ 선택됨: ' + name;
+    } else if (!hasStreamerEverUploaded(id)) {
+      uploadStreamerSelected.textContent = '🆕 선택됨: ' + name + ' (아직 이미지가 없는 스트리머예요 — 첫 업로드를 해보세요!)';
+    } else {
+      uploadStreamerSelected.textContent = '🔒 선택됨: ' + name + ' (열람 기간이 만료된 스트리머예요 — 업로드는 바로 되지만, 갱신 전까지는 다른 사람이 상세보기를 열 수 없어요)';
+    }
   }
 
   if (uploadStreamerSearch) {
@@ -481,7 +494,8 @@
       matches.forEach(function (s) {
         var row = document.createElement('div');
         row.className = 'streamer-row';
-        row.textContent = (isStreamerUnlocked(s.id) ? '✅ ' : '🔒 ') + s.name;
+        var icon = isStreamerUnlocked(s.id) ? '✅ ' : (hasStreamerEverUploaded(s.id) ? '🔒 ' : '🆕 ');
+        row.textContent = icon + s.name;
         row.addEventListener('click', function () { pickStreamer(s.name, s.id); });
         uploadStreamerResults.appendChild(row);
       });
