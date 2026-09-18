@@ -6,12 +6,19 @@
   var adminBtn = document.getElementById('open-admin-btn');
   var backdrop = document.getElementById('admin-backdrop');
   var closeBtn = document.getElementById('admin-modal-close');
-  var tabsWrap = document.getElementById('admin-tabs');
+  var tabsWrap = document.getElementById('admin-sidebar');
   var reportsPanel = document.getElementById('admin-reports-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
   var bansPanel = document.getElementById('admin-bans-panel');
   var linksPanel = document.getElementById('admin-links-panel');
+  var adminSidebar = document.getElementById('admin-sidebar');
+  var mobileMenuBtn = document.getElementById('admin-mobile-menu-btn');
+  var adminSearch = document.getElementById('admin-global-search');
+  var resultSummary = document.getElementById('admin-result-summary');
+  var currentSectionEl = document.getElementById('admin-current-section');
+  var reportsCountEl = document.getElementById('admin-reports-count');
+  var unlocksCountEl = document.getElementById('admin-unlocks-count');
   if (!backdrop) return;
 
   var reportsUnsub = null;
@@ -35,8 +42,31 @@
     return (window.galAllImages || []).find(function (i) { return i.id === id; });
   }
 
+  function filterCurrentPanel() {
+    var panels = [reportsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel];
+    var activePanel = panels.find(function (panel) { return panel && panel.style.display !== 'none'; });
+    if (!activePanel) return;
+    var query = (adminSearch && adminSearch.value || '').trim().toLocaleLowerCase();
+    var rows = Array.from(activePanel.querySelectorAll('.admin-row'));
+    var visible = 0;
+    rows.forEach(function (row) {
+      var matches = !query || row.textContent.toLocaleLowerCase().includes(query);
+      row.style.display = matches ? '' : 'none';
+      if (matches) visible += 1;
+    });
+    if (resultSummary) {
+      resultSummary.textContent = rows.length
+        ? (query ? (visible + '개 / ' + rows.length + '개 표시') : (rows.length + '개'))
+        : '';
+    }
+  }
+
   function renderReports() {
-    if (!latestReports.length) { reportsPanel.innerHTML = '<p class="empty-msg">접수된 신고가 없어요.</p>'; return; }
+    if (reportsCountEl) {
+      reportsCountEl.textContent = latestReports.length > 99 ? '99+' : String(latestReports.length);
+      reportsCountEl.hidden = latestReports.length === 0;
+    }
+    if (!latestReports.length) { reportsPanel.innerHTML = '<p class="empty-msg">접수된 신고가 없어요.</p>'; filterCurrentPanel(); return; }
     reportsPanel.innerHTML = latestReports.map(function (r) {
       var img = findImage(r.imageId);
       var thumb = img ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="">' : '';
@@ -59,12 +89,13 @@
         '</div>'
       );
     }).join('');
+    filterCurrentPanel();
   }
 
   function renderImages() {
     var images = window.galAllImages || [];
     var labels = window.galCategoryLabels || {};
-    if (!images.length) { imagesPanel.innerHTML = '<p class="empty-msg">이미지가 없어요.</p>'; return; }
+    if (!images.length) { imagesPanel.innerHTML = '<p class="empty-msg">이미지가 없어요.</p>'; filterCurrentPanel(); return; }
     imagesPanel.innerHTML = images.map(function (img) {
       return (
         '<div class="admin-row" data-image-id="' + escapeHtml(img.id) + '">' +
@@ -80,10 +111,11 @@
         '</div>'
       );
     }).join('');
+    filterCurrentPanel();
   }
 
   function renderBans() {
-    if (!latestBans.length) { bansPanel.innerHTML = '<p class="empty-msg">정지된 계정이 없어요.</p>'; return; }
+    if (!latestBans.length) { bansPanel.innerHTML = '<p class="empty-msg">정지된 계정이 없어요.</p>'; filterCurrentPanel(); return; }
     bansPanel.innerHTML = latestBans.map(function (b) {
       var when = b.bannedAt ? new Date(b.bannedAt).toLocaleString('ko-KR') : '';
       return (
@@ -98,13 +130,14 @@
         '</div>'
       );
     }).join('');
+    filterCurrentPanel();
   }
 
   // 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — deleteOwnImage의
   // 이름 자동 대조가 표기 차이(오타·띄어쓰기 등)로 실패하는 경우를 관리자가 직접
   // 보정한다. streamerVerifications는 공개 노드라 여기서도 그대로 읽을 수 있다.
   function renderLinks() {
-    if (!latestVerifications.length) { linksPanel.innerHTML = '<p class="empty-msg">인증된 스트리머가 없어요.</p>'; return; }
+    if (!latestVerifications.length) { linksPanel.innerHTML = '<p class="empty-msg">인증된 스트리머가 없어요.</p>'; filterCurrentPanel(); return; }
     linksPanel.innerHTML = latestVerifications.map(function (v) {
       var link = latestAccountLinks[v.uid];
       var statusText = link
@@ -129,6 +162,7 @@
         '</div>'
       );
     }).join('');
+    filterCurrentPanel();
   }
 
   function subscribeVerifications() {
@@ -158,7 +192,11 @@
 
   function renderUnlocks() {
     var pending = latestUnlockRequests.filter(function (r) { return r.status === 'pending'; });
-    if (!pending.length) { unlocksPanel.innerHTML = '<p class="empty-msg">대기 중인 해금 신청이 없어요.</p>'; return; }
+    if (unlocksCountEl) {
+      unlocksCountEl.textContent = pending.length > 99 ? '99+' : String(pending.length);
+      unlocksCountEl.hidden = pending.length === 0;
+    }
+    if (!pending.length) { unlocksPanel.innerHTML = '<p class="empty-msg">대기 중인 해금 신청이 없어요.</p>'; filterCurrentPanel(); return; }
     unlocksPanel.innerHTML = pending.map(function (r) {
       var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString('ko-KR') : '';
       return (
@@ -174,6 +212,7 @@
         '</div>'
       );
     }).join('');
+    filterCurrentPanel();
   }
 
   function subscribeUnlockRequests() {
@@ -241,11 +280,17 @@
     if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
   });
 
-  function closeAdminPanel() { backdrop.classList.remove('open'); window.galPopModal(closeAdminPanel); }
+  function closeAdminPanel() {
+    backdrop.classList.remove('open');
+    if (adminSidebar) adminSidebar.classList.remove('open');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    window.galPopModal(closeAdminPanel);
+  }
 
   adminBtn.addEventListener('click', function () {
     backdrop.classList.add('open');
     window.galPushModal(closeAdminPanel);
+    if (adminSearch) adminSearch.value = '';
     renderReports();
     renderImages();
     renderUnlocks();
@@ -256,9 +301,10 @@
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeAdminPanel(); });
 
   tabsWrap.addEventListener('click', function (e) {
-    var btn = e.target.closest('.chip');
+    var btn = e.target.closest('.admin-nav-item');
     if (!btn) return;
-    tabsWrap.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
+    if (btn.disabled) return;
+    tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (c) { c.classList.remove('active'); });
     btn.classList.add('active');
     var tab = btn.dataset.adminTab;
     reportsPanel.style.display = tab === 'reports' ? '' : 'none';
@@ -266,6 +312,17 @@
     unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
     bansPanel.style.display = tab === 'bans' ? '' : 'none';
     linksPanel.style.display = tab === 'links' ? '' : 'none';
+    var names = { reports: '신고 목록', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결' };
+    if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
+    filterCurrentPanel();
+    if (adminSidebar) adminSidebar.classList.remove('open');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  if (adminSearch) adminSearch.addEventListener('input', filterCurrentPanel);
+  if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function () {
+    var isOpen = adminSidebar && adminSidebar.classList.toggle('open');
+    mobileMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   });
 
   async function banUploader(uid, btn) {

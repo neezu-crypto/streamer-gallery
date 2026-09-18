@@ -250,35 +250,83 @@
 
 <div class="propose-backdrop" id="admin-backdrop">
   <div class="propose-modal admin-modal">
-    <div class="terminal-header">
-      <span class="terminal-title">ADMIN_PANEL</span>
+    <div class="admin-shell-header">
+      <div>
+        <span class="terminal-title">ADMIN_PANEL</span>
+        <p class="admin-shell-subtitle">스트리머 갤러리 운영 도구</p>
+      </div>
       <div class="terminal-dots">
+        <button class="admin-mobile-menu-btn" id="admin-mobile-menu-btn" type="button" aria-label="관리자 메뉴 열기" aria-expanded="false">☰</button>
         <button class="propose-modal-close" id="admin-modal-close" type="button" aria-label="닫기">✕</button>
       </div>
     </div>
-    <div class="gallery-category-chips" id="admin-tabs">
-      <button class="chip active" type="button" data-admin-tab="reports">신고 목록</button>
-      <button class="chip" type="button" data-admin-tab="images">전체 이미지</button>
-      <button class="chip" type="button" data-admin-tab="unlocks">해금 신청</button>
-      <button class="chip" type="button" data-admin-tab="bans">정지 관리</button>
-      <button class="chip" type="button" data-admin-tab="links">스트리머 연결</button>
-    </div>
-    <div class="admin-panel-body" id="admin-reports-panel">
-      <p class="empty-msg">신고 목록을 불러오는 중...</p>
-    </div>
-    <div class="admin-panel-body" id="admin-images-panel" style="display:none;">
-      <p class="empty-msg">이미지 목록을 불러오는 중...</p>
-    </div>
-    <div class="admin-panel-body" id="admin-unlocks-panel" style="display:none;">
-      <p class="empty-msg">해금 신청을 불러오는 중...</p>
-    </div>
-    <div class="admin-panel-body" id="admin-bans-panel" style="display:none;">
-      <p class="empty-msg">정지된 계정을 불러오는 중...</p>
-    </div>
-    <!-- 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — 이름 표기
-         차이로 자동 판별이 실패하는 경우를 관리자가 직접 보정한다. -->
-    <div class="admin-panel-body" id="admin-links-panel" style="display:none;">
-      <p class="empty-msg">인증 스트리머 목록을 불러오는 중...</p>
+    <div class="admin-shell-layout">
+      <nav class="admin-sidebar" id="admin-sidebar" aria-label="관리자 메뉴">
+        <div class="admin-nav-group">
+          <p class="admin-nav-heading">콘텐츠 관리</p>
+          <div class="admin-nav-list">
+            <button class="admin-nav-item active" type="button" data-admin-tab="reports"><span>신고 목록</span><span class="admin-nav-count" id="admin-reports-count" hidden>0</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="images"><span>전체 이미지</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="comments" disabled><span>댓글 검수</span><span class="admin-nav-soon">준비 중</span></button>
+          </div>
+        </div>
+        <div class="admin-nav-group">
+          <p class="admin-nav-heading">사용자·스트리머</p>
+          <div class="admin-nav-list">
+            <button class="admin-nav-item" type="button" data-admin-tab="unlocks"><span>해금 신청</span><span class="admin-nav-count" id="admin-unlocks-count" hidden>0</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="bans"><span>정지 관리</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="links"><span>스트리머 연결</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="users" disabled><span>사용자 검색</span><span class="admin-nav-soon">준비 중</span></button>
+          </div>
+        </div>
+        <div class="admin-nav-group">
+          <p class="admin-nav-heading">운영</p>
+          <div class="admin-nav-list">
+            <button class="admin-nav-item" type="button" data-admin-tab="audit" disabled><span>감사 로그</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="storage" disabled><span>R2 파일 점검</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="stats" disabled><span>운영 통계</span><span class="admin-nav-soon">준비 중</span></button>
+          </div>
+        </div>
+      </nav>
+      <main class="admin-main">
+        <div class="admin-toolbar">
+          <div>
+            <p class="admin-breadcrumb">관리자 / <strong id="admin-current-section">신고 목록</strong></p>
+            <p class="admin-toolbar-hint" id="admin-toolbar-hint">처리할 항목을 선택해 관리하세요.</p>
+          </div>
+          <label class="admin-search" for="admin-global-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="admin-global-search" type="search" maxlength="80" placeholder="현재 목록 검색">
+          </label>
+        </div>
+        <div class="admin-content-grid">
+          <section class="admin-list-column" aria-live="polite">
+            <p class="admin-result-summary" id="admin-result-summary"></p>
+            <div class="admin-panel-body" id="admin-reports-panel">
+              <p class="empty-msg">신고 목록을 불러오는 중...</p>
+            </div>
+            <div class="admin-panel-body" id="admin-images-panel" style="display:none;">
+              <p class="empty-msg">이미지 목록을 불러오는 중...</p>
+            </div>
+            <div class="admin-panel-body" id="admin-unlocks-panel" style="display:none;">
+              <p class="empty-msg">해금 신청을 불러오는 중...</p>
+            </div>
+            <div class="admin-panel-body" id="admin-bans-panel" style="display:none;">
+              <p class="empty-msg">정지된 계정을 불러오는 중...</p>
+            </div>
+            <!-- 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — 이름 표기
+                 차이로 자동 판별이 실패하는 경우를 관리자가 직접 보정한다. -->
+            <div class="admin-panel-body" id="admin-links-panel" style="display:none;">
+              <p class="empty-msg">인증 스트리머 목록을 불러오는 중...</p>
+            </div>
+          </section>
+          <aside class="admin-detail-panel" id="admin-detail-panel" aria-label="선택한 항목 상세 정보">
+            <span class="admin-detail-kicker">DETAIL</span>
+            <h2>상세 정보</h2>
+            <p>목록의 상세 보기 기능이 추가되면 선택한 이미지·댓글·계정 정보가 이곳에 표시됩니다.</p>
+          </aside>
+        </div>
+      </main>
     </div>
   </div>
 </div>
