@@ -415,7 +415,7 @@
     try {
       var fn = window.galFirebase.httpsCallable('adminDeleteComment');
       var result = await fn({ imageId: imageId, commentId: commentId });
-      if (result && result.data) {
+      if (result && result.data && typeof result.data.commentCount === 'number') {
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, result.data.commentCount);
       }
       window.galSound && window.galSound.adminAction();

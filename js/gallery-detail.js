@@ -412,7 +412,7 @@
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnComment');
       var result = await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
-      if (result && result.data) {
+      if (result && result.data && typeof result.data.commentCount === 'number') {
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, result.data.commentCount);
       }
       window.galSound && window.galSound.deleteConfirm();
@@ -472,7 +472,7 @@
     try {
       var postFn = window.galFirebase.httpsCallable('postComment');
       var result = await postFn({ imageId: currentImageId, text: text });
-      if (result && result.data) {
+      if (result && result.data && typeof result.data.commentCount === 'number') {
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, result.data.commentCount);
       }
     } catch (e) {
