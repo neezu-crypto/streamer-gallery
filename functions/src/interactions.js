@@ -3,7 +3,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { trimToLast } = require('./lib/capped-log');
 const { assertCooldown } = require('./lib/rate-limit');
-const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP, LIKE_COOLDOWN_MS, REPORT_COOLDOWN_MS } = require('./constants');
+const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP, COMMENT_REPORTS_CAP, COMMENT_REPORT_COOLDOWN_MS, LIKE_COOLDOWN_MS, REPORT_COOLDOWN_MS } = require('./constants');
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
@@ -95,6 +95,49 @@ const reportImage = onCall(async (request) => {
   return { reportId: reportRef.key };
 });
 
+// 댓글 신고 — 이미지 신고와 별도 큐로 분리해 관리자가 댓글 자체와 작성자를
+// 함께 검수할 수 있게 한다. commentText는 신고 시점의 스냅샷을 보관하므로
+// 원댓글이 먼저 삭제돼도 관리자 목록에서 신고 맥락이 사라지지 않는다.
+const reportComment = onCall(async (request) => {
+  const uid = await requireTrustedAccount(request);
+  await assertNotBanned(uid);
+  await assertCooldown(uid, 'commentReport', COMMENT_REPORT_COOLDOWN_MS);
+  const { imageId, commentId, reason } = request.data || {};
+  if (!imageId || typeof imageId !== 'string' || !commentId || typeof commentId !== 'string') {
+    throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+  }
+  const trimmedReason = (reason || '').trim().slice(0, REPORT_REASON_MAX_LENGTH);
+  if (FORBIDDEN_TEXT_RE.test(trimmedReason)) throw new HttpsError('invalid-argument', '허용되지 않는 문자가 포함되어 있습니다.');
+
+  const db = getDatabase();
+  const [imageSnap, commentSnap] = await Promise.all([
+    db.ref(`gallery/images/${imageId}`).get(),
+    db.ref(`gallery/comments/${imageId}/${commentId}`).get(),
+  ]);
+  if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
+  if (!commentSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
+  const comment = commentSnap.val() || {};
+  if (comment.uid === uid) throw new HttpsError('invalid-argument', '본인이 작성한 댓글은 신고할 수 없어요.');
+
+  const dedupRef = db.ref(`gallery/commentReportsByUser/${uid}/${imageId}/${commentId}`);
+  if ((await dedupRef.get()).exists()) throw new HttpsError('already-exists', '이미 신고한 댓글이에요.');
+
+  const reportsRef = db.ref('gallery/commentReports');
+  const reportRef = reportsRef.push();
+  await reportRef.set({
+    imageId,
+    commentId,
+    commentAuthorUid: comment.uid || '',
+    commentText: String(comment.text || '').slice(0, COMMENT_MAX_LENGTH),
+    reporterUid: uid,
+    reason: trimmedReason,
+    createdAt: Date.now(),
+  });
+  await dedupRef.set(true);
+  await trimToLast(reportsRef, COMMENT_REPORTS_CAP);
+  return { reportId: reportRef.key };
+});
+
 // 썸네일 숨기기(2026-09-05 추가) — 다른 사람에게는 전혀 영향 없이, 이 계정의
 // 메인 그리드에서만 해당 이미지를 안 보이게 하는 개인 취향 필터. userLikes와
 // 동일한 미러 패턴(gallery/hiddenImages/{uid}/{imageId})이라 클라이언트가
@@ -126,4 +169,4 @@ const unhideImage = onCall(async (request) => {
   return { hidden: false };
 });
 
-module.exports = { toggleLike, postComment, reportImage, hideImage, unhideImage };
+module.exports = { toggleLike, postComment, reportImage, reportComment, hideImage, unhideImage };

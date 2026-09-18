@@ -12,6 +12,8 @@ const COMMENT_MAX_LENGTH = 150; // 댓글 전용(2026-09-05 300->150로 축소)
 const REPORT_REASON_MAX_LENGTH = 300; // 신고 사유는 댓글보다 여유 있게 유지
 const COMMENT_COOLDOWN_MS = 8000; // 연속 댓글 도배 방지 — 계정당 8초에 한 번만 작성 가능
 const IMAGE_REPORTS_CAP = 500; // 신고는 유저당-이미지당 1회로 이미 막혀있지만, 방어적으로 상한도 둔다
+const COMMENT_REPORTS_CAP = 500; // 댓글 신고도 관리자 큐가 무한히 커지지 않도록 최근 건만 유지
+const COMMENT_REPORT_COOLDOWN_MS = 5000; // 댓글 신고 도배 방지
 
 // 매크로(자동화 스크립트) 방지 쿨다운(2026-09-06 추가, lib/rate-limit.js assertCooldown과
 // 짝) — 좋아요는 정상적인 연속 클릭 UX를 막지 않을 정도로 짧게, 업로드는 이미지 하나씩
@@ -54,6 +56,8 @@ module.exports = {
   LINK_RE,
   COMMENT_COOLDOWN_MS,
   IMAGE_REPORTS_CAP,
+  COMMENT_REPORTS_CAP,
+  COMMENT_REPORT_COOLDOWN_MS,
   LIKE_COOLDOWN_MS,
   REPORT_COOLDOWN_MS,
   UPLOAD_COOLDOWN_MS,

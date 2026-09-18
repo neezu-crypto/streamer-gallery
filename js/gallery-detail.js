@@ -163,7 +163,9 @@
       return (
         '<div class="detail-comment-row" data-comment-id="' + escapeHtml(c.id) + '">' +
           '<span class="detail-comment-text">' + escapeHtml(c.text) + '</span>' +
-          (mine ? '<button class="text-link detail-comment-delete-btn" type="button">삭제</button>' : '') +
+          '<span class="detail-comment-actions">' +
+            (mine ? '<button class="text-link detail-comment-delete-btn" type="button">삭제</button>' : '<button class="text-link detail-comment-report-btn" type="button">신고</button>') +
+          '</span>' +
         '</div>'
       );
     }).join('');
@@ -363,6 +365,42 @@
   });
 
   commentsWrap.addEventListener('click', async function (e) {
+    var reportBtn = e.target.closest('.detail-comment-report-btn');
+    if (reportBtn && currentImageId) {
+      if (!window.galTrusted) { closeModal(); window.galOpenLoginModal && window.galOpenLoginModal(); return; }
+      var reportRow = e.target.closest('.detail-comment-row');
+      var existingForm = reportRow && reportRow.nextElementSibling;
+      if (existingForm && existingForm.classList.contains('detail-comment-report-form')) {
+        existingForm.remove();
+        return;
+      }
+      commentsWrap.querySelectorAll('.detail-comment-report-form').forEach(function (form) { form.remove(); });
+      var form = document.createElement('div');
+      form.className = 'detail-comment-report-form';
+      form.innerHTML = '<input type="text" maxlength="300" placeholder="신고 사유(선택)"><button class="text-link detail-comment-report-cancel" type="button">취소</button><button class="glitch-btn detail-comment-report-submit" type="button">신고</button><p class="detail-comment-report-status"></p>';
+      reportRow.insertAdjacentElement('afterend', form);
+      var reasonInput = form.querySelector('input');
+      var submitReportBtn = form.querySelector('.detail-comment-report-submit');
+      var statusEl = form.querySelector('.detail-comment-report-status');
+      form.querySelector('.detail-comment-report-cancel').addEventListener('click', function () { form.remove(); });
+      submitReportBtn.addEventListener('click', async function () {
+        submitReportBtn.disabled = true;
+        statusEl.textContent = '⏳ 신고 접수 중...';
+        try {
+          var reportFn = window.galFirebase.httpsCallable('reportComment');
+          await reportFn({ imageId: currentImageId, commentId: reportRow.dataset.commentId, reason: reasonInput.value });
+          statusEl.textContent = '✅ 신고가 접수됐어요.';
+          window.galSound && window.galSound.reportSubmitted();
+          setTimeout(function () { if (form.parentNode) form.remove(); }, 1000);
+        } catch (err) {
+          window.galSound && window.galSound.error(err);
+          statusEl.textContent = '❌ 신고 처리 중 오류: ' + (err && err.message ? err.message : err);
+          submitReportBtn.disabled = false;
+        }
+      });
+      reasonInput.focus();
+      return;
+    }
     var btn = e.target.closest('.detail-comment-delete-btn');
     if (!btn || !currentImageId) return;
     var row = e.target.closest('.detail-comment-row');

@@ -654,6 +654,7 @@ button{ font-family: inherit; cursor: pointer; }
   display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
 }
 .detail-comment-row .detail-comment-text{ flex:1; word-break:break-word; }
+.detail-comment-actions{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .detail-comment-delete-btn{
   font-weight:800; font-size:10.5px; border:none; border-radius:8px;
   background:var(--panel); color:var(--muted); padding:5px 10px;
@@ -661,6 +662,17 @@ button{ font-family: inherit; cursor: pointer; }
   flex-shrink:0; transition: box-shadow .1s ease;
 }
 .detail-comment-delete-btn:active{ box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light); }
+.detail-comment-report-btn{ font-size:10.5px; padding:5px 10px; }
+.detail-comment-report-form{
+  display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:7px; align-items:center;
+  padding:9px 10px; background:var(--gold-dim); border:1px solid var(--gold-line); border-radius:10px;
+}
+.detail-comment-report-form input{
+  min-width:0; width:100%; border:none; border-radius:999px; background:var(--ink); padding:8px 12px;
+  font:600 12px var(--font-body); color:var(--text); outline:none; box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+}
+.detail-comment-report-form .glitch-btn{ width:auto; margin:0; padding:7px 12px; font-size:11px; }
+.detail-comment-report-status{ grid-column:1 / -1; margin:0; color:var(--muted); font-size:10.5px; }
 
 .detail-comment-form{ display:flex; align-items:stretch; gap:10px; }
 .detail-comment-form input, .detail-report-form input{

@@ -8,6 +8,7 @@
   var closeBtn = document.getElementById('admin-modal-close');
   var tabsWrap = document.getElementById('admin-sidebar');
   var reportsPanel = document.getElementById('admin-reports-panel');
+  var commentsPanel = document.getElementById('admin-comments-panel');
   var imagesPanel = document.getElementById('admin-images-panel');
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
   var bansPanel = document.getElementById('admin-bans-panel');
@@ -18,11 +19,14 @@
   var resultSummary = document.getElementById('admin-result-summary');
   var currentSectionEl = document.getElementById('admin-current-section');
   var reportsCountEl = document.getElementById('admin-reports-count');
+  var commentsCountEl = document.getElementById('admin-comments-count');
   var unlocksCountEl = document.getElementById('admin-unlocks-count');
   if (!backdrop) return;
 
   var reportsUnsub = null;
   var latestReports = [];
+  var commentReportsUnsub = null;
+  var latestCommentReports = [];
   var unlocksUnsub = null;
   var latestUnlockRequests = [];
   var bansUnsub = null;
@@ -43,7 +47,7 @@
   }
 
   function filterCurrentPanel() {
-    var panels = [reportsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel];
+    var panels = [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel];
     var activePanel = panels.find(function (panel) { return panel && panel.style.display !== 'none'; });
     if (!activePanel) return;
     var query = (adminSearch && adminSearch.value || '').trim().toLocaleLowerCase();
@@ -85,6 +89,35 @@
             banBtn +
             '<button class="text-link admin-dismiss-btn" type="button">신고 무시</button>' +
             '<button class="text-link admin-delete-btn" type="button">이미지 삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+    filterCurrentPanel();
+  }
+
+  function renderCommentReports() {
+    if (commentsCountEl) {
+      commentsCountEl.textContent = latestCommentReports.length > 99 ? '99+' : String(latestCommentReports.length);
+      commentsCountEl.hidden = latestCommentReports.length === 0;
+    }
+    if (!latestCommentReports.length) { commentsPanel.innerHTML = '<p class="empty-msg">접수된 댓글 신고가 없어요.</p>'; filterCurrentPanel(); return; }
+    commentsPanel.innerHTML = latestCommentReports.map(function (r) {
+      var img = findImage(r.imageId);
+      var when = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR') : '';
+      var author = escapeHtml(r.commentAuthorUid || '(알 수 없음)');
+      return (
+        '<div class="admin-row admin-comment-report-row" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '" data-comment-id="' + escapeHtml(r.commentId) + '">' +
+          '<div class="admin-row-body">' +
+            '<div class="admin-row-meta">댓글 신고 · ' + escapeHtml((img && img.streamerName) || r.imageId || '(이미지 없음)') + ' · ' + when + '</div>' +
+            '<div class="admin-row-reason"><strong>댓글:</strong> ' + (escapeHtml(r.commentText) || '(내용 없음)') + '</div>' +
+            '<div class="admin-row-reason"><strong>작성자:</strong> ' + author + ' · <strong>신고자:</strong> ' + escapeHtml(r.reporterUid || '(알 수 없음)') + '</div>' +
+            '<div class="admin-row-reason"><strong>사유:</strong> ' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
+          '</div>' +
+          '<div class="admin-row-actions">' +
+            (r.commentAuthorUid && r.commentAuthorUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + author + '">작성자 정지</button>' : '') +
+            '<button class="text-link admin-dismiss-comment-btn" type="button">신고 무시</button>' +
+            '<button class="text-link admin-delete-comment-btn" type="button">댓글 삭제</button>' +
           '</div>' +
         '</div>'
       );
@@ -253,6 +286,23 @@
     });
   }
 
+  function subscribeCommentReports() {
+    if (commentReportsUnsub) return;
+    var reportsRef = window.galFirebase.query(
+      window.galFirebase.ref(window.galDb, 'gallery/commentReports'),
+      window.galFirebase.limitToLast(500)
+    );
+    commentReportsUnsub = window.galFirebase.onValue(reportsRef, function (snap) {
+      var data = snap.val() || {};
+      latestCommentReports = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
+        .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      renderCommentReports();
+    }, function (err) {
+      console.error('댓글 신고 목록 구독 실패', err);
+      commentsPanel.innerHTML = '<p class="empty-msg">댓글 신고 목록을 불러오지 못했어요.</p>';
+    });
+  }
+
   // bannedAccounts는 게임 전체가 공유하는 루트 노드라 정지 사유에 다른 게임 것도 섞여
   // 올 수 있다 — games.gallery가 있는 것만 걸러서 보여준다(정지 자체는 게임별이라
   // 실제 효력엔 문제없음, 목록에 다른 게임 정지 건이 안 보이게 필터링만 하는 것).
@@ -274,10 +324,10 @@
 
   document.addEventListener('gal-auth-changed', function (e) {
     adminBtn.style.display = e.detail.isAdmin ? '' : 'none';
-    if (e.detail.isAdmin) { subscribeReports(); subscribeUnlockRequests(); subscribeBans(); subscribeVerifications(); subscribeAccountLinks(); }
+    if (e.detail.isAdmin) { subscribeReports(); subscribeCommentReports(); subscribeUnlockRequests(); subscribeBans(); subscribeVerifications(); subscribeAccountLinks(); }
   });
   document.addEventListener('gal-images-updated', function () {
-    if (backdrop.classList.contains('open')) { renderReports(); renderImages(); }
+    if (backdrop.classList.contains('open')) { renderReports(); renderCommentReports(); renderImages(); }
   });
 
   function closeAdminPanel() {
@@ -292,6 +342,7 @@
     window.galPushModal(closeAdminPanel);
     if (adminSearch) adminSearch.value = '';
     renderReports();
+    renderCommentReports();
     renderImages();
     renderUnlocks();
     renderBans();
@@ -308,11 +359,12 @@
     btn.classList.add('active');
     var tab = btn.dataset.adminTab;
     reportsPanel.style.display = tab === 'reports' ? '' : 'none';
+    commentsPanel.style.display = tab === 'comments' ? '' : 'none';
     imagesPanel.style.display = tab === 'images' ? '' : 'none';
     unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
     bansPanel.style.display = tab === 'bans' ? '' : 'none';
     linksPanel.style.display = tab === 'links' ? '' : 'none';
-    var names = { reports: '신고 목록', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결' };
+    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
     filterCurrentPanel();
     if (adminSidebar) adminSidebar.classList.remove('open');
@@ -357,6 +409,20 @@
     }
   }
 
+  async function deleteComment(imageId, commentId, btn) {
+    if (!confirm('이 댓글을 삭제할까요? 신고 항목도 함께 처리됩니다.')) return;
+    btn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('adminDeleteComment');
+      await fn({ imageId: imageId, commentId: commentId });
+      window.galSound && window.galSound.adminAction();
+    } catch (e) {
+      window.galSound && window.galSound.error(e);
+      alert('댓글 삭제 중 오류: ' + (e && e.message ? e.message : e));
+      btn.disabled = false;
+    }
+  }
+
   reportsPanel.addEventListener('click', async function (e) {
     var row = e.target.closest('.admin-row');
     if (!row) return;
@@ -381,6 +447,32 @@
       }
     } else if (e.target.closest('.admin-delete-btn')) {
       deleteImage(row.dataset.imageId, e.target);
+    }
+  });
+
+  commentsPanel.addEventListener('click', async function (e) {
+    var row = e.target.closest('.admin-comment-report-row');
+    if (!row) return;
+    if (e.target.closest('.admin-ban-btn')) {
+      banUploader(e.target.dataset.uid, e.target);
+      return;
+    }
+    if (e.target.closest('.admin-dismiss-comment-btn')) {
+      var dismissBtn = e.target;
+      dismissBtn.disabled = true;
+      try {
+        var dismissFn = window.galFirebase.httpsCallable('adminDismissCommentReport');
+        await dismissFn({ reportId: row.dataset.reportId });
+        window.galSound && window.galSound.adminAction();
+      } catch (err) {
+        window.galSound && window.galSound.error(err);
+        alert('댓글 신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
+        dismissBtn.disabled = false;
+      }
+      return;
+    }
+    if (e.target.closest('.admin-delete-comment-btn')) {
+      deleteComment(row.dataset.imageId, row.dataset.commentId, e.target);
     }
   });
 

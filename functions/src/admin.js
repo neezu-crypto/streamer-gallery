@@ -58,9 +58,24 @@ async function performImageDeletion(imageId) {
 async function performCommentDeletion(imageId, commentId) {
   const db = getDatabase();
   const commentRef = db.ref(`gallery/comments/${imageId}/${commentId}`);
-  const snap = await commentRef.get();
+  const [snap, reportsSnap] = await Promise.all([
+    commentRef.get(),
+    db.ref('gallery/commentReports').orderByChild('commentId').equalTo(commentId).get(),
+  ]);
   if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
-  await commentRef.remove();
+  const updates = {};
+  updates[`gallery/comments/${imageId}/${commentId}`] = null;
+  if (reportsSnap.exists()) {
+    reportsSnap.forEach((child) => {
+      const report = child.val() || {};
+      if (report.imageId !== imageId) return;
+      updates[`gallery/commentReports/${child.key}`] = null;
+      if (report.reporterUid) {
+        updates[`gallery/commentReportsByUser/${report.reporterUid}/${imageId}/${commentId}`] = null;
+      }
+    });
+  }
+  await db.ref().update(updates);
   await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
   return snap.val();
 }
@@ -157,6 +172,20 @@ const adminDismissImageReport = onCall(async (request) => {
   return { dismissed: true };
 });
 
+const adminDismissCommentReport = onCall(async (request) => {
+  const uid = await requireAdmin(request);
+  const { reportId } = request.data || {};
+  if (!reportId) throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+
+  const db = getDatabase();
+  const reportRef = db.ref(`gallery/commentReports/${reportId}`);
+  if (!(await reportRef.get()).exists()) throw new HttpsError('not-found', '존재하지 않는 댓글 신고입니다.');
+
+  await reportRef.remove();
+  await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.dismissCommentReport', reportId);
+  return { dismissed: true };
+});
+
 // 게임별 정지 관리(2026-09-05 추가, 신규 게임 온보딩 체크리스트) — StreamBet-Market의
 // banAccount/unbanAccount와 동일 패턴이지만 이름은 다르게 짓는다. Cloud Functions
 // 리소스 이름은 codebase로 네임스페이스되지 않아(2026-09-04 whoAmI 충돌 사고로 확인)
@@ -234,6 +263,7 @@ module.exports = {
   adminDeleteComment,
   deleteOwnComment,
   adminDismissImageReport,
+  adminDismissCommentReport,
   banGalleryAccount,
   unbanGalleryAccount,
   adminLinkStreamerAccount,

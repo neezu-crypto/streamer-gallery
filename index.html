@@ -267,7 +267,7 @@
           <div class="admin-nav-list">
             <button class="admin-nav-item active" type="button" data-admin-tab="reports"><span>신고 목록</span><span class="admin-nav-count" id="admin-reports-count" hidden>0</span></button>
             <button class="admin-nav-item" type="button" data-admin-tab="images"><span>전체 이미지</span></button>
-            <button class="admin-nav-item" type="button" data-admin-tab="comments" disabled><span>댓글 검수</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="comments"><span>댓글 검수</span><span class="admin-nav-count" id="admin-comments-count" hidden>0</span></button>
           </div>
         </div>
         <div class="admin-nav-group">
@@ -304,6 +304,9 @@
             <p class="admin-result-summary" id="admin-result-summary"></p>
             <div class="admin-panel-body" id="admin-reports-panel">
               <p class="empty-msg">신고 목록을 불러오는 중...</p>
+            </div>
+            <div class="admin-panel-body" id="admin-comments-panel" style="display:none;">
+              <p class="empty-msg">댓글 신고 목록을 불러오는 중...</p>
             </div>
             <div class="admin-panel-body" id="admin-images-panel" style="display:none;">
               <p class="empty-msg">이미지 목록을 불러오는 중...</p>
