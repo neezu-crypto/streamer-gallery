@@ -640,8 +640,14 @@ button{ font-family: inherit; cursor: pointer; }
   margin:10px 0 6px; padding:14px; border-radius:14px; background:var(--panel-raised);
   display:flex; flex-direction:column; gap:10px;
 }
-.detail-comments-label{ font-size:11.5px; font-weight:800; color:var(--muted); margin:4px 0 8px; }
-.detail-comments{ margin:0 0 14px; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.detail-comments-label{ font-size:11.5px; font-weight:800; color:var(--muted); margin:4px 0 8px; flex:0 0 auto; }
+.detail-comments{
+  /* 상세 패널이 flex column이라 관련 사진이 많을 때 기본 flex-shrink가
+     댓글 영역을 0px까지 눌러 본문이 잘리던 문제를 방지한다. 댓글은
+     자체 높이를 유지하고, 목록이 길면 기존 max-height 안에서만 스크롤한다. */
+  margin:0 0 14px; max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;
+  flex:0 0 auto; min-height:0;
+}
 @media (max-width:720px){
   /* 댓글 영역만 따로 스크롤되지 않고 패널 전체(.detail-panel의 overflow-y:auto)가
      한 번에 스크롤되게 — 중첩 스크롤 영역을 없앤다. 위의 기본 .detail-comments
