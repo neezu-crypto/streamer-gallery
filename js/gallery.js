@@ -312,6 +312,21 @@
     renderGrid();
   };
 
+  // 댓글 등록/삭제는 imageStats의 commentCount만 바꾸므로 gallery/images 실시간
+  // 구독만으로는 관리자 전체 이미지 목록의 숫자가 갱신되지 않는다. 상세보기와
+  // 관리자 검수 화면이 같은 캐시를 보도록, 서버가 돌려준 최신 카운트를 이 창구로
+  // 반영하고 목록 갱신 이벤트도 함께 발행한다.
+  window.galPatchImageCommentCount = function (imageId, commentCount) {
+    var img = allImages.find(function (i) { return i.id === imageId; });
+    if (!img) return;
+    var nextCount = Math.max(0, Number(commentCount) || 0);
+    if ((img.commentCount || 0) === nextCount) return;
+    img.commentCount = nextCount;
+    window.galAllImages = allImages;
+    renderGrid();
+    document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
+  };
+
   function subscribeImages() {
     if (!window.galFirebase || !window.galDb) { setTimeout(subscribeImages, 200); return; }
     if (imagesUnsub) { imagesUnsub(); imagesUnsub = null; }

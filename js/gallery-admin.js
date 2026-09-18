@@ -414,7 +414,10 @@
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('adminDeleteComment');
-      await fn({ imageId: imageId, commentId: commentId });
+      var result = await fn({ imageId: imageId, commentId: commentId });
+      if (result && result.data) {
+        window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, result.data.commentCount);
+      }
       window.galSound && window.galSound.adminAction();
     } catch (e) {
       window.galSound && window.galSound.error(e);

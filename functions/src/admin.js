@@ -76,8 +76,8 @@ async function performCommentDeletion(imageId, commentId) {
     });
   }
   await db.ref().update(updates);
-  await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
-  return snap.val();
+  const countResult = await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => Math.max(0, (current || 0) - 1));
+  return { comment: snap.val(), commentCount: countResult.snapshot.val() || 0 };
 }
 
 const adminDeleteImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
@@ -136,9 +136,9 @@ const adminDeleteComment = onCall(async (request) => {
   const { imageId, commentId } = request.data || {};
   if (!imageId || !commentId) throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
 
-  await performCommentDeletion(imageId, commentId);
+  const result = await performCommentDeletion(imageId, commentId);
   await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.deleteComment', `${imageId}/${commentId}`);
-  return { deleted: true };
+  return { deleted: true, commentCount: result.commentCount };
 });
 
 // 본인이 작성한 댓글 셀프 삭제(2026-09-05 추가).
@@ -154,8 +154,8 @@ const deleteOwnComment = onCall(async (request) => {
     throw new HttpsError('permission-denied', '본인이 작성한 댓글만 삭제할 수 있어요.');
   }
 
-  await performCommentDeletion(imageId, commentId);
-  return { deleted: true };
+  const result = await performCommentDeletion(imageId, commentId);
+  return { deleted: true, commentCount: result.commentCount };
 });
 
 const adminDismissImageReport = onCall(async (request) => {

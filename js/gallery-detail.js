@@ -178,6 +178,9 @@
       var list = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
         .sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
       renderComments(list);
+      // 댓글 구독은 해당 이미지 하나에만 걸려 있으므로, 실제 목록 길이도
+      // 전체 이미지 캐시의 카운터에 반영해 관리자 목록과 동기화한다.
+      window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, list.length);
     });
   }
 
@@ -408,7 +411,10 @@
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnComment');
-      await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
+      var result = await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
+      if (result && result.data) {
+        window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, result.data.commentCount);
+      }
       window.galSound && window.galSound.deleteConfirm();
     } catch (e2) {
       window.galSound && window.galSound.error(e2);
@@ -465,7 +471,10 @@
     commentSubmitBtn.disabled = true;
     try {
       var postFn = window.galFirebase.httpsCallable('postComment');
-      await postFn({ imageId: currentImageId, text: text });
+      var result = await postFn({ imageId: currentImageId, text: text });
+      if (result && result.data) {
+        window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, result.data.commentCount);
+      }
     } catch (e) {
       if (tempRow.parentNode) tempRow.parentNode.removeChild(tempRow);
       commentInput.value = text;

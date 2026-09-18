@@ -59,9 +59,9 @@ const postComment = onCall(async (request) => {
 
   const commentRef = db.ref(`gallery/comments/${imageId}`).push();
   await commentRef.set({ uid, text: trimmed, createdAt: Date.now() });
-  await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
+  const countResult = await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
 
-  return { commentId: commentRef.key };
+  return { commentId: commentRef.key, commentCount: countResult.snapshot.val() || 0 };
 });
 
 const reportImage = onCall(async (request) => {
