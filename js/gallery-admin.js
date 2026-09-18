@@ -18,6 +18,10 @@
   var adminSearch = document.getElementById('admin-global-search');
   var resultSummary = document.getElementById('admin-result-summary');
   var currentSectionEl = document.getElementById('admin-current-section');
+  var contentGrid = document.querySelector('.admin-content-grid');
+  var detailPanel = document.getElementById('admin-detail-panel');
+  var detailBackBtn = document.getElementById('admin-detail-back');
+  var detailContent = document.getElementById('admin-detail-content');
   var reportsCountEl = document.getElementById('admin-reports-count');
   var commentsCountEl = document.getElementById('admin-comments-count');
   var unlocksCountEl = document.getElementById('admin-unlocks-count');
@@ -35,6 +39,8 @@
   var accountLinksUnsub = null;
   var latestVerifications = [];
   var latestAccountLinks = {};
+  var selectedDetail = null;
+  var detailLoadToken = 0;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -44,6 +50,113 @@
 
   function findImage(id) {
     return (window.galAllImages || []).find(function (i) { return i.id === id; });
+  }
+
+  function formatWhen(timestamp) {
+    return timestamp ? new Date(timestamp).toLocaleString('ko-KR') : '시간 정보 없음';
+  }
+
+  function getSelectedReport() {
+    if (!selectedDetail) return null;
+    var source = selectedDetail.kind === 'comment' ? latestCommentReports : latestReports;
+    return source.find(function (r) { return r.id === selectedDetail.reportId; }) || selectedDetail.report;
+  }
+
+  function getDetailAuthorUid(report, image, kind) {
+    return kind === 'comment' ? (report && report.commentAuthorUid) : (image && image.uploaderUid);
+  }
+
+  function getRecentAuthorReports(authorUid) {
+    if (!authorUid) return [];
+    var items = [];
+    latestReports.forEach(function (r) {
+      var img = findImage(r.imageId);
+      if (img && img.uploaderUid === authorUid) {
+        items.push({ type: '이미지 신고', reason: r.reason, createdAt: r.createdAt });
+      }
+    });
+    latestCommentReports.forEach(function (r) {
+      if (r.commentAuthorUid === authorUid) {
+        items.push({ type: '댓글 신고', reason: r.reason, createdAt: r.createdAt });
+      }
+    });
+    return items.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, 5);
+  }
+
+  function clearDetail() {
+    selectedDetail = null;
+    detailLoadToken += 1;
+    if (contentGrid) contentGrid.classList.remove('admin-detail-open');
+    if (detailContent) {
+      detailContent.innerHTML = '<span class="admin-detail-kicker">DETAIL</span><h2>상세 정보</h2><p>신고 목록에서 항목을 선택하면 이미지·댓글·작성자 정보가 표시됩니다.</p>';
+    }
+  }
+
+  function renderDetailPanel() {
+    if (!detailContent || !selectedDetail) return;
+    var report = getSelectedReport();
+    if (!report) { clearDetail(); return; }
+    var image = selectedDetail.image || findImage(report.imageId);
+    var kind = selectedDetail.kind;
+    var authorUid = getDetailAuthorUid(report, image, kind);
+    var ban = authorUid && latestBans.find(function (b) { return b.uid === authorUid; });
+    var recentReports = getRecentAuthorReports(authorUid);
+    var previewUrl = image && (image.thumbUrl || image.imageUrl);
+    var fullUrl = image && (image.imageUrl || image.thumbUrl);
+    var detailType = kind === 'comment' ? '댓글 신고' : '이미지 신고';
+    var targetName = image && image.streamerName ? image.streamerName : '(이미지 정보 없음)';
+    var reportText = kind === 'comment'
+      ? '<div class="admin-detail-section"><h3>신고된 댓글</h3><p class="admin-detail-comment">' + (escapeHtml(report.commentText) || '(내용 없음)') + '</p></div>'
+      : '';
+    var recentHtml = recentReports.length
+      ? '<ul class="admin-detail-report-list">' + recentReports.map(function (r) {
+          return '<li class="admin-detail-report-item"><strong>' + escapeHtml(r.type) + '</strong> · ' + escapeHtml(formatWhen(r.createdAt)) + '<br>' + (escapeHtml(r.reason) || '(사유 없음)') + '</li>';
+        }).join('') + '</ul>'
+      : '<p>최근 신고 내역이 없습니다.</p>';
+    var statusHtml = ban
+      ? '<p class="admin-detail-status is-banned">🔒 갤러리 이용 정지 상태<br>' + escapeHtml(ban.reason || '(사유 없음)') + '<br>' + escapeHtml(formatWhen(ban.bannedAt)) + '</p>'
+      : '<p class="admin-detail-status is-clear">✅ 현재 갤러리 정지 상태가 아닙니다.</p>';
+    var canBan = authorUid && authorUid !== (window.galUser && window.galUser.uid);
+    var actions = '<div class="admin-detail-actions">' +
+      (canBan ? '<button class="text-link admin-detail-action" type="button" data-detail-action="ban" data-uid="' + escapeHtml(authorUid) + '">작성자 정지</button>' : '') +
+      '<button class="text-link admin-detail-action" type="button" data-detail-action="dismiss" data-report-id="' + escapeHtml(report.id) + '">' + (kind === 'comment' ? '댓글 신고 무시' : '이미지 신고 무시') + '</button>' +
+      (kind === 'comment'
+        ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-comment" data-image-id="' + escapeHtml(report.imageId) + '" data-comment-id="' + escapeHtml(report.commentId) + '">댓글 삭제</button>'
+        : (image ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-image" data-image-id="' + escapeHtml(report.imageId) + '">이미지 삭제</button>' : '')) +
+      '</div>';
+
+    detailContent.innerHTML =
+      '<span class="admin-detail-kicker">DETAIL</span>' +
+      '<h2>' + escapeHtml(detailType) + '</h2>' +
+      (previewUrl
+        ? '<button class="admin-detail-preview" type="button" data-detail-preview-url="' + escapeHtml(fullUrl) + '" title="클릭하면 크게 보기"><img src="' + escapeHtml(previewUrl) + '" alt=""></button>'
+        : '<div class="admin-detail-preview admin-detail-preview-empty">이미지를 찾을 수 없습니다.</div>') +
+      '<div class="admin-detail-meta">' +
+        '<span><strong>이미지</strong> ' + escapeHtml(targetName) + '</span>' +
+        '<span><strong>신고 접수</strong> ' + escapeHtml(formatWhen(report.createdAt)) + '</span>' +
+        '<span><strong>신고자</strong> ' + escapeHtml(report.reporterUid || '(알 수 없음)') + '</span>' +
+        '<span><strong>작성자 UID</strong> ' + escapeHtml(authorUid || '(알 수 없음)') + '</span>' +
+      '</div>' +
+      reportText +
+      '<div class="admin-detail-section"><h3>작성자 정지 상태</h3>' + statusHtml + '</div>' +
+      '<div class="admin-detail-section"><h3>작성자 최근 신고 · 최대 5건</h3>' + recentHtml + '</div>' +
+      actions;
+  }
+
+  async function selectDetail(kind, report) {
+    if (!report) return;
+    selectedDetail = { kind: kind, reportId: report.id, report: report, image: findImage(report.imageId) };
+    var token = ++detailLoadToken;
+    if (contentGrid) contentGrid.classList.add('admin-detail-open');
+    if (detailContent) detailContent.innerHTML = '<span class="admin-detail-kicker">DETAIL</span><h2>불러오는 중...</h2><p>신고 대상 정보를 확인하고 있어요.</p>';
+    if (!selectedDetail.image && report.imageId && window.galFirebase && window.galDb) {
+      try {
+        var snap = await window.galFirebase.get(window.galFirebase.ref(window.galDb, 'gallery/images/' + report.imageId));
+        if (snap.exists()) selectedDetail.image = Object.assign({ id: report.imageId }, snap.val());
+      } catch (e) { console.error('관리자 상세 이미지 조회 실패', e); }
+    }
+    if (token !== detailLoadToken || !selectedDetail) return;
+    renderDetailPanel();
   }
 
   function filterCurrentPanel() {
@@ -66,6 +179,7 @@
   }
 
   function renderReports() {
+    if (selectedDetail && selectedDetail.kind === 'image' && !latestReports.some(function (r) { return r.id === selectedDetail.reportId; })) clearDetail();
     if (reportsCountEl) {
       reportsCountEl.textContent = latestReports.length > 99 ? '99+' : String(latestReports.length);
       reportsCountEl.hidden = latestReports.length === 0;
@@ -79,7 +193,7 @@
         ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>'
         : '';
       return (
-        '<div class="admin-row" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '">' +
+        '<div class="admin-row admin-row-selectable' + (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.reportId === r.id ? ' is-selected' : '') + '" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '">' +
           '<div class="admin-row-thumb' + (img ? ' clickable' : '') + '" title="' + (img ? '클릭하면 풀이미지로 열어요' : '') + '">' + thumb + '</div>' +
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">' + escapeHtml((img && img.streamerName) || '(삭제된 이미지)') + ' · ' + when + '</div>' +
@@ -94,9 +208,11 @@
       );
     }).join('');
     filterCurrentPanel();
+    if (selectedDetail && selectedDetail.kind === 'image') renderDetailPanel();
   }
 
   function renderCommentReports() {
+    if (selectedDetail && selectedDetail.kind === 'comment' && !latestCommentReports.some(function (r) { return r.id === selectedDetail.reportId; })) clearDetail();
     if (commentsCountEl) {
       commentsCountEl.textContent = latestCommentReports.length > 99 ? '99+' : String(latestCommentReports.length);
       commentsCountEl.hidden = latestCommentReports.length === 0;
@@ -107,7 +223,7 @@
       var when = r.createdAt ? new Date(r.createdAt).toLocaleString('ko-KR') : '';
       var author = escapeHtml(r.commentAuthorUid || '(알 수 없음)');
       return (
-        '<div class="admin-row admin-comment-report-row" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '" data-comment-id="' + escapeHtml(r.commentId) + '">' +
+        '<div class="admin-row admin-row-selectable admin-comment-report-row' + (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.reportId === r.id ? ' is-selected' : '') + '" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '" data-comment-id="' + escapeHtml(r.commentId) + '">' +
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">댓글 신고 · ' + escapeHtml((img && img.streamerName) || r.imageId || '(이미지 없음)') + ' · ' + when + '</div>' +
             '<div class="admin-row-reason"><strong>댓글:</strong> ' + (escapeHtml(r.commentText) || '(내용 없음)') + '</div>' +
@@ -123,6 +239,7 @@
       );
     }).join('');
     filterCurrentPanel();
+    if (selectedDetail && selectedDetail.kind === 'comment') renderDetailPanel();
   }
 
   function renderImages() {
@@ -145,6 +262,7 @@
       );
     }).join('');
     filterCurrentPanel();
+    if (selectedDetail) renderDetailPanel();
   }
 
   function renderBans() {
@@ -164,6 +282,7 @@
       );
     }).join('');
     filterCurrentPanel();
+    if (selectedDetail) renderDetailPanel();
   }
 
   // 인증 스트리머 계정 ↔ 스트리머ID 수동 연결(2026-09-06 추가) — deleteOwnImage의
@@ -334,12 +453,14 @@
     backdrop.classList.remove('open');
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    clearDetail();
     window.galPopModal(closeAdminPanel);
   }
 
   adminBtn.addEventListener('click', function () {
     backdrop.classList.add('open');
     window.galPushModal(closeAdminPanel);
+    clearDetail();
     if (adminSearch) adminSearch.value = '';
     renderReports();
     renderCommentReports();
@@ -355,6 +476,7 @@
     var btn = e.target.closest('.admin-nav-item');
     if (!btn) return;
     if (btn.disabled) return;
+    clearDetail();
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (c) { c.classList.remove('active'); });
     btn.classList.add('active');
     var tab = btn.dataset.adminTab;
@@ -402,6 +524,7 @@
       var fn = window.galFirebase.httpsCallable('adminDeleteImage');
       await fn({ imageId: imageId });
       window.galSound && window.galSound.adminAction();
+      if (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.report && selectedDetail.report.imageId === imageId) clearDetail();
     } catch (e) {
       window.galSound && window.galSound.error(e);
       alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
@@ -419,6 +542,7 @@
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, result.data.commentCount);
       }
       window.galSound && window.galSound.adminAction();
+      if (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.report && selectedDetail.report.commentId === commentId) clearDetail();
     } catch (e) {
       window.galSound && window.galSound.error(e);
       alert('댓글 삭제 중 오류: ' + (e && e.message ? e.message : e));
@@ -426,30 +550,75 @@
     }
   }
 
+  async function dismissImageReport(reportId, btn) {
+    btn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('adminDismissImageReport');
+      await fn({ reportId: reportId });
+      window.galSound && window.galSound.adminAction();
+      if (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.reportId === reportId) clearDetail();
+    } catch (err) {
+      window.galSound && window.galSound.error(err);
+      alert('신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
+      btn.disabled = false;
+    }
+  }
+
+  async function dismissCommentReport(reportId, btn) {
+    btn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('adminDismissCommentReport');
+      await fn({ reportId: reportId });
+      window.galSound && window.galSound.adminAction();
+      if (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.reportId === reportId) clearDetail();
+    } catch (err) {
+      window.galSound && window.galSound.error(err);
+      alert('댓글 신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
+      btn.disabled = false;
+    }
+  }
+
+  if (detailBackBtn) detailBackBtn.addEventListener('click', clearDetail);
+  if (detailPanel) detailPanel.addEventListener('click', function (e) {
+    var preview = e.target.closest('.admin-detail-preview[data-detail-preview-url]');
+    if (preview) {
+      window.galOpenImageView && window.galOpenImageView(preview.dataset.detailPreviewUrl);
+      return;
+    }
+    var btn = e.target.closest('.admin-detail-action');
+    if (!btn) return;
+    var action = btn.dataset.detailAction;
+    if (action === 'ban') {
+      banUploader(btn.dataset.uid, btn);
+    } else if (action === 'dismiss') {
+      if (selectedDetail && selectedDetail.kind === 'comment') dismissCommentReport(btn.dataset.reportId, btn);
+      else dismissImageReport(btn.dataset.reportId, btn);
+    } else if (action === 'delete-image') {
+      deleteImage(btn.dataset.imageId, btn);
+    } else if (action === 'delete-comment') {
+      deleteComment(btn.dataset.imageId, btn.dataset.commentId, btn);
+    }
+  });
+
   reportsPanel.addEventListener('click', async function (e) {
     var row = e.target.closest('.admin-row');
     if (!row) return;
     if (e.target.closest('.admin-row-thumb.clickable')) {
       var reportedImg = findImage(row.dataset.imageId);
+      var report = latestReports.find(function (r) { return r.id === row.dataset.reportId; });
+      if (report) selectDetail('image', report);
       if (reportedImg) window.galOpenImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
       return;
     }
     if (e.target.closest('.admin-ban-btn')) {
       banUploader(e.target.dataset.uid, e.target);
     } else if (e.target.closest('.admin-dismiss-btn')) {
-      var btn = e.target;
-      btn.disabled = true;
-      try {
-        var fn = window.galFirebase.httpsCallable('adminDismissImageReport');
-        await fn({ reportId: row.dataset.reportId });
-        window.galSound && window.galSound.adminAction();
-      } catch (err) {
-        window.galSound && window.galSound.error(err);
-        alert('신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
-        btn.disabled = false;
-      }
+      dismissImageReport(row.dataset.reportId, e.target);
     } else if (e.target.closest('.admin-delete-btn')) {
       deleteImage(row.dataset.imageId, e.target);
+    } else {
+      var report = latestReports.find(function (r) { return r.id === row.dataset.reportId; });
+      if (report) selectDetail('image', report);
     }
   });
 
@@ -461,22 +630,15 @@
       return;
     }
     if (e.target.closest('.admin-dismiss-comment-btn')) {
-      var dismissBtn = e.target;
-      dismissBtn.disabled = true;
-      try {
-        var dismissFn = window.galFirebase.httpsCallable('adminDismissCommentReport');
-        await dismissFn({ reportId: row.dataset.reportId });
-        window.galSound && window.galSound.adminAction();
-      } catch (err) {
-        window.galSound && window.galSound.error(err);
-        alert('댓글 신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
-        dismissBtn.disabled = false;
-      }
+      dismissCommentReport(row.dataset.reportId, e.target);
       return;
     }
     if (e.target.closest('.admin-delete-comment-btn')) {
       deleteComment(row.dataset.imageId, row.dataset.commentId, e.target);
+      return;
     }
+    var report = latestCommentReports.find(function (r) { return r.id === row.dataset.reportId; });
+    if (report) selectDetail('comment', report);
   });
 
   imagesPanel.addEventListener('click', function (e) {
