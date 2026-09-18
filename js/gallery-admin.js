@@ -180,6 +180,7 @@
   }
 
   function renderReports() {
+    latestReports = latestReports.filter(function (r) { return !(window.galPendingImageDeletes && window.galPendingImageDeletes[r.imageId]); });
     if (selectedDetail && selectedDetail.kind === 'image' && !latestReports.some(function (r) { return r.id === selectedDetail.reportId; })) clearDetail();
     if (reportsCountEl) {
       reportsCountEl.textContent = latestReports.length > 99 ? '99+' : String(latestReports.length);
@@ -398,6 +399,7 @@
     reportsUnsub = window.galFirebase.onValue(reportsRef, function (snap) {
       var data = snap.val() || {};
       latestReports = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
+        .filter(function (r) { return !(window.galPendingImageDeletes && window.galPendingImageDeletes[r.imageId]); })
         .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       renderReports();
     }, function (err) {
@@ -521,13 +523,27 @@
 
   async function deleteImage(imageId, btn) {
     if (!confirm('이 이미지를 삭제할까요? 되돌릴 수 없어요.')) return;
+    var deletionToken = window.galBeginImageDelete && window.galBeginImageDelete(imageId);
+    var previousReports = latestReports.slice();
+    var removedReports = previousReports.filter(function (r) { return r.imageId === imageId; });
+    latestReports = latestReports.filter(function (r) { return r.imageId !== imageId; });
+    // 신고 목록·전체 이미지 목록·상세 패널을 서버 응답 전에 바로 갱신한다.
+    renderReports();
+    renderImages();
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('adminDeleteImage');
       await fn({ imageId: imageId });
+      window.galConfirmImageDelete && window.galConfirmImageDelete(imageId);
       window.galSound && window.galSound.adminAction();
-      if (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.report && selectedDetail.report.imageId === imageId) clearDetail();
     } catch (e) {
+      window.galRollbackImageDelete && window.galRollbackImageDelete(deletionToken);
+      removedReports.forEach(function (report) {
+        if (!latestReports.some(function (current) { return current.id === report.id; })) latestReports.push(report);
+      });
+      latestReports.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      renderReports();
+      renderImages();
       window.galSound && window.galSound.error(e);
       alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
       btn.disabled = false;

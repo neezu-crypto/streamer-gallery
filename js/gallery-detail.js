@@ -358,13 +358,20 @@
   deleteBtn.addEventListener('click', async function () {
     if (!currentImageId) return;
     if (!confirm('이 이미지를 삭제할까요? 되돌릴 수 없어요.')) return;
+    var deletingImageId = currentImageId;
+    var deletionToken = window.galBeginImageDelete && window.galBeginImageDelete(deletingImageId);
     deleteBtn.disabled = true;
+    // 댓글 삭제와 동일하게 서버 응답 전에 상세 화면을 닫고 그리드에서도 즉시
+    // 제거한다. 실패하면 캐시를 되돌려 이미지가 다시 보이게 한다.
+    if (deletionToken) closeModal();
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnImage');
-      await fn({ imageId: currentImageId });
+      await fn({ imageId: deletingImageId });
+      window.galConfirmImageDelete && window.galConfirmImageDelete(deletingImageId);
       window.galSound && window.galSound.deleteConfirm();
-      closeModal();
+      if (!deletionToken) closeModal();
     } catch (e) {
+      window.galRollbackImageDelete && window.galRollbackImageDelete(deletionToken);
       window.galSound && window.galSound.error(e);
       alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
     } finally {

@@ -62,6 +62,11 @@
   var hasMoreImages = false;
   var isLoadingMore = false;
   var allImages = [];
+  // 이미지 삭제는 서버 응답을 기다리는 동안에도 화면에서 먼저 숨긴다(댓글 삭제와
+  // 같은 낙관적 UX). 서버의 RTDB 구독이 이전 값을 잠깐 재전달해도 삭제 중인 카드가
+  // 다시 나타나지 않도록 이 상태를 구독 병합 단계에서도 적용한다.
+  var pendingImageDeletes = {};
+  window.galPendingImageDeletes = pendingImageDeletes;
   var activeCategory = 'all';
   var myGalleryOnly = false;
   var allStreamers = [];
@@ -244,6 +249,56 @@
   // 안 바뀜), gallery-detail.js가 값을 갱신한 직후 이 함수를 불러 즉시 반영했었다.
   window.galRenderGrid = renderGrid;
 
+  function cacheRecentImages() {
+    try { localStorage.setItem(GRID_CACHE_KEY, JSON.stringify({ images: recentImages })); } catch (e) {}
+  }
+
+  function publishImageCache() {
+    allImages = recentImages.concat(olderImages);
+    window.galAllImages = allImages;
+    renderGrid();
+    document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
+    cacheRecentImages();
+  }
+
+  // 상세 화면/관리자 화면에서 이미지 삭제를 시작할 때 호출한다. 반환 토큰은
+  // 서버 실패 시 원래 목록 위치로 복구하는 데 사용한다.
+  window.galBeginImageDelete = function (imageId) {
+    if (!imageId || pendingImageDeletes[imageId]) return null;
+    var recentIndex = recentImages.findIndex(function (img) { return img.id === imageId; });
+    var olderIndex = olderImages.findIndex(function (img) { return img.id === imageId; });
+    var image = recentIndex >= 0 ? recentImages[recentIndex] : (olderIndex >= 0 ? olderImages[olderIndex] : null);
+    pendingImageDeletes[imageId] = {
+      image: image,
+      source: recentIndex >= 0 ? 'recent' : (olderIndex >= 0 ? 'older' : null),
+      index: recentIndex >= 0 ? recentIndex : olderIndex,
+      confirmed: false,
+    };
+    recentImages = recentImages.filter(function (img) { return img.id !== imageId; });
+    olderImages = olderImages.filter(function (img) { return img.id !== imageId; });
+    publishImageCache();
+    return { imageId: imageId };
+  };
+
+  // 서버가 삭제를 확정했음을 기록한다. RTDB 구독에서 실제로 항목이 사라질 때까지
+  // pending 상태를 유지해, 서버 응답 직후 도착하는 이전 스냅샷으로 카드가 되살아나는
+  // 깜빡임을 막는다.
+  window.galConfirmImageDelete = function (imageId) {
+    if (pendingImageDeletes[imageId]) pendingImageDeletes[imageId].confirmed = true;
+  };
+
+  window.galRollbackImageDelete = function (token) {
+    if (!token || !pendingImageDeletes[token.imageId]) return;
+    var state = pendingImageDeletes[token.imageId];
+    delete pendingImageDeletes[token.imageId];
+    if (state.image && !recentImages.some(function (img) { return img.id === token.imageId; }) && !olderImages.some(function (img) { return img.id === token.imageId; })) {
+      var target = state.source === 'older' ? olderImages : recentImages;
+      target.push(state.image);
+      target.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    }
+    publishImageCache();
+  };
+
   // 배지 하나 옮기자고 그리드 전체를 innerHTML로 통째로 다시 그리면(renderGrid())
   // 새 카드들이 masonry span(grid-row-end)을 다시 계산받기 전까지 한순간 전부
   // 기본 높이로 쪼그라들어 문서 전체 높이가 스크롤 위치보다 짧아지는 순간이
@@ -279,6 +334,8 @@
   // get()으로 읽어와 병합한다. 내가 직접 누른 좋아요는 이 재조회를 기다리지 않고
   // window.galPatchImageLikeCount로 그 자리에서 바로 반영한다.
   async function mergeStatsAndRender() {
+    recentImages = recentImages.filter(function (img) { return !pendingImageDeletes[img.id]; });
+    olderImages = olderImages.filter(function (img) { return !pendingImageDeletes[img.id]; });
     allImages = recentImages.concat(olderImages);
     window.galAllImages = allImages;
     if (window.galFirebase && window.galDb) {
@@ -300,7 +357,7 @@
     // 초기 로드 체감 속도(2026-09-06 추가) — 최신 페이지만 캐싱해서 다음 방문 때
     // 실시간 구독 응답을 기다리지 않고 바로 그려준다(용량 방지 위해 olderImages는
     // 캐싱 안 함).
-    try { localStorage.setItem(GRID_CACHE_KEY, JSON.stringify({ images: recentImages })); } catch (e) {}
+    cacheRecentImages();
   }
 
   window.galPatchImageLikeCount = function (imageId, likeCount) {
@@ -343,9 +400,15 @@
       var data = snap.val() || {};
       var keys = Object.keys(data);
       hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
-      recentImages = keys.map(function (id) {
+      var rawRecentImages = keys.map(function (id) {
         return Object.assign({ id: id }, data[id]);
       }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      Object.keys(pendingImageDeletes).forEach(function (imageId) {
+        if (pendingImageDeletes[imageId].confirmed && !rawRecentImages.some(function (img) { return img.id === imageId; })) {
+          delete pendingImageDeletes[imageId];
+        }
+      });
+      recentImages = rawRecentImages.filter(function (img) { return !pendingImageDeletes[img.id]; });
       // "더 보기"로 이미 불러온 과거 페이지 중 이번 최신 윈도우와 겹치는 항목은
       // 제거 — 최신 윈도우 쪽이 항상 더 신선한 데이터라 그쪽을 우선한다.
       var recentIds = {};
@@ -380,6 +443,7 @@
       hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
       var page = keys.map(function (id) { return Object.assign({ id: id }, data[id]); })
         .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      page = page.filter(function (img) { return !pendingImageDeletes[img.id]; });
       olderImages = olderImages.concat(page);
       await mergeStatsAndRender();
     } catch (err) {
