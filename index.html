@@ -299,6 +299,20 @@
             <input id="admin-global-search" type="search" maxlength="80" placeholder="현재 목록 검색">
           </label>
         </div>
+        <div class="admin-filter-row" id="admin-filter-row">
+          <label class="admin-filter-field">유형<select id="admin-type-filter"></select></label>
+          <label class="admin-filter-field">상태<select id="admin-status-filter"></select></label>
+          <label class="admin-filter-field">시작일<input id="admin-from-filter" type="date"></label>
+          <label class="admin-filter-field">종료일<input id="admin-to-filter" type="date"></label>
+          <label class="admin-filter-field">정렬<select id="admin-sort-filter"><option value="latest">최신순</option><option value="oldest">오래된순</option></select></label>
+          <button class="text-link admin-filter-reset" id="admin-filter-reset" type="button">필터 초기화</button>
+        </div>
+        <div class="admin-bulk-toolbar" id="admin-bulk-toolbar" hidden>
+          <label class="admin-select-all"><input id="admin-select-all" type="checkbox"><span id="admin-selected-count">0개 선택</span></label>
+          <select id="admin-bulk-action" aria-label="일괄 처리 선택"></select>
+          <button class="glitch-btn admin-bulk-apply" id="admin-bulk-apply" type="button">선택 항목 처리</button>
+          <button class="text-link" id="admin-selection-clear" type="button">선택 해제</button>
+        </div>
         <div class="admin-content-grid">
           <section class="admin-list-column" aria-live="polite">
             <p class="admin-result-summary" id="admin-result-summary"></p>
@@ -332,10 +346,17 @@
             </div>
           </aside>
         </div>
+        <div class="admin-pagination" id="admin-pagination" hidden>
+          <button class="text-link" id="admin-page-prev" type="button">← 이전</button>
+          <span id="admin-page-summary"></span>
+          <button class="text-link" id="admin-page-next" type="button">다음 →</button>
+        </div>
       </main>
     </div>
   </div>
 </div>
+
+<div class="admin-toast-container" id="admin-toast-container" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 풀이미지 뷰어(공용, js/image-viewer.js) — 관리자 신고/전체이미지 목록 썸네일과
      메인페이지 상세보기 모달(#detail-image) 양쪽에서 재사용한다. detail-backdrop/

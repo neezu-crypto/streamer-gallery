@@ -16,6 +16,23 @@
   var adminSidebar = document.getElementById('admin-sidebar');
   var mobileMenuBtn = document.getElementById('admin-mobile-menu-btn');
   var adminSearch = document.getElementById('admin-global-search');
+  var typeFilter = document.getElementById('admin-type-filter');
+  var statusFilter = document.getElementById('admin-status-filter');
+  var fromFilter = document.getElementById('admin-from-filter');
+  var toFilter = document.getElementById('admin-to-filter');
+  var sortFilter = document.getElementById('admin-sort-filter');
+  var filterResetBtn = document.getElementById('admin-filter-reset');
+  var bulkToolbar = document.getElementById('admin-bulk-toolbar');
+  var selectAllCheckbox = document.getElementById('admin-select-all');
+  var selectedCountEl = document.getElementById('admin-selected-count');
+  var bulkActionSelect = document.getElementById('admin-bulk-action');
+  var bulkApplyBtn = document.getElementById('admin-bulk-apply');
+  var selectionClearBtn = document.getElementById('admin-selection-clear');
+  var pagination = document.getElementById('admin-pagination');
+  var pagePrevBtn = document.getElementById('admin-page-prev');
+  var pageNextBtn = document.getElementById('admin-page-next');
+  var pageSummary = document.getElementById('admin-page-summary');
+  var toastContainer = document.getElementById('admin-toast-container');
   var resultSummary = document.getElementById('admin-result-summary');
   var currentSectionEl = document.getElementById('admin-current-section');
   var contentGrid = document.querySelector('.admin-content-grid');
@@ -42,6 +59,27 @@
   var pendingCommentReportDeletes = {};
   var selectedDetail = null;
   var detailLoadToken = 0;
+  var activeTab = 'reports';
+  var pageCursor = null;
+  var pageNextCursor = null;
+  var pageHistory = [];
+  var pageHasMore = false;
+  var pageTotal = 0;
+  var pageLoading = false;
+  var pageRequestToken = 0;
+  var pageSize = 50;
+  var selectedItems = {};
+  var pageImages = {};
+  var pageItems = [];
+
+  var TAB_CONFIG = {
+    reports: { label: '신고 목록', types: [['all', '전체'], ['image', '이미지 신고']], statuses: [['pending', '대기'], ['dismissed', '무시 처리'], ['deleted', '삭제 처리'], ['all', '전체']], actions: [['dismiss', '신고 무시'], ['delete-image', '이미지 삭제']] },
+    comments: { label: '댓글 검수', types: [['all', '전체'], ['comment', '댓글 신고']], statuses: [['pending', '대기'], ['dismissed', '무시 처리'], ['deleted', '삭제 처리'], ['all', '전체']], actions: [['dismiss', '신고 무시'], ['delete-comment', '댓글 삭제']] },
+    images: { label: '전체 이미지', types: [['all', '전체'], ['screenshot', '스크린샷'], ['ai-art', 'AI 일러스트'], ['fan-art', '팬아트'], ['meme', '밈'], ['etc', '기타']], statuses: [['active', '게시 중'], ['all', '전체']], actions: [['delete-image', '이미지 삭제']] },
+    unlocks: { label: '해금 신청', types: [['all', '전체']], statuses: [['pending', '대기'], ['approved', '승인'], ['rejected', '거절'], ['all', '전체']], actions: [['approve', '해금 승인'], ['reject', '거절']] },
+    bans: { label: '정지 관리', types: [['all', '전체']], statuses: [['banned', '정지 중'], ['all', '전체']], actions: [['unban', '정지 해제']] },
+    links: { label: '스트리머 연결', types: [['all', '전체']], statuses: [['linked', '연결됨'], ['unlinked', '미연결'], ['all', '전체']], actions: [['unlink', '연결 해제']] },
+  };
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -50,7 +88,88 @@
   }
 
   function findImage(id) {
-    return (window.galAllImages || []).find(function (i) { return i.id === id; });
+    return (window.galAllImages || []).find(function (i) { return i.id === id; }) || pageImages[id] || null;
+  }
+
+  function showToast(message, isError, duration) {
+    if (!toastContainer) return;
+    var toast = document.createElement('div');
+    toast.className = 'admin-toast' + (isError ? ' is-error' : '');
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(function () { if (toast.parentNode) toast.remove(); }, duration || (isError ? 7000 : 3500));
+  }
+
+  function currentConfig() { return TAB_CONFIG[activeTab] || TAB_CONFIG.reports; }
+
+  function optionHtml(options, selected) {
+    return options.map(function (item) { return '<option value="' + escapeHtml(item[0]) + '"' + (item[0] === selected ? ' selected' : '') + '>' + escapeHtml(item[1]) + '</option>'; }).join('');
+  }
+
+  function configureFilters() {
+    var config = currentConfig();
+    var previousType = typeFilter && typeFilter.value;
+    var previousStatus = statusFilter && statusFilter.value;
+    if (typeFilter) typeFilter.innerHTML = optionHtml(config.types, config.types.some(function (i) { return i[0] === previousType; }) ? previousType : config.types[0][0]);
+    if (statusFilter) statusFilter.innerHTML = optionHtml(config.statuses, config.statuses.some(function (i) { return i[0] === previousStatus; }) ? previousStatus : config.statuses[0][0]);
+    if (bulkActionSelect) bulkActionSelect.innerHTML = optionHtml(config.actions, config.actions[0][0]);
+  }
+
+  function getFilters() {
+    var from = fromFilter && fromFilter.value ? new Date(fromFilter.value + 'T00:00:00+09:00').getTime() : 0;
+    var to = toFilter && toFilter.value ? new Date(toFilter.value + 'T23:59:59.999+09:00').getTime() : 0;
+    return {
+      search: adminSearch ? adminSearch.value.trim() : '',
+      type: typeFilter ? typeFilter.value : 'all',
+      status: statusFilter ? statusFilter.value : 'pending',
+      from: from,
+      to: to,
+      sort: sortFilter ? sortFilter.value : 'latest',
+    };
+  }
+
+  function itemKey(item) { return activeTab + ':' + item.id; }
+
+  function clearSelection() {
+    selectedItems = {};
+    updateSelectionUi();
+  }
+
+  function updateSelectionUi() {
+    var keys = Object.keys(selectedItems);
+    if (bulkToolbar) bulkToolbar.hidden = keys.length === 0;
+    if (selectedCountEl) selectedCountEl.textContent = keys.length + '개 선택';
+    if (bulkApplyBtn) bulkApplyBtn.disabled = keys.length === 0 || pageLoading;
+    if (selectAllCheckbox) {
+      var rows = document.querySelectorAll('#admin-' + (activeTab === 'reports' ? 'reports' : activeTab) + '-panel .admin-select-checkbox');
+      selectAllCheckbox.checked = rows.length > 0 && Array.from(rows).every(function (checkbox) { return checkbox.checked; });
+      selectAllCheckbox.indeterminate = rows.length > 0 && !selectAllCheckbox.checked && Array.from(rows).some(function (checkbox) { return checkbox.checked; });
+    }
+  }
+
+  function selectedForCurrentPage() {
+    var source = activeTab === 'reports' ? latestReports : activeTab === 'comments' ? latestCommentReports : activeTab === 'images' ? pageItems : activeTab === 'unlocks' ? latestUnlockRequests : activeTab === 'bans' ? latestBans : latestVerifications;
+    return source.filter(function (item) { return selectedItems[itemKey(item)]; });
+  }
+
+  function removeCurrentItem(id) {
+    if (activeTab === 'reports') latestReports = latestReports.filter(function (item) { return item.id !== id; });
+    else if (activeTab === 'comments') latestCommentReports = latestCommentReports.filter(function (item) { return item.id !== id; });
+    else if (activeTab === 'unlocks') latestUnlockRequests = latestUnlockRequests.filter(function (item) { return item.id !== id; });
+    else if (activeTab === 'bans') latestBans = latestBans.filter(function (item) { return item.id !== id; });
+    else if (activeTab === 'links') latestVerifications = latestVerifications.filter(function (item) { return item.id !== id; });
+    else if (activeTab === 'images') pageItems = pageItems.filter(function (item) { return item.id !== id; });
+    delete selectedItems[activeTab + ':' + id];
+  }
+
+  function renderActivePanel() {
+    if (activeTab === 'reports') renderReports();
+    else if (activeTab === 'comments') renderCommentReports();
+    else if (activeTab === 'images') renderImages();
+    else if (activeTab === 'unlocks') renderUnlocks();
+    else if (activeTab === 'bans') renderBans();
+    else if (activeTab === 'links') renderLinks();
+    updateSelectionUi();
   }
 
   function formatWhen(timestamp) {
@@ -100,7 +219,7 @@
     var image = selectedDetail.image || findImage(report.imageId);
     var kind = selectedDetail.kind;
     var authorUid = getDetailAuthorUid(report, image, kind);
-    var ban = authorUid && latestBans.find(function (b) { return b.uid === authorUid; });
+    var ban = authorUid && (latestBans.find(function (b) { return b.uid === authorUid; }) || report.ban);
     var recentReports = getRecentAuthorReports(authorUid);
     var previewUrl = image && (image.thumbUrl || image.imageUrl);
     var fullUrl = image && (image.imageUrl || image.thumbUrl);
@@ -118,13 +237,15 @@
       ? '<p class="admin-detail-status is-banned">🔒 갤러리 이용 정지 상태<br>' + escapeHtml(ban.reason || '(사유 없음)') + '<br>' + escapeHtml(formatWhen(ban.bannedAt)) + '</p>'
       : '<p class="admin-detail-status is-clear">✅ 현재 갤러리 정지 상태가 아닙니다.</p>';
     var canBan = authorUid && authorUid !== (window.galUser && window.galUser.uid);
-    var actions = '<div class="admin-detail-actions">' +
-      (canBan ? '<button class="text-link admin-detail-action" type="button" data-detail-action="ban" data-uid="' + escapeHtml(authorUid) + '">작성자 정지</button>' : '') +
-      '<button class="text-link admin-detail-action" type="button" data-detail-action="dismiss" data-report-id="' + escapeHtml(report.id) + '">' + (kind === 'comment' ? '댓글 신고 무시' : '이미지 신고 무시') + '</button>' +
-      (kind === 'comment'
-        ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-comment" data-image-id="' + escapeHtml(report.imageId) + '" data-comment-id="' + escapeHtml(report.commentId) + '">댓글 삭제</button>'
-        : (image ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-image" data-image-id="' + escapeHtml(report.imageId) + '">이미지 삭제</button>' : '')) +
-      '</div>';
+    var actions = report.status === 'pending'
+      ? '<div class="admin-detail-actions">' +
+        (canBan ? '<button class="text-link admin-detail-action" type="button" data-detail-action="ban" data-uid="' + escapeHtml(authorUid) + '">작성자 정지</button>' : '') +
+        '<button class="text-link admin-detail-action" type="button" data-detail-action="dismiss" data-report-id="' + escapeHtml(report.id) + '">' + (kind === 'comment' ? '댓글 신고 무시' : '이미지 신고 무시') + '</button>' +
+        (kind === 'comment'
+          ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-comment" data-image-id="' + escapeHtml(report.imageId) + '" data-comment-id="' + escapeHtml(report.commentId) + '">댓글 삭제</button>'
+          : (image ? '<button class="text-link admin-detail-action admin-detail-danger" type="button" data-detail-action="delete-image" data-image-id="' + escapeHtml(report.imageId) + '">이미지 삭제</button>' : '')) +
+        '</div>'
+      : '<p class="admin-detail-status is-clear">이미 처리된 항목입니다.</p>';
 
     detailContent.innerHTML =
       '<span class="admin-detail-kicker">DETAIL</span>' +
@@ -146,7 +267,7 @@
 
   async function selectDetail(kind, report) {
     if (!report) return;
-    selectedDetail = { kind: kind, reportId: report.id, report: report, image: findImage(report.imageId) };
+    selectedDetail = { kind: kind, reportId: report.id, report: report, image: findImage(report.imageId) || report.image || null };
     var token = ++detailLoadToken;
     if (contentGrid) contentGrid.classList.add('admin-detail-open');
     if (detailContent) detailContent.innerHTML = '<span class="admin-detail-kicker">DETAIL</span><h2>불러오는 중...</h2><p>신고 대상 정보를 확인하고 있어요.</p>';
@@ -164,27 +285,102 @@
     var panels = [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel];
     var activePanel = panels.find(function (panel) { return panel && panel.style.display !== 'none'; });
     if (!activePanel) return;
-    var query = (adminSearch && adminSearch.value || '').trim().toLocaleLowerCase();
     var rows = Array.from(activePanel.querySelectorAll('.admin-row'));
-    var visible = 0;
     rows.forEach(function (row) {
-      var matches = !query || row.textContent.toLocaleLowerCase().includes(query);
-      row.style.display = matches ? '' : 'none';
-      if (matches) visible += 1;
+      row.style.display = '';
     });
     if (resultSummary) {
       resultSummary.textContent = rows.length
-        ? (query ? (visible + '개 / ' + rows.length + '개 표시') : (rows.length + '개'))
+        ? ((pageTotal || rows.length) + '개 중 ' + rows.length + '개 표시')
         : '';
     }
+  }
+
+  function setPageItems(items) {
+    pageItems = items || [];
+    if (activeTab === 'reports') latestReports = pageItems;
+    else if (activeTab === 'comments') latestCommentReports = pageItems;
+    else if (activeTab === 'unlocks') latestUnlockRequests = pageItems;
+    else if (activeTab === 'bans') latestBans = pageItems;
+    else if (activeTab === 'links') latestVerifications = pageItems;
+    pageItems.forEach(function (item) {
+      if (item.image) pageImages[item.image.id] = item.image;
+      if (activeTab === 'images') pageImages[item.id] = item;
+    });
+  }
+
+  async function loadAdminPage(options) {
+    options = options || {};
+    if (!window.galFirebase) return;
+    var token = ++pageRequestToken;
+    pageLoading = true;
+    updateSelectionUi();
+    if (currentSectionEl) currentSectionEl.textContent = currentConfig().label;
+    if (options.showLoading !== false) {
+      var activePanel = document.getElementById('admin-' + activeTab + '-panel');
+      if (activePanel) activePanel.innerHTML = '<p class="empty-msg">목록을 불러오는 중...</p>';
+    }
+    try {
+      var fn = window.galFirebase.httpsCallable('getGalleryAdminPage');
+      var result = await fn(Object.assign({ kind: activeTab, cursor: pageCursor, pageSize: pageSize }, getFilters()));
+      if (token !== pageRequestToken) return;
+      var data = result.data || {};
+      pageImages = {};
+      setPageItems(data.items || []);
+      pageTotal = Number(data.total) || 0;
+      pageHasMore = !!data.hasMore;
+      pageNextCursor = data.nextCursor || null;
+      renderActivePanel();
+      updatePaginationUi();
+    } catch (e) {
+      if (token !== pageRequestToken) return;
+      var failedPanel = document.getElementById('admin-' + activeTab + '-panel');
+      if (failedPanel) failedPanel.innerHTML = '<p class="empty-msg">목록을 불러오지 못했어요. 새로고침해 주세요.</p>';
+      showToast('목록을 불러오지 못했어요: ' + (e && e.message ? e.message : e), true);
+    } finally {
+      if (token === pageRequestToken) {
+        pageLoading = false;
+        updateSelectionUi();
+      }
+    }
+  }
+
+  function updatePaginationUi() {
+    var hasPrevious = pageHistory.length > 0;
+    if (pagination) pagination.hidden = !(hasPrevious || pageHasMore);
+    if (pagePrevBtn) pagePrevBtn.disabled = !hasPrevious || pageLoading;
+    if (pageNextBtn) pageNextBtn.disabled = !pageHasMore || pageLoading;
+    if (pageSummary) {
+      var pageNumber = pageHistory.length + 1;
+      pageSummary.textContent = pageTotal ? pageNumber + '페이지 · 전체 ' + pageTotal + '건' : '표시할 항목이 없어요';
+    }
+  }
+
+  function resetPageAndLoad() {
+    pageCursor = null;
+    pageNextCursor = null;
+    pageHistory = [];
+    clearSelection();
+    loadAdminPage();
+  }
+
+  function statusBadge(status) {
+    var labels = { pending: '대기', dismissed: '무시 처리', deleted: '삭제 처리', approved: '승인', rejected: '거절', active: '게시 중', banned: '정지 중', linked: '연결됨', unlinked: '미연결' };
+    var label = labels[status] || status || '대기';
+    var complete = ['dismissed', 'deleted', 'approved', 'rejected', 'unlinked'].includes(status);
+    return '<span class="admin-status-badge ' + (complete ? 'is-complete' : 'is-pending') + '">' + escapeHtml(label) + '</span>';
+  }
+
+  function rowCheckbox(item) {
+    return '<label class="admin-row-check"><input class="admin-select-checkbox" type="checkbox" data-select-id="' + escapeHtml(item.id) + '"' + (selectedItems[itemKey(item)] ? ' checked' : '') + ' aria-label="항목 선택"></label>';
   }
 
   function renderReports() {
     latestReports = latestReports.filter(function (r) { return !(window.galPendingImageDeletes && window.galPendingImageDeletes[r.imageId]); });
     if (selectedDetail && selectedDetail.kind === 'image' && !latestReports.some(function (r) { return r.id === selectedDetail.reportId; })) clearDetail();
     if (reportsCountEl) {
-      reportsCountEl.textContent = latestReports.length > 99 ? '99+' : String(latestReports.length);
-      reportsCountEl.hidden = latestReports.length === 0;
+      reportsCountEl.textContent = (activeTab === 'reports' ? pageTotal : latestReports.length) > 99 ? '99+' : String(activeTab === 'reports' ? pageTotal : latestReports.length);
+      reportsCountEl.hidden = (activeTab === 'reports' ? pageTotal : latestReports.length) === 0;
     }
     if (!latestReports.length) { reportsPanel.innerHTML = '<p class="empty-msg">접수된 신고가 없어요.</p>'; filterCurrentPanel(); return; }
     reportsPanel.innerHTML = latestReports.map(function (r) {
@@ -196,15 +392,16 @@
         : '';
       return (
         '<div class="admin-row admin-row-selectable' + (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.reportId === r.id ? ' is-selected' : '') + '" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '">' +
+          rowCheckbox(r) +
           '<div class="admin-row-thumb' + (img ? ' clickable' : '') + '" title="' + (img ? '클릭하면 풀이미지로 열어요' : '') + '">' + thumb + '</div>' +
           '<div class="admin-row-body">' +
-            '<div class="admin-row-meta">' + escapeHtml((img && img.streamerName) || '(삭제된 이미지)') + ' · ' + when + '</div>' +
+            '<div class="admin-row-meta">' + escapeHtml((img && img.streamerName) || r.streamerName || '(삭제된 이미지)') + ' · ' + when + statusBadge(r.status) + '</div>' +
             '<div class="admin-row-reason">' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
-            banBtn +
-            '<button class="text-link admin-dismiss-btn" type="button">신고 무시</button>' +
-            '<button class="text-link admin-delete-btn" type="button">이미지 삭제</button>' +
+            (r.status === 'pending' ? banBtn +
+              '<button class="text-link admin-dismiss-btn" type="button">신고 무시</button>' +
+              '<button class="text-link admin-delete-btn" type="button">이미지 삭제</button>' : '') +
           '</div>' +
         '</div>'
       );
@@ -216,8 +413,8 @@
   function renderCommentReports() {
     if (selectedDetail && selectedDetail.kind === 'comment' && !latestCommentReports.some(function (r) { return r.id === selectedDetail.reportId; })) clearDetail();
     if (commentsCountEl) {
-      commentsCountEl.textContent = latestCommentReports.length > 99 ? '99+' : String(latestCommentReports.length);
-      commentsCountEl.hidden = latestCommentReports.length === 0;
+      commentsCountEl.textContent = (activeTab === 'comments' ? pageTotal : latestCommentReports.length) > 99 ? '99+' : String(activeTab === 'comments' ? pageTotal : latestCommentReports.length);
+      commentsCountEl.hidden = (activeTab === 'comments' ? pageTotal : latestCommentReports.length) === 0;
     }
     if (!latestCommentReports.length) { commentsPanel.innerHTML = '<p class="empty-msg">접수된 댓글 신고가 없어요.</p>'; filterCurrentPanel(); return; }
     commentsPanel.innerHTML = latestCommentReports.map(function (r) {
@@ -226,16 +423,17 @@
       var author = escapeHtml(r.commentAuthorUid || '(알 수 없음)');
       return (
         '<div class="admin-row admin-row-selectable admin-comment-report-row' + (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.reportId === r.id ? ' is-selected' : '') + '" data-report-id="' + escapeHtml(r.id) + '" data-image-id="' + escapeHtml(r.imageId) + '" data-comment-id="' + escapeHtml(r.commentId) + '">' +
+          rowCheckbox(r) +
           '<div class="admin-row-body">' +
-            '<div class="admin-row-meta">댓글 신고 · ' + escapeHtml((img && img.streamerName) || r.imageId || '(이미지 없음)') + ' · ' + when + '</div>' +
+            '<div class="admin-row-meta">댓글 신고 · ' + escapeHtml((img && img.streamerName) || r.streamerName || r.imageId || '(이미지 없음)') + ' · ' + when + statusBadge(r.status) + '</div>' +
             '<div class="admin-row-reason"><strong>댓글:</strong> ' + (escapeHtml(r.commentText) || '(내용 없음)') + '</div>' +
             '<div class="admin-row-reason"><strong>작성자:</strong> ' + author + ' · <strong>신고자:</strong> ' + escapeHtml(r.reporterUid || '(알 수 없음)') + '</div>' +
             '<div class="admin-row-reason"><strong>사유:</strong> ' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
-            (r.commentAuthorUid && r.commentAuthorUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + author + '">작성자 정지</button>' : '') +
-            '<button class="text-link admin-dismiss-comment-btn" type="button">신고 무시</button>' +
-            '<button class="text-link admin-delete-comment-btn" type="button">댓글 삭제</button>' +
+            (r.status === 'pending' ? (r.commentAuthorUid && r.commentAuthorUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + author + '">작성자 정지</button>' : '') +
+              '<button class="text-link admin-dismiss-comment-btn" type="button">신고 무시</button>' +
+              '<button class="text-link admin-delete-comment-btn" type="button">댓글 삭제</button>' : '') +
           '</div>' +
         '</div>'
       );
@@ -245,20 +443,21 @@
   }
 
   function renderImages() {
-    var images = window.galAllImages || [];
+    var images = pageItems;
     var labels = window.galCategoryLabels || {};
     if (!images.length) { imagesPanel.innerHTML = '<p class="empty-msg">이미지가 없어요.</p>'; filterCurrentPanel(); return; }
     imagesPanel.innerHTML = images.map(function (img) {
       return (
         '<div class="admin-row" data-image-id="' + escapeHtml(img.id) + '">' +
+          rowCheckbox(img) +
           '<div class="admin-row-thumb clickable" title="클릭하면 풀이미지로 열어요"><img src="' + escapeHtml(img.thumbUrl) + '" alt=""></div>' +
           '<div class="admin-row-body">' +
-            '<div class="admin-row-meta">' + escapeHtml(img.streamerName || '익명') + ' · ' + escapeHtml(labels[img.category] || img.category || '') + '</div>' +
+            '<div class="admin-row-meta">' + escapeHtml(img.streamerName || '익명') + ' · ' + escapeHtml(labels[img.category] || img.category || '') + statusBadge(img.status) + '</div>' +
             '<div class="admin-row-reason">♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
-            (img.uploaderUid && img.uploaderUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +
-            '<button class="text-link admin-delete-btn" type="button">삭제</button>' +
+            (img.status === 'active' ? (img.uploaderUid && img.uploaderUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +
+              '<button class="text-link admin-delete-btn" type="button">삭제</button>' : '') +
           '</div>' +
         '</div>'
       );
@@ -273,8 +472,9 @@
       var when = b.bannedAt ? new Date(b.bannedAt).toLocaleString('ko-KR') : '';
       return (
         '<div class="admin-row" data-uid="' + escapeHtml(b.uid) + '">' +
+          rowCheckbox(Object.assign({ id: b.uid }, b)) +
           '<div class="admin-row-body">' +
-            '<div class="admin-row-meta">' + escapeHtml(b.uid) + ' · ' + when + '</div>' +
+            '<div class="admin-row-meta">' + escapeHtml(b.uid) + ' · ' + when + statusBadge(b.status) + '</div>' +
             '<div class="admin-row-reason">' + (escapeHtml(b.reason) || '(사유 없음)') + ' · 처리자: ' + escapeHtml(b.bannedByName || '') + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
@@ -293,15 +493,16 @@
   function renderLinks() {
     if (!latestVerifications.length) { linksPanel.innerHTML = '<p class="empty-msg">인증된 스트리머가 없어요.</p>'; filterCurrentPanel(); return; }
     linksPanel.innerHTML = latestVerifications.map(function (v) {
-      var link = latestAccountLinks[v.uid];
+      var link = v.link || latestAccountLinks[v.uid];
       var statusText = link
         ? ('✅ 연결됨: ' + escapeHtml(link.streamerName))
         : '⚠️ 미연결(이름 자동 대조만 적용)';
       return (
         '<div class="admin-row" data-uid="' + escapeHtml(v.uid) + '" style="flex-direction:column; align-items:stretch;">' +
+          rowCheckbox(Object.assign({ id: v.uid }, v)) +
           '<div style="display:flex; align-items:center; gap:12px;">' +
             '<div class="admin-row-body">' +
-              '<div class="admin-row-meta">' + escapeHtml(v.nickname) + ' · ' + escapeHtml(v.soopId) + '</div>' +
+              '<div class="admin-row-meta">' + escapeHtml(v.nickname) + ' · ' + escapeHtml(v.soopId) + statusBadge(v.status) + '</div>' +
               '<div class="admin-row-reason">' + statusText + '</div>' +
             '</div>' +
             '<div class="admin-row-actions">' +
@@ -347,21 +548,22 @@
   function renderUnlocks() {
     var pending = latestUnlockRequests.filter(function (r) { return r.status === 'pending'; });
     if (unlocksCountEl) {
-      unlocksCountEl.textContent = pending.length > 99 ? '99+' : String(pending.length);
-      unlocksCountEl.hidden = pending.length === 0;
+      unlocksCountEl.textContent = (activeTab === 'unlocks' ? pageTotal : pending.length) > 99 ? '99+' : String(activeTab === 'unlocks' ? pageTotal : pending.length);
+      unlocksCountEl.hidden = (activeTab === 'unlocks' ? pageTotal : pending.length) === 0;
     }
-    if (!pending.length) { unlocksPanel.innerHTML = '<p class="empty-msg">대기 중인 해금 신청이 없어요.</p>'; filterCurrentPanel(); return; }
-    unlocksPanel.innerHTML = pending.map(function (r) {
+    if (!latestUnlockRequests.length) { unlocksPanel.innerHTML = '<p class="empty-msg">조건에 맞는 해금 신청이 없어요.</p>'; filterCurrentPanel(); return; }
+    unlocksPanel.innerHTML = latestUnlockRequests.map(function (r) {
       var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString('ko-KR') : '';
       return (
         '<div class="admin-row" data-request-id="' + escapeHtml(r.id) + '">' +
+          rowCheckbox(r) +
           '<div class="admin-row-body">' +
-            '<div class="admin-row-meta">' + escapeHtml(r.streamerName) + ' · ' + when + '</div>' +
+            '<div class="admin-row-meta">' + escapeHtml(r.streamerName) + ' · ' + when + statusBadge(r.status) + '</div>' +
             '<div class="admin-row-reason">후원자 닉네임: ' + escapeHtml(r.nickname) + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
-            '<button class="text-link admin-reject-unlock-btn" type="button">거절</button>' +
-            '<button class="text-link admin-approve-unlock-btn" type="button">해금 승인</button>' +
+            (r.status === 'pending' ? '<button class="text-link admin-reject-unlock-btn" type="button">거절</button>' +
+              '<button class="text-link admin-approve-unlock-btn" type="button">해금 승인</button>' : '') +
           '</div>' +
         '</div>'
       );
@@ -447,10 +649,10 @@
 
   document.addEventListener('gal-auth-changed', function (e) {
     adminBtn.style.display = e.detail.isAdmin ? '' : 'none';
-    if (e.detail.isAdmin) { subscribeReports(); subscribeCommentReports(); subscribeUnlockRequests(); subscribeBans(); subscribeVerifications(); subscribeAccountLinks(); }
+    if (e.detail.isAdmin && backdrop.classList.contains('open')) loadAdminPage();
   });
   document.addEventListener('gal-images-updated', function () {
-    if (backdrop.classList.contains('open')) { renderReports(); renderCommentReports(); renderImages(); }
+    if (backdrop.classList.contains('open') && activeTab === 'images') loadAdminPage({ showLoading: false });
   });
 
   function closeAdminPanel() {
@@ -465,13 +667,14 @@
     backdrop.classList.add('open');
     window.galPushModal(closeAdminPanel);
     clearDetail();
+    activeTab = 'reports';
+    tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (item) { item.classList.toggle('active', item.dataset.adminTab === 'reports'); });
+    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
     if (adminSearch) adminSearch.value = '';
-    renderReports();
-    renderCommentReports();
-    renderImages();
-    renderUnlocks();
-    renderBans();
-    renderLinks();
+    if (fromFilter) fromFilter.value = '';
+    if (toFilter) toFilter.value = '';
+    configureFilters();
+    resetPageAndLoad();
   });
   closeBtn.addEventListener('click', closeAdminPanel);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeAdminPanel(); });
@@ -484,6 +687,7 @@
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (c) { c.classList.remove('active'); });
     btn.classList.add('active');
     var tab = btn.dataset.adminTab;
+    activeTab = tab;
     reportsPanel.style.display = tab === 'reports' ? '' : 'none';
     commentsPanel.style.display = tab === 'comments' ? '' : 'none';
     imagesPanel.style.display = tab === 'images' ? '' : 'none';
@@ -492,15 +696,121 @@
     linksPanel.style.display = tab === 'links' ? '' : 'none';
     var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
-    filterCurrentPanel();
+    configureFilters();
+    resetPageAndLoad();
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
   });
 
-  if (adminSearch) adminSearch.addEventListener('input', filterCurrentPanel);
+  var filterLoadTimer = null;
+  function scheduleFilteredLoad() {
+    clearTimeout(filterLoadTimer);
+    filterLoadTimer = setTimeout(resetPageAndLoad, 250);
+  }
+  if (adminSearch) adminSearch.addEventListener('input', scheduleFilteredLoad);
+  [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
+    if (field) field.addEventListener('change', resetPageAndLoad);
+  });
+  if (filterResetBtn) filterResetBtn.addEventListener('click', function () {
+    if (adminSearch) adminSearch.value = '';
+    if (fromFilter) fromFilter.value = '';
+    if (toFilter) toFilter.value = '';
+    if (sortFilter) sortFilter.value = 'latest';
+    configureFilters();
+    resetPageAndLoad();
+  });
+  if (pageNextBtn) pageNextBtn.addEventListener('click', function () {
+    if (!pageHasMore || pageLoading || !pageNextCursor) return;
+    pageHistory.push(pageCursor);
+    pageCursor = pageNextCursor;
+    clearSelection();
+    loadAdminPage();
+  });
+  if (pagePrevBtn) pagePrevBtn.addEventListener('click', function () {
+    if (!pageHistory.length || pageLoading) return;
+    pageCursor = pageHistory.pop();
+    clearSelection();
+    loadAdminPage();
+  });
+  document.addEventListener('click', function (e) {
+    var checkbox = e.target.closest && e.target.closest('.admin-select-checkbox');
+    if (!checkbox) return;
+    e.stopPropagation();
+    var id = checkbox.dataset.selectId;
+    var key = activeTab + ':' + id;
+    if (checkbox.checked) selectedItems[key] = true;
+    else delete selectedItems[key];
+    updateSelectionUi();
+  }, true);
+  if (selectAllCheckbox) selectAllCheckbox.addEventListener('change', function () {
+    var source = activeTab === 'reports' ? latestReports : activeTab === 'comments' ? latestCommentReports : activeTab === 'images' ? pageItems : activeTab === 'unlocks' ? latestUnlockRequests : activeTab === 'bans' ? latestBans : latestVerifications;
+    source.forEach(function (item) {
+      if (selectAllCheckbox.checked) selectedItems[itemKey(item)] = true;
+      else delete selectedItems[itemKey(item)];
+    });
+    renderActivePanel();
+  });
+  if (selectionClearBtn) selectionClearBtn.addEventListener('click', clearSelection);
   if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function () {
     var isOpen = adminSidebar && adminSidebar.classList.toggle('open');
     mobileMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+
+  if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', async function () {
+    var selected = selectedForCurrentPage();
+    if (!selected.length || pageLoading) return;
+    var action = bulkActionSelect && bulkActionSelect.value;
+    var actionLabel = bulkActionSelect && bulkActionSelect.options[bulkActionSelect.selectedIndex] ? bulkActionSelect.options[bulkActionSelect.selectedIndex].textContent : '처리';
+    if (!confirm(selected.length + '개 항목을 ' + actionLabel + '할까요?')) return;
+
+    var payloadItems = [];
+    var uniqueActionIds = {};
+    selected.forEach(function (item) {
+      var payload = { id: item.id, imageId: item.imageId, commentId: item.commentId };
+      if (action === 'delete-image') {
+        var targetId = item.imageId || item.id;
+        if (uniqueActionIds[targetId]) return;
+        uniqueActionIds[targetId] = true;
+        payload.id = item.id;
+        payload.imageId = targetId;
+      }
+      payloadItems.push(payload);
+    });
+    var optimisticImageTokens = {};
+    if (action === 'delete-image' && window.galBeginImageDelete) {
+      payloadItems.forEach(function (item) {
+        var imageId = item.imageId || item.id;
+        optimisticImageTokens[item.id] = window.galBeginImageDelete(imageId);
+      });
+    }
+    payloadItems.forEach(function (item) { removeCurrentItem(item.id); });
+    renderActivePanel();
+    pageLoading = true;
+    updateSelectionUi();
+    try {
+      var fn = window.galFirebase.httpsCallable('adminBulkGalleryAction');
+      var result = await fn({ kind: activeTab, action: action, items: payloadItems });
+      var data = result.data || {};
+      var succeeded = data.succeeded || [];
+      var failed = data.failed || [];
+      succeeded.forEach(function (id) {
+        if (action === 'delete-image' && optimisticImageTokens[id]) window.galConfirmImageDelete && window.galConfirmImageDelete(payloadItems.find(function (item) { return item.id === id; }).imageId || id);
+      });
+      failed.forEach(function (failure) {
+        if (action === 'delete-image' && optimisticImageTokens[failure.id]) window.galRollbackImageDelete && window.galRollbackImageDelete(optimisticImageTokens[failure.id]);
+      });
+      clearSelection();
+      showToast('✅ ' + succeeded.length + '건 처리 완료' + (failed.length ? ' · ' + failed.length + '건 실패' : ''));
+      if (failed.length) showToast('실패 항목을 복구하고 있어요. 다시 확인해 주세요.', true);
+      await loadAdminPage({ showLoading: false });
+    } catch (e) {
+      Object.keys(optimisticImageTokens).forEach(function (id) { if (optimisticImageTokens[id]) window.galRollbackImageDelete && window.galRollbackImageDelete(optimisticImageTokens[id]); });
+      showToast('일괄 처리 중 오류가 발생했어요: ' + (e && e.message ? e.message : e), true);
+      await loadAdminPage({ showLoading: false });
+    } finally {
+      pageLoading = false;
+      updateSelectionUi();
+    }
   });
 
   async function banUploader(uid, btn) {
@@ -512,10 +822,11 @@
       var fn = window.galFirebase.httpsCallable('banGalleryAccount');
       await fn({ uid: uid, reason: reason.trim() });
       window.galSound && window.galSound.adminAction();
-      alert('✅ 정지 처리했어요.');
+      showToast('✅ 정지 처리했어요.');
+      loadAdminPage({ showLoading: false });
     } catch (e) {
       window.galSound && window.galSound.error(e);
-      alert('정지 처리 중 오류: ' + (e && e.message ? e.message : e));
+      showToast('정지 처리 중 오류: ' + (e && e.message ? e.message : e), true);
     } finally {
       btn.disabled = false;
     }
@@ -536,6 +847,8 @@
       await fn({ imageId: imageId });
       window.galConfirmImageDelete && window.galConfirmImageDelete(imageId);
       window.galSound && window.galSound.adminAction();
+      showToast('✅ 이미지 삭제 완료');
+      loadAdminPage({ showLoading: false });
     } catch (e) {
       window.galRollbackImageDelete && window.galRollbackImageDelete(deletionToken);
       removedReports.forEach(function (report) {
@@ -545,7 +858,7 @@
       renderReports();
       renderImages();
       window.galSound && window.galSound.error(e);
-      alert('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e));
+      showToast('이미지 삭제 중 오류: ' + (e && e.message ? e.message : e), true);
       btn.disabled = false;
     }
   }
@@ -574,6 +887,8 @@
       }
       window.galSound && window.galSound.adminAction();
       if (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.report && selectedDetail.report.commentId === commentId) clearDetail();
+      showToast('✅ 댓글 삭제 완료');
+      loadAdminPage({ showLoading: false });
     } catch (e) {
       if (targetReport) {
         delete pendingCommentReportDeletes[targetReport.id];
@@ -582,36 +897,46 @@
         if (selectedBefore) selectDetail(selectedBefore.kind, selectedBefore.report);
       }
       window.galSound && window.galSound.error(e);
-      alert('댓글 삭제 중 오류: ' + (e && e.message ? e.message : e));
+      showToast('댓글 삭제 중 오류: ' + (e && e.message ? e.message : e), true);
       if (!targetReport && btn) btn.disabled = false;
     }
   }
 
   async function dismissImageReport(reportId, btn) {
+    removeCurrentItem(reportId);
+    renderActivePanel();
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('adminDismissImageReport');
       await fn({ reportId: reportId });
       window.galSound && window.galSound.adminAction();
       if (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.reportId === reportId) clearDetail();
+      showToast('✅ 이미지 신고를 무시했어요.');
+      loadAdminPage({ showLoading: false });
     } catch (err) {
       window.galSound && window.galSound.error(err);
-      alert('신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
+      showToast('신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err), true);
       btn.disabled = false;
+      loadAdminPage({ showLoading: false });
     }
   }
 
   async function dismissCommentReport(reportId, btn) {
+    removeCurrentItem(reportId);
+    renderActivePanel();
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('adminDismissCommentReport');
       await fn({ reportId: reportId });
       window.galSound && window.galSound.adminAction();
       if (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.reportId === reportId) clearDetail();
+      showToast('✅ 댓글 신고를 무시했어요.');
+      loadAdminPage({ showLoading: false });
     } catch (err) {
       window.galSound && window.galSound.error(err);
-      alert('댓글 신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err));
+      showToast('댓글 신고 무시 처리 중 오류: ' + (err && err.message ? err.message : err), true);
       btn.disabled = false;
+      loadAdminPage({ showLoading: false });
     }
   }
 
@@ -703,10 +1028,15 @@
         var fn = window.galFirebase.httpsCallable('unbanGalleryAccount');
         await fn({ uid: row.dataset.uid });
         window.galSound && window.galSound.adminAction();
+        removeCurrentItem(row.dataset.uid);
+        renderActivePanel();
+        showToast('✅ 정지 해제 완료');
+        loadAdminPage({ showLoading: false });
       } catch (err) {
         window.galSound && window.galSound.error(err);
-        alert('정지 해제 중 오류: ' + (err && err.message ? err.message : err));
+        showToast('정지 해제 중 오류: ' + (err && err.message ? err.message : err), true);
         btn.disabled = false;
+        loadAdminPage({ showLoading: false });
       }
     }
   });
@@ -722,10 +1052,15 @@
         var approveFn = window.galFirebase.httpsCallable('adminApproveStreamerUnlock');
         await approveFn({ requestId: requestId });
         window.galSound && window.galSound.adminAction();
+        removeCurrentItem(requestId);
+        renderActivePanel();
+        showToast('✅ 해금 신청 승인 완료');
+        loadAdminPage({ showLoading: false });
       } catch (err) {
         window.galSound && window.galSound.error(err);
-        alert('해금 승인 중 오류: ' + (err && err.message ? err.message : err));
+        showToast('해금 승인 중 오류: ' + (err && err.message ? err.message : err), true);
         approveBtn.disabled = false;
+        loadAdminPage({ showLoading: false });
       }
     } else if (e.target.closest('.admin-reject-unlock-btn')) {
       var rejectBtn = e.target;
@@ -734,10 +1069,15 @@
         var rejectFn = window.galFirebase.httpsCallable('adminRejectStreamerUnlock');
         await rejectFn({ requestId: requestId });
         window.galSound && window.galSound.adminAction();
+        removeCurrentItem(requestId);
+        renderActivePanel();
+        showToast('✅ 해금 신청을 거절했어요.');
+        loadAdminPage({ showLoading: false });
       } catch (err) {
         window.galSound && window.galSound.error(err);
-        alert('해금 거절 중 오류: ' + (err && err.message ? err.message : err));
+        showToast('해금 거절 중 오류: ' + (err && err.message ? err.message : err), true);
         rejectBtn.disabled = false;
+        loadAdminPage({ showLoading: false });
       }
     }
   });
@@ -763,10 +1103,15 @@
         var unlinkFn = window.galFirebase.httpsCallable('adminUnlinkStreamerAccount');
         await unlinkFn({ uid: uid });
         window.galSound && window.galSound.adminAction();
+        removeCurrentItem(uid);
+        renderActivePanel();
+        showToast('✅ 스트리머 연결을 해제했어요.');
+        loadAdminPage({ showLoading: false });
       } catch (err) {
         window.galSound && window.galSound.error(err);
-        alert('연결 해제 중 오류: ' + (err && err.message ? err.message : err));
+        showToast('연결 해제 중 오류: ' + (err && err.message ? err.message : err), true);
         unlinkBtn.disabled = false;
+        loadAdminPage({ showLoading: false });
       }
       return;
     }
@@ -777,9 +1122,11 @@
         var linkFn = window.galFirebase.httpsCallable('adminLinkStreamerAccount');
         await linkFn({ uid: uid, streamerId: pickedRow.dataset.streamerId, streamerName: pickedRow.dataset.streamerName });
         window.galSound && window.galSound.adminAction();
+        showToast('✅ 스트리머 연결 완료');
+        loadAdminPage({ showLoading: false });
       } catch (err) {
         window.galSound && window.galSound.error(err);
-        alert('스트리머 연결 중 오류: ' + (err && err.message ? err.message : err));
+        showToast('스트리머 연결 중 오류: ' + (err && err.message ? err.message : err), true);
       }
     }
   });

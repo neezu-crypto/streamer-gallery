@@ -4,6 +4,7 @@ const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = r
 const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { UNLOCK_DURATION_MS } = require('./constants');
 
 async function requireAdmin(request) {
   const uid = requireAuth(request);
@@ -158,6 +159,260 @@ const deleteOwnComment = onCall(async (request) => {
   return { deleted: true, commentCount: result.commentCount };
 });
 
+// 관리자 목록 공통 페이지 조회(2026-09-19) — 각 메뉴가 RTDB 전체를 브라우저로
+// 내려받지 않도록 관리자 인증 후 서버에서 검색·상태·날짜·정렬·커서 페이지네이션을
+// 적용한다. 데이터 규모가 커져도 클라이언트는 현재 페이지(최대 100건)만 받는다.
+function adminQueueText(value) {
+  return String(value == null ? '' : value).toLocaleLowerCase('ko-KR');
+}
+
+function encodeAdminQueueCursor(item) {
+  return Buffer.from(JSON.stringify({ value: item._sortValue || 0, id: item.id || '' })).toString('base64url');
+}
+
+function decodeAdminQueueCursor(cursor) {
+  if (!cursor) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(String(cursor), 'base64url').toString('utf8'));
+    if (!parsed || typeof parsed.value !== 'number' || typeof parsed.id !== 'string') return null;
+    return parsed;
+  } catch (e) {
+    throw new HttpsError('invalid-argument', '페이지 커서가 올바르지 않습니다.');
+  }
+}
+
+function adminQueueSort(items, sort) {
+  const direction = sort === 'oldest' ? 1 : -1;
+  return items.sort((a, b) => {
+    const valueDiff = ((a._sortValue || 0) - (b._sortValue || 0)) * direction;
+    if (valueDiff) return valueDiff;
+    return String(a.id || '').localeCompare(String(b.id || '')) * direction;
+  });
+}
+
+function adminQueueStatus(item, fallback) {
+  return item.status || fallback;
+}
+
+function adminQueueMatchesCursor(item, cursor, sort) {
+  if (!cursor) return true;
+  const direction = sort === 'oldest' ? 1 : -1;
+  const value = item._sortValue || 0;
+  if (value !== cursor.value) return (value - cursor.value) * direction > 0;
+  return String(item.id || '').localeCompare(cursor.id) * direction > 0;
+}
+
+async function getAdminQueueItems(kind) {
+  const db = getDatabase();
+  const [reportsSnap, commentsSnap, imagesSnap, statsSnap, unlocksSnap, bansSnap, verificationsSnap, linksSnap] = await Promise.all([
+    kind === 'reports' ? db.ref('gallery/imageReports').get() : Promise.resolve(null),
+    kind === 'comments' ? db.ref('gallery/commentReports').get() : Promise.resolve(null),
+    (kind === 'images' || kind === 'reports' || kind === 'comments') ? db.ref('gallery/images').get() : Promise.resolve(null),
+    kind === 'images' ? db.ref('gallery/imageStats').get() : Promise.resolve(null),
+    kind === 'unlocks' ? db.ref('gallery/unlockRequests').get() : Promise.resolve(null),
+    (kind === 'bans' || kind === 'reports' || kind === 'comments') ? db.ref('bannedAccounts').get() : Promise.resolve(null),
+    kind === 'links' ? db.ref('streamerVerifications').get() : Promise.resolve(null),
+    kind === 'links' ? db.ref('gallery/streamerAccountLinks').get() : Promise.resolve(null),
+  ]);
+
+  const images = imagesSnap ? (imagesSnap.val() || {}) : {};
+  const bannedAccounts = bansSnap ? (bansSnap.val() || {}) : {};
+  const imageFor = (imageId) => imageId && images[imageId] ? Object.assign({ id: imageId }, images[imageId]) : null;
+  const galleryBanFor = (uid) => {
+    const value = uid && bannedAccounts[uid] && bannedAccounts[uid].games && bannedAccounts[uid].games.gallery;
+    return value ? Object.assign({ uid }, value) : null;
+  };
+  let items = [];
+
+  if (kind === 'reports') {
+    const data = reportsSnap ? (reportsSnap.val() || {}) : {};
+    items = Object.keys(data).map((id) => {
+      const report = Object.assign({ id, kind: 'imageReport' }, data[id] || {});
+      const image = imageFor(report.imageId);
+      return Object.assign(report, {
+        status: adminQueueStatus(report, 'pending'),
+        image: image || null,
+        streamerName: image && image.streamerName || '',
+        uploaderUid: image && image.uploaderUid || '',
+        ban: galleryBanFor(image && image.uploaderUid),
+        _sortValue: Number(report.createdAt) || 0,
+      });
+    });
+  } else if (kind === 'comments') {
+    const data = commentsSnap ? (commentsSnap.val() || {}) : {};
+    items = Object.keys(data).map((id) => {
+      const report = Object.assign({ id, kind: 'commentReport' }, data[id] || {});
+      const image = imageFor(report.imageId);
+      return Object.assign(report, {
+        status: adminQueueStatus(report, 'pending'),
+        image: image || null,
+        streamerName: image && image.streamerName || '',
+        ban: galleryBanFor(report.commentAuthorUid),
+        _sortValue: Number(report.createdAt) || 0,
+      });
+    });
+  } else if (kind === 'images') {
+    const data = imagesSnap ? (imagesSnap.val() || {}) : {};
+    const stats = statsSnap ? (statsSnap.val() || {}) : {};
+    items = Object.keys(data).map((id) => {
+      const image = Object.assign({ id, kind: 'image' }, data[id] || {});
+      const stat = stats[id] || {};
+      return Object.assign(image, {
+        status: adminQueueStatus(image, 'active'),
+        likeCount: stat.likeCount || 0,
+        commentCount: stat.commentCount || 0,
+        _sortValue: Number(image.createdAt) || 0,
+      });
+    });
+  } else if (kind === 'unlocks') {
+    const data = unlocksSnap ? (unlocksSnap.val() || {}) : {};
+    items = Object.keys(data).map((id) => {
+      const item = Object.assign({ id, kind: 'unlock' }, data[id] || {});
+      return Object.assign(item, { status: adminQueueStatus(item, 'pending'), _sortValue: Number(item.requestedAt) || 0 });
+    });
+  } else if (kind === 'bans') {
+    const data = bansSnap ? (bansSnap.val() || {}) : {};
+    items = Object.keys(data).filter((uid) => data[uid] && data[uid].games && data[uid].games.gallery).map((uid) => {
+      const item = Object.assign({ id: uid, uid, kind: 'ban' }, data[uid].games.gallery);
+      return Object.assign(item, { status: 'banned', _sortValue: Number(item.bannedAt) || 0 });
+    });
+  } else if (kind === 'links') {
+    const data = verificationsSnap ? (verificationsSnap.val() || {}) : {};
+    const links = linksSnap ? (linksSnap.val() || {}) : {};
+    items = Object.keys(data).map((id) => {
+      const verification = Object.assign({ id: (data[id] && data[id].uid) || id, kind: 'link' }, data[id] || {});
+      const link = links[verification.uid];
+      return Object.assign(verification, {
+        status: link ? 'linked' : 'unlinked',
+        link: link || null,
+        _sortValue: Number(verification.verifiedAt) || 0,
+      });
+    });
+  } else {
+    throw new HttpsError('invalid-argument', '지원하지 않는 관리자 목록입니다.');
+  }
+  return items;
+}
+
+const getGalleryAdminPage = onCall(async (request) => {
+  await requireAdmin(request);
+  const data = request.data || {};
+  const kind = String(data.kind || '');
+  const allowedKinds = new Set(['reports', 'comments', 'images', 'unlocks', 'bans', 'links']);
+  if (!allowedKinds.has(kind)) throw new HttpsError('invalid-argument', '지원하지 않는 관리자 목록입니다.');
+
+  const pageSize = Math.min(100, Math.max(1, Number(data.pageSize) || 50));
+  const sort = data.sort === 'oldest' ? 'oldest' : 'latest';
+  const status = String(data.status || 'pending');
+  const type = String(data.type || 'all');
+  const search = adminQueueText(String(data.search || '').trim().slice(0, 80));
+  const from = Number(data.from) || 0;
+  const to = Number(data.to) || 0;
+  const cursor = decodeAdminQueueCursor(data.cursor);
+  let items = await getAdminQueueItems(kind);
+
+  items = items.filter((item) => {
+    const itemStatus = item.status || 'pending';
+    if (status !== 'all' && itemStatus !== status) return false;
+    if (type !== 'all') {
+      if (kind === 'images' && item.category !== type) return false;
+      if ((kind === 'reports' && type !== 'image') || (kind === 'comments' && type !== 'comment')) return false;
+    }
+    if (from && item._sortValue < from) return false;
+    if (to && item._sortValue > to) return false;
+    if (search) {
+      const haystack = adminQueueText([
+        item.id, item.uid, item.imageId, item.commentId, item.streamerName,
+        item.nickname, item.soopId, item.reason, item.commentText,
+        item.category, item.reporterUid, item.commentAuthorUid, item.uploaderUid,
+      ].join(' '));
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  adminQueueSort(items, sort);
+  const total = items.length;
+  if (cursor) items = items.filter((item) => adminQueueMatchesCursor(item, cursor, sort));
+  const page = items.slice(0, pageSize);
+  const nextCursor = items.length > pageSize ? encodeAdminQueueCursor(page[page.length - 1]) : null;
+  page.forEach((item) => { delete item._sortValue; });
+  return { items: page, total, hasMore: !!nextCursor, nextCursor };
+});
+
+async function markAdminReport(reportPath, reportId, status, uid, actorName, action) {
+  const ref = getDatabase().ref(`${reportPath}/${reportId}`);
+  const snap = await ref.get();
+  if (!snap.exists()) throw new HttpsError('not-found', '처리할 신고를 찾을 수 없습니다.');
+  await ref.update({ status, resolution: status, reviewedAt: Date.now(), reviewedBy: uid });
+  await logAudit(uid, actorName, action, reportId);
+}
+
+async function approveUnlockById(requestId, adminUid, actorName) {
+  const db = getDatabase();
+  const reqRef = db.ref(`gallery/unlockRequests/${requestId}`);
+  const snap = await reqRef.get();
+  if (!snap.exists()) throw new HttpsError('not-found', '해금 신청을 찾을 수 없습니다.');
+  const data = snap.val();
+  if (data.status !== 'pending') throw new HttpsError('failed-precondition', '이미 처리된 신청입니다.');
+  const now = Date.now();
+  await db.ref(`gallery/streamerUnlockedUntil/${data.streamerId}`).transaction((current) => Math.max(now, current || 0) + UNLOCK_DURATION_MS);
+  await reqRef.update({ status: 'approved', reviewedAt: now, reviewedBy: adminUid });
+  await logAudit(adminUid, actorName, 'gallery.approveUnlock', data.streamerName + ' (' + data.streamerId + ')');
+}
+
+const adminBulkGalleryAction = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const adminUid = await requireAdmin(request);
+  const data = request.data || {};
+  const kind = String(data.kind || '');
+  const action = String(data.action || '');
+  if (!Array.isArray(data.items) || data.items.length > 20) throw new HttpsError('invalid-argument', '일괄 처리는 한 번에 최대 20건까지 가능합니다.');
+  const items = data.items;
+  if (!items.length) throw new HttpsError('invalid-argument', '처리할 항목을 선택해 주세요.');
+  const actorName = (request.auth.token && (request.auth.token.email || request.auth.token.name)) || adminUid;
+  const result = { succeeded: [], failed: [] };
+
+  for (const item of items) {
+    const id = String(item.id || '');
+    try {
+      if (!id) throw new HttpsError('invalid-argument', '항목 ID가 없습니다.');
+      if (kind === 'reports' && action === 'dismiss') {
+        await markAdminReport('gallery/imageReports', id, 'dismissed', adminUid, actorName, 'gallery.dismissReport');
+      } else if (kind === 'comments' && action === 'dismiss') {
+        await markAdminReport('gallery/commentReports', id, 'dismissed', adminUid, actorName, 'gallery.dismissCommentReport');
+      } else if ((kind === 'reports' || kind === 'images') && action === 'delete-image') {
+        await performImageDeletion(String(item.imageId || id));
+        await logAudit(adminUid, actorName, 'gallery.deleteImage', String(item.imageId || id));
+      } else if (kind === 'comments' && action === 'delete-comment') {
+        const imageId = String(item.imageId || '');
+        await performCommentDeletion(imageId, String(item.commentId || ''));
+        await logAudit(adminUid, actorName, 'gallery.deleteComment', imageId + '/' + String(item.commentId || ''));
+      } else if (kind === 'unlocks' && action === 'approve') {
+        await approveUnlockById(id, adminUid, actorName);
+      } else if (kind === 'unlocks' && action === 'reject') {
+        const ref = getDatabase().ref(`gallery/unlockRequests/${id}`);
+        const snap = await ref.get();
+        if (!snap.exists()) throw new HttpsError('not-found', '해금 신청을 찾을 수 없습니다.');
+        if (snap.val().status !== 'pending') throw new HttpsError('failed-precondition', '이미 처리된 신청입니다.');
+        await ref.update({ status: 'rejected', reviewedAt: Date.now(), reviewedBy: adminUid });
+        await logAudit(adminUid, actorName, 'gallery.rejectUnlock', snap.val().streamerName + ' (' + snap.val().streamerId + ')');
+      } else if (kind === 'bans' && action === 'unban') {
+        await getDatabase().ref(`bannedAccounts/${id}/games/gallery`).remove();
+        await logAudit(adminUid, actorName, '계정 정지 해제', id);
+      } else if (kind === 'links' && action === 'unlink') {
+        await getDatabase().ref(`gallery/streamerAccountLinks/${id}`).remove();
+        await logAudit(adminUid, actorName, 'gallery.unlinkStreamerAccount', id);
+      } else {
+        throw new HttpsError('invalid-argument', '목록과 처리 방식이 일치하지 않습니다.');
+      }
+      result.succeeded.push(id);
+    } catch (e) {
+      result.failed.push({ id, message: e && e.message ? e.message : '처리 실패' });
+    }
+  }
+  return result;
+});
+
 const adminDismissImageReport = onCall(async (request) => {
   const uid = await requireAdmin(request);
   const { reportId } = request.data || {};
@@ -167,7 +422,7 @@ const adminDismissImageReport = onCall(async (request) => {
   const reportRef = db.ref(`gallery/imageReports/${reportId}`);
   if (!(await reportRef.get()).exists()) throw new HttpsError('not-found', '존재하지 않는 신고입니다.');
 
-  await reportRef.remove();
+  await reportRef.update({ status: 'dismissed', resolution: 'dismissed', reviewedAt: Date.now(), reviewedBy: uid });
   await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.dismissReport', reportId);
   return { dismissed: true };
 });
@@ -181,7 +436,7 @@ const adminDismissCommentReport = onCall(async (request) => {
   const reportRef = db.ref(`gallery/commentReports/${reportId}`);
   if (!(await reportRef.get()).exists()) throw new HttpsError('not-found', '존재하지 않는 댓글 신고입니다.');
 
-  await reportRef.remove();
+  await reportRef.update({ status: 'dismissed', resolution: 'dismissed', reviewedAt: Date.now(), reviewedBy: uid });
   await logAudit(uid, (request.auth.token && request.auth.token.email) || uid, 'gallery.dismissCommentReport', reportId);
   return { dismissed: true };
 });
@@ -268,4 +523,6 @@ module.exports = {
   unbanGalleryAccount,
   adminLinkStreamerAccount,
   adminUnlinkStreamerAccount,
+  getGalleryAdminPage,
+  adminBulkGalleryAction,
 };
