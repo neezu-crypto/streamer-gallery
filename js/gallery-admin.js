@@ -39,6 +39,7 @@
   var accountLinksUnsub = null;
   var latestVerifications = [];
   var latestAccountLinks = {};
+  var pendingCommentReportDeletes = {};
   var selectedDetail = null;
   var detailLoadToken = 0;
 
@@ -414,6 +415,7 @@
     commentReportsUnsub = window.galFirebase.onValue(reportsRef, function (snap) {
       var data = snap.val() || {};
       latestCommentReports = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
+        .filter(function (r) { return !pendingCommentReportDeletes[r.id]; })
         .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       renderCommentReports();
     }, function (err) {
@@ -534,19 +536,38 @@
 
   async function deleteComment(imageId, commentId, btn) {
     if (!confirm('이 댓글을 삭제할까요? 신고 항목도 함께 처리됩니다.')) return;
-    btn.disabled = true;
+    var targetReport = latestCommentReports.find(function (r) { return r.imageId === imageId && r.commentId === commentId; });
+    if (!targetReport && selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.report && selectedDetail.report.imageId === imageId && selectedDetail.report.commentId === commentId) {
+      targetReport = selectedDetail.report;
+    }
+    var previousReports = latestCommentReports.slice();
+    var selectedBefore = selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.reportId === (targetReport && targetReport.id) ? selectedDetail : null;
+    if (targetReport) {
+      pendingCommentReportDeletes[targetReport.id] = true;
+      latestCommentReports = latestCommentReports.filter(function (r) { return r.id !== targetReport.id; });
+      renderCommentReports();
+    } else if (btn) {
+      btn.disabled = true;
+    }
     try {
       var fn = window.galFirebase.httpsCallable('adminDeleteComment');
       var result = await fn({ imageId: imageId, commentId: commentId });
+      if (targetReport) delete pendingCommentReportDeletes[targetReport.id];
       if (result && result.data && typeof result.data.commentCount === 'number') {
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, result.data.commentCount);
       }
       window.galSound && window.galSound.adminAction();
       if (selectedDetail && selectedDetail.kind === 'comment' && selectedDetail.report && selectedDetail.report.commentId === commentId) clearDetail();
     } catch (e) {
+      if (targetReport) {
+        delete pendingCommentReportDeletes[targetReport.id];
+        latestCommentReports = previousReports;
+        renderCommentReports();
+        if (selectedBefore) selectDetail(selectedBefore.kind, selectedBefore.report);
+      }
       window.galSound && window.galSound.error(e);
       alert('댓글 삭제 중 오류: ' + (e && e.message ? e.message : e));
-      btn.disabled = false;
+      if (!targetReport && btn) btn.disabled = false;
     }
   }
 

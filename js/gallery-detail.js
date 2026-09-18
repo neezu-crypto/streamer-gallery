@@ -34,6 +34,8 @@
   var currentStreamerName = '';
   var currentImageUrl = '';
   var commentsUnsub = null;
+  var latestCommentList = [];
+  var pendingCommentDeletes = {};
   var relatedItems = [];
 
   function escapeHtml(s) {
@@ -155,10 +157,12 @@
   }
 
   function renderComments(list) {
-    commentsLabel.textContent = '댓글 ' + list.length + '개';
-    if (!list.length) { commentsWrap.innerHTML = '<p class="empty-msg">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</p>'; return; }
+    latestCommentList = list;
+    var visibleList = list.filter(function (c) { return !pendingCommentDeletes[c.id]; });
+    commentsLabel.textContent = '댓글 ' + visibleList.length + '개';
+    if (!visibleList.length) { commentsWrap.innerHTML = '<p class="empty-msg">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</p>'; return; }
     var myUid = window.galUser && window.galUser.uid;
-    commentsWrap.innerHTML = list.map(function (c) {
+    commentsWrap.innerHTML = visibleList.map(function (c) {
       var mine = myUid && c.uid === myUid;
       return (
         '<div class="detail-comment-row" data-comment-id="' + escapeHtml(c.id) + '">' +
@@ -180,7 +184,7 @@
       renderComments(list);
       // 댓글 구독은 해당 이미지 하나에만 걸려 있으므로, 실제 목록 길이도
       // 전체 이미지 캐시의 카운터에 반영해 관리자 목록과 동기화한다.
-      window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, list.length);
+      window.galPatchImageCommentCount && window.galPatchImageCommentCount(imageId, list.filter(function (c) { return !pendingCommentDeletes[c.id]; }).length);
     });
   }
 
@@ -285,6 +289,7 @@
     reportReasonInput.value = '';
     reportStatus.textContent = '';
     commentInput.value = '';
+    latestCommentList = [];
     commentsWrap.innerHTML = '<p class="empty-msg">댓글을 불러오는 중...</p>';
     backdrop.classList.add('open');
     window.galPushModal(closeModal);
@@ -409,17 +414,28 @@
     var row = e.target.closest('.detail-comment-row');
     if (!confirm('이 댓글을 삭제할까요?')) return;
     btn.disabled = true;
+    var commentId = row.dataset.commentId;
+    pendingCommentDeletes[commentId] = true;
+    renderComments(latestCommentList);
+    window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, latestCommentList.filter(function (c) { return !pendingCommentDeletes[c.id]; }).length);
     try {
       var fn = window.galFirebase.httpsCallable('deleteOwnComment');
-      var result = await fn({ imageId: currentImageId, commentId: row.dataset.commentId });
+      var result = await fn({ imageId: currentImageId, commentId: commentId });
+      delete pendingCommentDeletes[commentId];
+      latestCommentList = latestCommentList.filter(function (c) { return c.id !== commentId; });
+      renderComments(latestCommentList);
       if (result && result.data && typeof result.data.commentCount === 'number') {
         window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, result.data.commentCount);
       }
       window.galSound && window.galSound.deleteConfirm();
     } catch (e2) {
+      delete pendingCommentDeletes[commentId];
+      renderComments(latestCommentList);
+      window.galPatchImageCommentCount && window.galPatchImageCommentCount(currentImageId, latestCommentList.length);
       window.galSound && window.galSound.error(e2);
       alert('댓글 삭제 중 오류: ' + (e2 && e2.message ? e2.message : e2));
-      btn.disabled = false;
+      var restoredBtn = commentsWrap.querySelector('[data-comment-id="' + CSS.escape(commentId) + '"] .detail-comment-delete-btn');
+      if (restoredBtn) restoredBtn.disabled = false;
     }
   });
 
