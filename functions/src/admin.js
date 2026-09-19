@@ -584,6 +584,202 @@ const galleryGetAuditLog = onCall(async (request) => {
   return { items: page, total, hasMore: !!nextCursor, nextCursor, actions: Array.from(actions).sort((a, b) => String(a).localeCompare(String(b), 'ko-KR')) };
 });
 
+// 운영 통계 대시보드(2026-09-20) — 관리자 화면에서 요청할 때만 원본 노드를
+// 서버에서 집계한다. UID·댓글 내용 등 원본 식별자는 응답에 포함하지 않고, 기간별
+// 활동량·카테고리·스트리머별 합계만 반환한다. 클라이언트가 여러 원장을 각각
+// 구독하지 않으므로 일반 사용자에게 통계 데이터가 노출되지 않는다.
+function galleryStatsDayKey(timestamp) {
+  const value = Number(timestamp) || 0;
+  if (!value) return '';
+  return new Date(value + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function galleryStatsDayStart(dayKey) {
+  return new Date(`${dayKey}T00:00:00+09:00`).getTime();
+}
+
+const galleryGetOperationsStats = onCall(async (request) => {
+  await requireAdmin(request);
+  const requestedDays = Number((request.data || {}).days) || 30;
+  const days = [7, 14, 30, 90].includes(requestedDays) ? requestedDays : 30;
+  const now = Date.now();
+  const todayKey = galleryStatsDayKey(now);
+  const dayKeys = [];
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const key = galleryStatsDayKey(galleryStatsDayStart(todayKey) - index * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000);
+    dayKeys.push(key);
+  }
+  const from = galleryStatsDayStart(dayKeys[0]);
+  const to = now;
+  const buckets = {};
+  dayKeys.forEach((day) => { buckets[day] = { date: day, uploads: 0, comments: 0, reports: 0, verifiedVisits: 0 }; });
+
+  const db = getDatabase();
+  const [imagesSnap, imageStatsSnap, commentsSnap, imageReportsSnap, commentReportsSnap, unlocksSnap, bansSnap, verificationsSnap, lifecycleSnap, visitsSnap, auditSnap] = await Promise.all([
+    db.ref('gallery/images').get(),
+    db.ref('gallery/imageStats').get(),
+    db.ref('gallery/comments').get(),
+    db.ref('gallery/imageReports').get(),
+    db.ref('gallery/commentReports').get(),
+    db.ref('gallery/unlockRequests').get(),
+    db.ref('bannedAccounts').get(),
+    db.ref('streamerVerifications').get(),
+    db.ref('gallery/r2FileLifecycle').get(),
+    db.ref('verifiedStreamerVisits').orderByChild('visitedAt').startAt(from).endAt(to).get(),
+    db.ref('gallery/auditLog').get(),
+  ]);
+
+  const images = imagesSnap.val() || {};
+  const imageStats = imageStatsSnap.val() || {};
+  const comments = commentsSnap.val() || {};
+  const imageReports = imageReportsSnap.val() || {};
+  const commentReports = commentReportsSnap.val() || {};
+  const unlocks = unlocksSnap.val() || {};
+  const bannedAccounts = bansSnap.val() || {};
+  const verifications = verificationsSnap.val() || {};
+  const lifecycle = lifecycleSnap.val() || {};
+  const visits = visitsSnap.val() || {};
+  const auditLog = auditSnap.val() || {};
+
+  const activeUsers = new Set();
+  const allUploaders = new Set();
+  const allCommenters = new Set();
+  const categoryCounts = {};
+  const streamerCounts = {};
+  let totalLikes = 0;
+  let totalComments = 0;
+  let periodUploads = 0;
+
+  Object.entries(images).forEach(([imageId, rawImage]) => {
+    const image = rawImage || {};
+    const createdAt = Number(image.createdAt) || 0;
+    const uploaderUid = image.uploaderUid;
+    if (uploaderUid) allUploaders.add(uploaderUid);
+    const stats = imageStats[imageId] || {};
+    totalLikes += Number(stats.likeCount) || 0;
+    const category = image.category || 'etc';
+    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    const streamerName = image.streamerName || '스트리머 미지정';
+    if (!streamerCounts[streamerName]) streamerCounts[streamerName] = { name: streamerName, images: 0, likes: 0 };
+    streamerCounts[streamerName].images += 1;
+    streamerCounts[streamerName].likes += Number(stats.likeCount) || 0;
+    if (createdAt >= from && createdAt <= to) {
+      const day = buckets[galleryStatsDayKey(createdAt)];
+      if (day) day.uploads += 1;
+      periodUploads += 1;
+      if (uploaderUid) activeUsers.add(uploaderUid);
+    }
+  });
+
+  Object.values(comments).forEach((imageComments) => {
+    Object.values(imageComments || {}).forEach((rawComment) => {
+      const comment = rawComment || {};
+      const createdAt = Number(comment.createdAt) || 0;
+      totalComments += 1;
+      if (comment.uid) {
+        allCommenters.add(comment.uid);
+        if (createdAt >= from && createdAt <= to) activeUsers.add(comment.uid);
+      }
+      if (createdAt >= from && createdAt <= to) {
+        const day = buckets[galleryStatsDayKey(createdAt)];
+        if (day) day.comments += 1;
+      }
+    });
+  });
+
+  const reportStatus = { pending: 0, dismissed: 0, deleted: 0, other: 0 };
+  let totalReports = 0;
+  const addReport = (rawReport) => {
+    const report = rawReport || {};
+    totalReports += 1;
+    const status = report.status || 'pending';
+    if (Object.prototype.hasOwnProperty.call(reportStatus, status)) reportStatus[status] += 1;
+    else reportStatus.other += 1;
+    const createdAt = Number(report.createdAt) || 0;
+    if (createdAt >= from && createdAt <= to) {
+      const day = buckets[galleryStatsDayKey(createdAt)];
+      if (day) day.reports += 1;
+    }
+  };
+  Object.values(imageReports).forEach(addReport);
+  Object.values(commentReports).forEach(addReport);
+
+  let pendingUnlocks = 0;
+  Object.values(unlocks).forEach((item) => { if ((item || {}).status === 'pending' || !(item || {}).status) pendingUnlocks += 1; });
+  let bannedGalleryAccounts = 0;
+  Object.values(bannedAccounts).forEach((account) => {
+    if (account && account.games && account.games.gallery && account.games.gallery.status !== 'unbanned') bannedGalleryAccounts += 1;
+  });
+  const verifiedStreamerUids = new Set();
+  Object.values(verifications).forEach((item) => { if (item && item.uid) verifiedStreamerUids.add(item.uid); });
+
+  let verifiedVisits = 0;
+  Object.values(visits).forEach((visit) => {
+    if (!visit || visit.market !== 'gallery') return;
+    const visitedAt = Number(visit.visitedAt) || 0;
+    if (visitedAt < from || visitedAt > to) return;
+    verifiedVisits += 1;
+    const day = buckets[galleryStatsDayKey(visitedAt)];
+    if (day) day.verifiedVisits += 1;
+  });
+
+  let moderationActions = 0;
+  Object.values(auditLog).forEach((entry) => {
+    const at = Number(entry && entry.at) || 0;
+    if (at >= from && at <= to) moderationActions += 1;
+  });
+  let r2RegisterFailures = 0;
+  let r2RegisterPending = 0;
+  let r2DeleteFailures = 0;
+  let r2DeletePending = 0;
+  Object.values(lifecycle).forEach((entry) => {
+    const status = entry && entry.status;
+    if (status === 'register_failed') r2RegisterFailures += 1;
+    if (status === 'upload_issued' || status === 'register_started' || status === 'uploaded') r2RegisterPending += 1;
+    if (status === 'delete_failed') r2DeleteFailures += 1;
+    if (status === 'deleting') r2DeletePending += 1;
+  });
+
+  const categories = Object.entries(categoryCounts)
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category, 'ko-KR'));
+  const topStreamers = Object.values(streamerCounts)
+    .sort((a, b) => b.images - a.images || b.likes - a.likes || a.name.localeCompare(b.name, 'ko-KR'))
+    .slice(0, 12);
+  const latestImageAt = Object.values(images).reduce((max, image) => Math.max(max, Number(image && image.createdAt) || 0), 0);
+  const latestCommentAt = Object.values(comments).reduce((max, imageComments) => Object.values(imageComments || {}).reduce((innerMax, comment) => Math.max(innerMax, Number(comment && comment.createdAt) || 0), max), 0);
+  return {
+    generatedAt: now,
+    period: { days, from, to, dayKeys },
+    totals: {
+      images: Object.keys(images).length,
+      comments: totalComments,
+      likes: totalLikes,
+      uploaders: allUploaders.size,
+      commenters: allCommenters.size,
+      activeUsers: activeUsers.size,
+      periodUploads,
+      totalReports,
+      pendingReports: reportStatus.pending,
+      pendingUnlocks,
+      bannedGalleryAccounts,
+      verifiedStreamers: verifiedStreamerUids.size,
+      verifiedVisits,
+      moderationActions,
+      r2RegisterFailures,
+      r2RegisterPending,
+      r2DeleteFailures,
+      r2DeletePending,
+      latestImageAt,
+      latestCommentAt,
+    },
+    reports: reportStatus,
+    timeseries: dayKeys.map((day) => buckets[day]),
+    categories,
+    topStreamers,
+  };
+});
+
 // R2 파일 점검(2026-09-20) — RTDB 원본 메타데이터의 key/thumbKey와 R2
 // images/ 오브젝트를 서버에서 대조한다. 메타데이터에 연결되지 않은 오브젝트는
 // 바로 삭제하지 않고 관리자에게 후보로만 보여준다.
@@ -937,6 +1133,7 @@ module.exports = {
   getGalleryAdminPage,
   gallerySearchUsers,
   galleryGetAuditLog,
+  galleryGetOperationsStats,
   galleryScanR2,
   galleryDeleteR2Orphans,
   adminBulkGalleryAction,

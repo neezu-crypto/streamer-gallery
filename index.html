@@ -284,7 +284,7 @@
           <div class="admin-nav-list">
             <button class="admin-nav-item" type="button" data-admin-tab="audit"><span>감사 로그</span></button>
             <button class="admin-nav-item" type="button" data-admin-tab="storage"><span>R2 파일 점검</span></button>
-            <button class="admin-nav-item" type="button" data-admin-tab="stats" disabled><span>운영 통계</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="stats"><span>운영 통계</span></button>
           </div>
         </div>
       </nav>
@@ -386,6 +386,41 @@
                 <div class="admin-storage-section-title"><h3>메타데이터에는 있으나 R2에서 찾을 수 없는 파일</h3></div>
                 <div id="admin-storage-missing"><p class="empty-msg">R2 점검을 실행하면 누락 파일이 표시됩니다.</p></div>
               </section>
+            </div>
+            <div class="admin-panel-body admin-stats-panel" id="admin-stats-panel" style="display:none;">
+              <div class="admin-stats-intro">
+                <div>
+                  <span class="admin-detail-kicker">OPERATIONS</span>
+                  <h2>운영 통계</h2>
+                  <p>갤러리 운영 현황을 서버에서 집계합니다. 기간별 활동량과 검수 대기 상태를 한눈에 확인할 수 있습니다.</p>
+                </div>
+                <div class="admin-stats-actions">
+                  <label>활동 기간<select id="admin-stats-days"><option value="7">최근 7일</option><option value="14">최근 14일</option><option value="30" selected>최근 30일</option><option value="90">최근 90일</option></select></label>
+                  <button class="glitch-btn" id="admin-stats-refresh-btn" type="button">새로고침</button>
+                </div>
+              </div>
+              <p class="admin-stats-status" id="admin-stats-status" aria-live="polite"></p>
+              <div class="admin-stats-grid" id="admin-stats-totals"></div>
+              <div class="admin-stats-columns">
+                <section class="admin-stats-card admin-stats-timeseries-card">
+                  <div class="admin-stats-card-title"><h3>기간별 활동량</h3><span>업로드 · 댓글 · 신고 · 인증 스트리머 방문</span></div>
+                  <div class="admin-stats-chart" id="admin-stats-timeseries"><p class="empty-msg">통계를 불러오는 중...</p></div>
+                </section>
+                <section class="admin-stats-card">
+                  <div class="admin-stats-card-title"><h3>콘텐츠 카테고리</h3><span>현재 게시 중</span></div>
+                  <div class="admin-stats-bars" id="admin-stats-categories"><p class="empty-msg">통계를 불러오는 중...</p></div>
+                </section>
+              </div>
+              <div class="admin-stats-columns">
+                <section class="admin-stats-card">
+                  <div class="admin-stats-card-title"><h3>인기 스트리머</h3><span>이미지 수 · 좋아요 수</span></div>
+                  <div class="admin-stats-table-wrap" id="admin-stats-streamers"><p class="empty-msg">통계를 불러오는 중...</p></div>
+                </section>
+                <section class="admin-stats-card">
+                  <div class="admin-stats-card-title"><h3>검수·보안 현황</h3><span>현재 상태</span></div>
+                  <div class="admin-stats-moderation" id="admin-stats-moderation"><p class="empty-msg">통계를 불러오는 중...</p></div>
+                </section>
+              </div>
             </div>
           </section>
           <aside class="admin-detail-panel" id="admin-detail-panel" aria-label="선택한 항목 상세 정보">

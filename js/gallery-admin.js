@@ -26,6 +26,15 @@
   var storageSummary = document.getElementById('admin-storage-summary');
   var storageOrphans = document.getElementById('admin-storage-orphans');
   var storageMissing = document.getElementById('admin-storage-missing');
+  var statsPanel = document.getElementById('admin-stats-panel');
+  var statsDaysSelect = document.getElementById('admin-stats-days');
+  var statsRefreshBtn = document.getElementById('admin-stats-refresh-btn');
+  var statsStatus = document.getElementById('admin-stats-status');
+  var statsTotals = document.getElementById('admin-stats-totals');
+  var statsTimeseries = document.getElementById('admin-stats-timeseries');
+  var statsCategories = document.getElementById('admin-stats-categories');
+  var statsStreamers = document.getElementById('admin-stats-streamers');
+  var statsModeration = document.getElementById('admin-stats-moderation');
   var usersSearchInput = document.getElementById('admin-users-search-input');
   var usersSearchBtn = document.getElementById('admin-users-search-btn');
   var usersSearchStatus = document.getElementById('admin-users-search-status');
@@ -101,6 +110,7 @@
     users: { label: '사용자 검색', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
     audit: { label: '감사 로그', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
     storage: { label: 'R2 파일 점검', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
+    stats: { label: '운영 통계', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
   };
 
   function escapeHtml(s) {
@@ -219,6 +229,18 @@
     if (filterResetBtn) filterResetBtn.hidden = !!isStorage;
     [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
       if (field && field.closest('.admin-filter-field')) field.closest('.admin-filter-field').hidden = !!isStorage;
+    });
+    if (auditActionField) auditActionField.hidden = true;
+    if (bulkToolbar) bulkToolbar.hidden = true;
+    if (pagination) pagination.hidden = true;
+  }
+
+  function setStatsMode(isStats) {
+    if (!isStats) return;
+    if (adminSearch && adminSearch.closest('.admin-search')) adminSearch.closest('.admin-search').hidden = true;
+    if (filterResetBtn) filterResetBtn.hidden = true;
+    [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
+      if (field && field.closest('.admin-filter-field')) field.closest('.admin-filter-field').hidden = true;
     });
     if (auditActionField) auditActionField.hidden = true;
     if (bulkToolbar) bulkToolbar.hidden = true;
@@ -447,6 +469,106 @@
     }
   }
 
+  function statsMetricCard(label, value, note, warning) {
+    return '<div class="admin-stats-metric' + (warning ? ' is-warning' : '') + '"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(formatCount(value)) + '</strong><small>' + escapeHtml(note || '') + '</small></div>';
+  }
+
+  function renderOperationsStats(data) {
+    var totals = data.totals || {};
+    var period = data.period || {};
+    if (statsTotals) {
+      statsTotals.innerHTML =
+        statsMetricCard('전체 이미지', totals.images, '현재 게시 중') +
+        statsMetricCard('전체 댓글', totals.comments, '현재 등록') +
+        statsMetricCard('누적 좋아요', totals.likes, '이미지 합계') +
+        statsMetricCard('기간 업로드', totals.periodUploads, '선택 기간') +
+        statsMetricCard('기간 활동 사용자', totals.activeUsers, '업로드·댓글 기준') +
+        statsMetricCard('대기 신고', totals.pendingReports, '즉시 확인 필요', Number(totals.pendingReports) > 0) +
+        statsMetricCard('대기 해금 신청', totals.pendingUnlocks, '처리 대기', Number(totals.pendingUnlocks) > 0) +
+        statsMetricCard('갤러리 정지 계정', totals.bannedGalleryAccounts, '현재 정지 중');
+    }
+    var series = data.timeseries || [];
+    if (statsTimeseries) {
+      if (!series.length) {
+        statsTimeseries.innerHTML = '<p class="empty-msg">표시할 활동 데이터가 없습니다.</p>';
+      } else {
+        var metricDefs = [
+          { key: 'uploads', label: '업로드', className: 'is-upload' },
+          { key: 'comments', label: '댓글', className: 'is-comment' },
+          { key: 'reports', label: '신고', className: 'is-report' },
+          { key: 'verifiedVisits', label: '인증 방문', className: 'is-visit' },
+        ];
+        var maxValue = Math.max(1, ...series.flatMap(function (item) { return metricDefs.map(function (metric) { return Number(item[metric.key]) || 0; }); }));
+        var legend = metricDefs.map(function (metric) { return '<span><i class="' + metric.className + '"></i>' + metric.label + '</span>'; }).join('');
+        var columns = series.map(function (item) {
+          var dayLabel = String(item.date || '').slice(5).replace('-', '.');
+          var bars = metricDefs.map(function (metric) {
+            var value = Number(item[metric.key]) || 0;
+            var height = value ? Math.max(4, Math.round(value / maxValue * 100)) : 0;
+            return '<span class="admin-stats-chart-bar ' + metric.className + '" style="height:' + height + '%" title="' + escapeHtml(metric.label + ' ' + value + '건') + '"></span>';
+          }).join('');
+          return '<div class="admin-stats-chart-col"><div class="admin-stats-chart-bars">' + bars + '</div><small>' + escapeHtml(dayLabel) + '</small></div>';
+        }).join('');
+        statsTimeseries.innerHTML = '<div class="admin-stats-chart-legend">' + legend + '</div><div class="admin-stats-chart-scroll"><div class="admin-stats-chart-grid">' + columns + '</div></div>';
+      }
+    }
+    if (statsCategories) {
+      var categories = data.categories || [];
+      var categoryLabels = { screenshot: '스크린샷', 'ai-art': 'AI 일러스트', 'fan-art': '팬아트', meme: '밈', etc: '기타' };
+      if (!categories.length) statsCategories.innerHTML = '<p class="empty-msg">등록된 이미지가 없습니다.</p>';
+      else {
+        var categoryMax = Math.max(1, ...categories.map(function (item) { return Number(item.count) || 0; }));
+        statsCategories.innerHTML = categories.map(function (item) {
+          var count = Number(item.count) || 0;
+          return '<div class="admin-stats-bar-row"><span>' + escapeHtml(categoryLabels[item.category] || item.category || '기타') + '</span><div><i style="width:' + Math.round(count / categoryMax * 100) + '%"></i></div><strong>' + escapeHtml(formatCount(count)) + '</strong></div>';
+        }).join('');
+      }
+    }
+    if (statsStreamers) {
+      var streamers = data.topStreamers || [];
+      statsStreamers.innerHTML = streamers.length ? '<div class="admin-stats-table"><div class="admin-stats-table-head"><span>스트리머</span><span>이미지</span><span>좋아요</span></div>' + streamers.map(function (item) {
+        return '<div class="admin-stats-table-row"><span>' + escapeHtml(item.name || '미지정') + '</span><strong>' + escapeHtml(formatCount(item.images)) + '</strong><strong>' + escapeHtml(formatCount(item.likes)) + '</strong></div>';
+      }).join('') + '</div>' : '<p class="empty-msg">등록된 이미지가 없습니다.</p>';
+    }
+    if (statsModeration) {
+      var reports = data.reports || {};
+      var moderationItems = [
+        ['대기 신고', totals.pendingReports, 'is-warning'],
+        ['처리 완료 신고', (Number(reports.dismissed) || 0) + (Number(reports.deleted) || 0), ''],
+        ['인증 스트리머', totals.verifiedStreamers, ''],
+        ['인증 스트리머 방문', totals.verifiedVisits, (Number(totals.verifiedVisits) ? '' : '')],
+        ['관리자 처리 기록', totals.moderationActions, ''],
+        ['R2 등록 오류', totals.r2RegisterFailures, Number(totals.r2RegisterFailures) ? 'is-warning' : ''],
+        ['R2 등록 미완료', totals.r2RegisterPending, Number(totals.r2RegisterPending) ? 'is-warning' : ''],
+        ['R2 삭제 오류', totals.r2DeleteFailures, Number(totals.r2DeleteFailures) ? 'is-warning' : ''],
+        ['R2 삭제 진행 중', totals.r2DeletePending, Number(totals.r2DeletePending) ? 'is-warning' : ''],
+      ];
+      statsModeration.innerHTML = moderationItems.map(function (item) {
+        return '<div class="admin-stats-status-row"><span>' + escapeHtml(item[0]) + '</span><strong class="' + item[2] + '">' + escapeHtml(formatCount(item[1])) + '</strong></div>';
+      }).join('') + '<p class="admin-stats-note">최근 이미지 ' + escapeHtml(formatWhen(totals.latestImageAt)) + '<br>최근 댓글 ' + escapeHtml(formatWhen(totals.latestCommentAt)) + '<br>집계 범위: 최근 ' + escapeHtml(String(period.days || 30)) + '일</p>';
+    }
+  }
+
+  async function loadOperationsStats(options) {
+    options = options || {};
+    if (!window.galFirebase || activeTab !== 'stats') return;
+    if (statsRefreshBtn) statsRefreshBtn.disabled = true;
+    if (statsStatus) statsStatus.textContent = '운영 데이터를 집계하는 중...';
+    if (options.showLoading !== false && statsTimeseries) statsTimeseries.innerHTML = '<p class="empty-msg">통계를 불러오는 중...</p>';
+    try {
+      var fn = window.galFirebase.httpsCallable('galleryGetOperationsStats');
+      var result = await fn({ days: Number(statsDaysSelect && statsDaysSelect.value) || 30 });
+      renderOperationsStats(result.data || {});
+      if (statsStatus) statsStatus.textContent = '집계 완료 · ' + formatWhen((result.data || {}).generatedAt);
+    } catch (e) {
+      if (statsStatus) statsStatus.textContent = '통계를 불러오지 못했습니다.';
+      if (statsTimeseries) statsTimeseries.innerHTML = '<p class="empty-msg">운영 통계 조회에 실패했어요. 다시 시도해 주세요.</p>';
+      showToast('운영 통계 조회 실패: ' + (e && e.message ? e.message : e), true);
+    } finally {
+      if (statsRefreshBtn) statsRefreshBtn.disabled = false;
+    }
+  }
+
   function formatWhen(timestamp) {
     return timestamp ? new Date(timestamp).toLocaleString('ko-KR') : '시간 정보 없음';
   }
@@ -597,6 +719,12 @@
       updatePaginationUi();
       return;
     }
+    if (activeTab === 'stats') {
+      setStatsMode(true);
+      if (currentSectionEl) currentSectionEl.textContent = TAB_CONFIG.stats.label;
+      loadOperationsStats(options);
+      return;
+    }
     var token = ++pageRequestToken;
     pageLoading = true;
     updateSelectionUi();
@@ -649,6 +777,7 @@
     setUsersMode(activeTab === 'users');
     setAuditMode(activeTab === 'audit');
     setStorageMode(activeTab === 'storage');
+    setStatsMode(activeTab === 'stats');
     loadAdminPage();
   }
 
@@ -957,7 +1086,7 @@
     clearDetail();
     activeTab = 'reports';
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (item) { item.classList.toggle('active', item.dataset.adminTab === 'reports'); });
-    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel, auditPanel, storagePanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
+    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel, auditPanel, storagePanel, statsPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
     if (toFilter) toFilter.value = '';
@@ -996,12 +1125,14 @@
     usersPanel.style.display = tab === 'users' ? '' : 'none';
     auditPanel.style.display = tab === 'audit' ? '' : 'none';
     storagePanel.style.display = tab === 'storage' ? '' : 'none';
-    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색', audit: '감사 로그', storage: 'R2 파일 점검' };
+    statsPanel.style.display = tab === 'stats' ? '' : 'none';
+    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색', audit: '감사 로그', storage: 'R2 파일 점검', stats: '운영 통계' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
     configureFilters();
     setUsersMode(tab === 'users');
     setAuditMode(tab === 'audit');
     setStorageMode(tab === 'storage');
+    setStatsMode(tab === 'stats');
     resetPageAndLoad();
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
@@ -1023,6 +1154,8 @@
   if (auditActionFilter) auditActionFilter.addEventListener('change', resetPageAndLoad);
   if (storageScanBtn) storageScanBtn.addEventListener('click', function () { loadStorageScan(); });
   if (storageDeleteBtn) storageDeleteBtn.addEventListener('click', deleteSelectedStorageObjects);
+  if (statsRefreshBtn) statsRefreshBtn.addEventListener('click', function () { loadOperationsStats(); });
+  if (statsDaysSelect) statsDaysSelect.addEventListener('change', function () { loadOperationsStats(); });
   if (storageSelectAll) storageSelectAll.addEventListener('change', function () {
     storageOrphanItems.forEach(function (item) {
       if (storageSelectAll.checked) storageSelectedKeys[item.key] = true;
