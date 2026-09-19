@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
-const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
+const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
 const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
@@ -31,6 +31,8 @@ async function performImageDeletion(imageId) {
   ]);
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
 
+  await updateR2Lifecycle(imageId, { status: 'deleting', deletingAt: Date.now(), failureStage: null, failureMessage: null });
+
   const updates = {};
   updates[`gallery/images/${imageId}`] = null;
   updates[`gallery/imagesPublic/${imageId}`] = null;
@@ -44,16 +46,28 @@ async function performImageDeletion(imageId) {
   if (reportsSnap.exists()) {
     reportsSnap.forEach((child) => { updates[`gallery/imageReports/${child.key}`] = null; });
   }
-  await db.ref().update(updates);
+  try {
+    await db.ref().update(updates);
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'delete_failed', failureStage: 'metadata_delete', failureMessage: String(error && error.message || 'RTDB 메타데이터 삭제 실패').slice(0, 200), failedAt: Date.now() });
+    throw error;
+  }
 
   const { key, thumbKey } = imageSnap.val();
   const r2Keys = [key, thumbKey].filter(Boolean);
+  const failedR2Keys = [];
   for (const r2Key of r2Keys) {
     try {
       await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: r2Key }));
     } catch (e) {
       console.error('R2 파일 삭제 실패(메타데이터는 이미 삭제됨):', r2Key, e);
+      failedR2Keys.push(r2Key);
     }
+  }
+  if (failedR2Keys.length) {
+    await updateR2Lifecycle(imageId, { status: 'delete_failed', failureStage: 'r2_delete', failureMessage: 'R2 파일 삭제 실패', failedKeys: failedR2Keys, failedAt: Date.now() });
+  } else {
+    await updateR2Lifecycle(imageId, { status: 'deleted', deletedAt: Date.now(), failureStage: null, failureMessage: null, failedKeys: null });
   }
   return imageSnap.val();
 }
@@ -576,8 +590,12 @@ const galleryGetAuditLog = onCall(async (request) => {
 const galleryScanR2 = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   await requireAdmin(request);
   const db = getDatabase();
-  const [imagesSnap] = await Promise.all([db.ref('gallery/images').get()]);
+  const [imagesSnap, lifecycleSnap] = await Promise.all([
+    db.ref('gallery/images').get(),
+    db.ref('gallery/r2FileLifecycle').get(),
+  ]);
   const images = imagesSnap.val() || {};
+  const lifecycle = lifecycleSnap.val() || {};
   const referenced = new Set();
   Object.keys(images).forEach((imageId) => {
     const image = images[imageId] || {};
@@ -609,7 +627,24 @@ const galleryScanR2 = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]
   } while (continuationToken);
 
   const objectKeys = new Set(objects.map((item) => item.key));
-  const orphanObjects = objects.filter((item) => !referenced.has(item.key));
+  const lifecycleByKey = {};
+  Object.keys(lifecycle).forEach((imageId) => {
+    const record = lifecycle[imageId] || {};
+    [record.key, record.thumbKey].forEach((key) => {
+      if (typeof key === 'string') lifecycleByKey[key] = Object.assign({ imageId }, record);
+    });
+  });
+  const orphanObjects = objects.filter((item) => !referenced.has(item.key)).map((item) => {
+    const record = lifecycleByKey[item.key];
+    const deleteFailure = record && (record.status === 'deleting' || record.status === 'delete_failed');
+    const registerFailure = record && ['upload_issued', 'register_started', 'uploaded', 'register_failed'].includes(record.status);
+    return Object.assign(item, {
+      classification: deleteFailure ? 'delete_failed' : registerFailure ? 'register_failed' : 'unknown',
+      lifecycleStatus: record && record.status || '',
+      failureStage: record && record.failureStage || '',
+      imageId: record && record.imageId || '',
+    });
+  });
   const missingReferences = [];
   referenced.forEach((key) => {
     if (!objectKeys.has(key)) missingReferences.push({ key });
@@ -626,6 +661,9 @@ const galleryScanR2 = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]
       missingReferences: missingReferences.length,
       totalBytes: objects.reduce((sum, item) => sum + item.size, 0),
       orphanBytes: orphanObjects.reduce((sum, item) => sum + item.size, 0),
+      registerFailureObjects: orphanObjects.filter((item) => item.classification === 'register_failed').length,
+      deleteFailureObjects: orphanObjects.filter((item) => item.classification === 'delete_failed').length,
+      unknownObjects: orphanObjects.filter((item) => item.classification === 'unknown').length,
     },
     orphanObjects: orphanObjects.slice(0, 1000),
     missingReferences: missingReferences.slice(0, 1000),
@@ -644,8 +682,13 @@ const galleryDeleteR2Orphans = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_AC
   }
   const requestedKeys = Array.from(new Set(data.keys.map((key) => String(key || '')).filter((key) => key.startsWith('images/') && key.length <= 300)));
   if (!requestedKeys.length) throw new HttpsError('invalid-argument', '올바른 R2 파일을 선택해 주세요.');
-  const imagesSnap = await getDatabase().ref('gallery/images').get();
+  const db = getDatabase();
+  const [imagesSnap, lifecycleSnap] = await Promise.all([
+    db.ref('gallery/images').get(),
+    db.ref('gallery/r2FileLifecycle').get(),
+  ]);
   const images = imagesSnap.val() || {};
+  const lifecycle = lifecycleSnap.val() || {};
   const referenced = new Set();
   Object.keys(images).forEach((imageId) => {
     const image = images[imageId] || {};
@@ -665,6 +708,15 @@ const galleryDeleteR2Orphans = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_AC
     deletedKeys = safeKeys.filter((key) => !errors.some((error) => error.key === key));
     if (errors.length) console.error('R2 고아 파일 일부 삭제 실패:', errors);
   }
+  const lifecycleUpdates = {};
+  Object.keys(lifecycle).forEach((imageId) => {
+    const record = lifecycle[imageId] || {};
+    const recordKeys = [record.key, record.thumbKey];
+    if (!recordKeys.some((key) => deletedKeys.includes(key))) return;
+    lifecycleUpdates[`gallery/r2FileLifecycle/${imageId}/cleanupAt`] = Date.now();
+    lifecycleUpdates[`gallery/r2FileLifecycle/${imageId}/cleanupStatus`] = 'deleted';
+  });
+  if (Object.keys(lifecycleUpdates).length) await db.ref().update(lifecycleUpdates);
   const actorName = (request.auth.token && (request.auth.token.email || request.auth.token.name)) || adminUid;
   if (deletedKeys.length) await logAudit(adminUid, actorName, 'gallery.r2Cleanup', deletedKeys.length + '개 고아 파일 삭제');
   return { deletedKeys, skippedKeys, failedCount: requestedKeys.length - deletedKeys.length - skippedKeys.length };

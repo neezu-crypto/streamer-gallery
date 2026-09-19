@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { getDatabase } = require('firebase-admin/database');
 const { randomUUID } = require('crypto');
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { requireTrustedAccount, requireAuth, assertNotBanned } = require('./lib/auth');
 const { assertCooldown } = require('./lib/rate-limit');
@@ -35,6 +35,17 @@ function getR2Client() {
       secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
     },
   });
+}
+
+// R2 파일 생명주기 로그는 원본 UID/키가 포함될 수 있어 서버 전용 노드에만 기록한다.
+// 로깅 실패가 업로드·삭제 자체를 막지는 않도록 호출부에서 best-effort로 사용한다.
+async function updateR2Lifecycle(imageId, patch) {
+  if (typeof imageId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(imageId)) return;
+  try {
+    await getDatabase().ref(`gallery/r2FileLifecycle/${imageId}`).update(patch || {});
+  } catch (error) {
+    console.error('R2 생명주기 로그 기록 실패:', imageId, error);
+  }
 }
 
 // 1단계: 클라이언트가 R2에 직접 PUT할 수 있는 presigned URL을 발급 (Functions 대역폭을
@@ -75,6 +86,18 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
     ContentLength: thumbFileSize,
   }), { expiresIn: 300 });
 
+  await getDatabase().ref(`gallery/r2FileLifecycle/${imageId}`).set({
+    status: 'upload_issued',
+    key,
+    thumbKey,
+    uploaderUid: uid,
+    contentType,
+    fileSize,
+    thumbFileSize,
+    uploadIssuedAt: Date.now(),
+    expiresAt: Date.now() + 5 * 60 * 1000,
+  });
+
   return { uploadUrl, thumbUploadUrl, imageId, key, thumbKey };
 });
 
@@ -82,7 +105,7 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
 // (R2 업로드는 성공했는데 이 호출이 실패하면 "고아 파일"이 남는다 — 클라이언트가
 // 실패 시 알림만 띄우는 수준이며, 관리자 패널의 R2 점검/고아 정리 도구에서
 // RTDB 메타데이터와 대조 후 수동 삭제한다.)
-const registerImage = onCall(async (request) => {
+const registerImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
   // 매크로/스크립트로 이미지를 연속 대량 업로드하는 것을 막는다 — 이미지 하나씩
@@ -107,14 +130,42 @@ const registerImage = onCall(async (request) => {
     throw new HttpsError('invalid-argument', '스트리머를 목록에서 선택해 주세요.');
   }
 
+  await updateR2Lifecycle(imageId, { status: 'register_started', registerStartedAt: Date.now() });
+  try {
+    const client = getR2Client();
+    await Promise.all([
+      client.send(new HeadObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })),
+      client.send(new HeadObjectCommand({ Bucket: R2_BUCKET_NAME, Key: thumbKey })),
+    ]);
+    await updateR2Lifecycle(imageId, { status: 'uploaded', uploadedAt: Date.now() });
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'r2_verify', failureMessage: String(error && error.name || 'R2 파일 확인 실패').slice(0, 200), failedAt: Date.now() });
+    throw new HttpsError('failed-precondition', 'R2 업로드 파일을 확인하지 못했습니다. 원본과 썸네일 업로드가 모두 끝났는지 확인해 주세요.');
+  }
+
   const db = getDatabase();
-  const publicId = await ensurePublicId(db, uid);
+  let publicId;
+  try {
+    publicId = await ensurePublicId(db, uid);
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'identity_prepare', failureMessage: String(error && error.message || '공개 식별자 준비 실패').slice(0, 200), failedAt: Date.now() });
+    throw error;
+  }
   // 스트리머별 업로드 잠금은 2026-09-06부로 폐지 — 이제 로그인(신뢰 계정)한
   // 누구나 잠긴 스트리머 이미지도 올릴 수 있다. 다만 그 이미지의 상세보기는
   // 여전히 해금 전까지 막혀있다(js/gallery-detail.js의 잠금 체크는 그대로 유지).
 
-  const existing = await db.ref(`gallery/images/${imageId}`).get();
-  if (existing.exists()) throw new HttpsError('already-exists', '이미 등록된 이미지입니다.');
+  let existing;
+  try {
+    existing = await db.ref(`gallery/images/${imageId}`).get();
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'metadata_check', failureMessage: String(error && error.message || '기존 메타데이터 확인 실패').slice(0, 200), failedAt: Date.now() });
+    throw error;
+  }
+  if (existing.exists()) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'duplicate_image', failureMessage: '이미 등록된 이미지 ID', failedAt: Date.now() });
+    throw new HttpsError('already-exists', '이미 등록된 이미지입니다.');
+  }
 
   const imageUrl = `${R2_PUBLIC_BASE_URL}/${key}`;
   const thumbUrl = `${R2_PUBLIC_BASE_URL}/${thumbKey}`;
@@ -138,11 +189,16 @@ const registerImage = onCall(async (request) => {
       uploaderUid: uid,
       createdAt: Date.now(),
   };
-  await db.ref().update({
-    [`gallery/images/${imageId}`]: image,
-    [`gallery/imagesPublic/${imageId}`]: publicImage(image, publicId),
-    [`gallery/imageStats/${imageId}`]: { likeCount: 0, commentCount: 0 },
-  });
+  try {
+    await db.ref().update({
+      [`gallery/images/${imageId}`]: image,
+      [`gallery/imagesPublic/${imageId}`]: publicImage(image, publicId),
+      [`gallery/imageStats/${imageId}`]: { likeCount: 0, commentCount: 0 },
+    });
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'metadata_register', failureMessage: String(error && error.message || 'RTDB 등록 실패').slice(0, 200), failedAt: Date.now() });
+    throw error;
+  }
 
   // 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 이 스트리머의 첫 업로드
   // 시각을 1회만 기록한다(이후 무료체험 만료 계산 기준). 트랜잭션으로 감싸는
@@ -150,10 +206,17 @@ const registerImage = onCall(async (request) => {
   // 이론상 가능한데, read-then-write로 짜면 둘 다 "없음"을 보고 둘 다 쓰려고
   // 해서 나중 것이 먼저 것을 덮어쓸 수 있다 - transaction이면 둘 중 하나만
   // 실제로 값을 쓰고 나머지는 그대로 둔다.
-  await db.ref(`gallery/streamerFirstUpload/${streamerId}`).transaction((current) => {
-    if (current !== null) return; // 이미 있으면 트랜잭션 중단(undefined 반환) - 덮어쓰지 않음
-    return Date.now();
-  });
+  try {
+    await db.ref(`gallery/streamerFirstUpload/${streamerId}`).transaction((current) => {
+      if (current !== null) return; // 이미 있으면 트랜잭션 중단(undefined 반환) - 덮어쓰지 않음
+      return Date.now();
+    });
+  } catch (error) {
+    await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'streamer_metadata', failureMessage: String(error && error.message || '스트리머 메타데이터 등록 실패').slice(0, 200), failedAt: Date.now() });
+    throw error;
+  }
+
+  await updateR2Lifecycle(imageId, { status: 'registered', registeredAt: Date.now(), failureStage: null, failureMessage: null });
 
   return { imageId, imageUrl, thumbUrl };
 });
@@ -200,4 +263,4 @@ const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCES
   return { downloadUrl };
 });
 
-module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };

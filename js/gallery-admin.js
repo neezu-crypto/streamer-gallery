@@ -380,6 +380,9 @@
       storageSummary.innerHTML = '<span>R2 파일 <strong>' + formatCount(totals.r2Objects) + '</strong></span>' +
         '<span>참조된 파일 <strong>' + formatCount(totals.referencedObjects) + '</strong></span>' +
         '<span>고아 후보 <strong class="is-warning">' + formatCount(totals.orphanObjects) + '</strong></span>' +
+        '<span>등록 중 오류 <strong class="is-warning">' + formatCount(totals.registerFailureObjects) + '</strong></span>' +
+        '<span>삭제 중 오류 <strong class="is-warning">' + formatCount(totals.deleteFailureObjects) + '</strong></span>' +
+        '<span>원인 미확인 <strong>' + formatCount(totals.unknownObjects) + '</strong></span>' +
         '<span>고아 용량 <strong>' + escapeHtml(formatBytes(totals.orphanBytes)) + '</strong></span>' +
         '<span>메타데이터 누락 <strong class="is-warning">' + formatCount(totals.missingReferences) + '</strong></span>';
     }
@@ -390,7 +393,9 @@
     }
     if (storageOrphans) {
       storageOrphans.innerHTML = storageOrphanItems.length ? storageOrphanItems.map(function (item) {
-        return '<label class="admin-storage-row"><input class="admin-storage-checkbox" type="checkbox" data-storage-key="' + escapeHtml(item.key) + '"><span class="admin-storage-key">' + escapeHtml(item.key) + '</span><span class="admin-storage-size">' + escapeHtml(formatBytes(item.size)) + '</span><time>' + escapeHtml(formatWhen(item.lastModified)) + '</time></label>';
+        var classification = item.classification === 'register_failed' ? '등록 중 오류' : item.classification === 'delete_failed' ? '삭제 중 오류' : '원인 미확인';
+        var badgeClass = item.classification === 'unknown' ? '' : ' is-warning';
+        return '<label class="admin-storage-row"><input class="admin-storage-checkbox" type="checkbox" data-storage-key="' + escapeHtml(item.key) + '"><span class="admin-storage-key">' + escapeHtml(item.key) + '<em class="admin-storage-classification' + badgeClass + '">' + escapeHtml(classification) + '</em></span><span class="admin-storage-size">' + escapeHtml(formatBytes(item.size)) + '</span><time>' + escapeHtml(formatWhen(item.lastModified)) + '</time></label>';
       }).join('') : '<p class="empty-msg">현재 고아 파일 후보가 없습니다.</p>';
     }
     if (storageMissing) {
