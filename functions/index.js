@@ -4,7 +4,7 @@ initializeApp();
 const { galleryCheckAdmin } = require('./src/whoami');
 const { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl } = require('./src/r2');
 const { toggleLike, postComment, reportImage, reportComment, hideImage, unhideImage } = require('./src/interactions');
-const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, migrateGalleryPublicIdentityData, getGalleryAdminPage, adminBulkGalleryAction } = require('./src/admin');
+const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, migrateGalleryPublicIdentityData, getGalleryAdminPage, gallerySearchUsers, adminBulkGalleryAction } = require('./src/admin');
 const { updateGalleryProfile } = require('./src/profile');
 const { requestStreamerUnlock, cancelStreamerUnlockRequest, adminApproveStreamerUnlock, adminRejectStreamerUnlock } = require('./src/unlock');
 const { logGalleryVisit } = require('./src/streamerVisitLog');
@@ -36,6 +36,7 @@ module.exports = {
   adminUnlinkStreamerAccount,
   migrateGalleryPublicIdentityData,
   getGalleryAdminPage,
+  gallerySearchUsers,
   adminBulkGalleryAction,
   updateGalleryProfile,
   requestStreamerUnlock,

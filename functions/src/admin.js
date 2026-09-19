@@ -5,7 +5,7 @@ const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
-const { ensurePublicId, publicImage, publicComment } = require('./public-identity');
+const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
 
 async function requireAdmin(request) {
   const uid = requireAuth(request);
@@ -344,6 +344,188 @@ const getGalleryAdminPage = onCall(async (request) => {
   return { items: page, total, hasMore: !!nextCursor, nextCursor };
 });
 
+// 사용자 검색(2026-09-20) — 원본 UID가 들어 있는 원장들은 서버에서만 읽고,
+// 관리자 화면에는 공개 ID와 최소 활동 정보만 반환한다. 검색어가 UID인 경우에도
+// UID를 응답에 되돌려 보내지 않으므로 브라우저·네트워크 로그에 원본 식별자가
+// 남지 않는다. 이 함수는 관리자 재검증(requireAdmin)을 거친 관리자만 호출할 수 있다.
+const gallerySearchUsers = onCall(async (request) => {
+  await requireAdmin(request);
+  const rawQuery = String((request.data || {}).query || '').trim().slice(0, 80);
+  if (rawQuery.length < 2) throw new HttpsError('invalid-argument', '두 글자 이상 입력해 주세요.');
+  const query = adminQueueText(rawQuery);
+  const requestedLimit = Number((request.data || {}).limit) || 20;
+  const limit = Math.min(30, Math.max(1, requestedLimit));
+  const db = getDatabase();
+  const [profilesSnap, mappingsSnap, imagesSnap, commentsSnap, imageReportsSnap, commentReportsSnap, bansSnap, verificationsSnap, statsSnap, userLikesSnap] = await Promise.all([
+    db.ref('gallery/profiles').get(),
+    db.ref('privateUserIds/gallery').get(),
+    db.ref('gallery/images').get(),
+    db.ref('gallery/comments').get(),
+    db.ref('gallery/imageReports').get(),
+    db.ref('gallery/commentReports').get(),
+    db.ref('bannedAccounts').get(),
+    db.ref('streamerVerifications').get(),
+    db.ref('gallery/imageStats').get(),
+    db.ref('gallery/userLikes').get(),
+  ]);
+
+  const profiles = profilesSnap.val() || {};
+  const mappings = mappingsSnap.val() || {};
+  const byUid = mappings.byUid || {};
+  const byPublicId = mappings.byPublicId || {};
+  const images = imagesSnap.val() || {};
+  const comments = commentsSnap.val() || {};
+  const imageReports = imageReportsSnap.val() || {};
+  const commentReports = commentReportsSnap.val() || {};
+  const bannedAccounts = bansSnap.val() || {};
+  const verifications = verificationsSnap.val() || {};
+  const imageStats = statsSnap.val() || {};
+  const userLikes = userLikesSnap.val() || {};
+
+  const verifiedByUid = {};
+  Object.keys(verifications).forEach((id) => {
+    const value = verifications[id] || {};
+    if (!value.uid) return;
+    if (!verifiedByUid[value.uid]) verifiedByUid[value.uid] = [];
+    verifiedByUid[value.uid].push({
+      nickname: value.nickname || '',
+      soopId: value.soopId || '',
+      verifiedAt: Number(value.verifiedAt) || 0,
+    });
+  });
+
+  const imageById = {};
+  const imageCountByUid = {};
+  const imageLikesByUid = {};
+  const imageListByUid = {};
+  Object.keys(images).forEach((imageId) => {
+    const image = images[imageId] || {};
+    const uid = image.uploaderUid;
+    if (!uid) return;
+    imageById[imageId] = image;
+    imageCountByUid[uid] = (imageCountByUid[uid] || 0) + 1;
+    imageLikesByUid[uid] = (imageLikesByUid[uid] || 0) + (Number(imageStats[imageId] && imageStats[imageId].likeCount) || 0);
+    if (!imageListByUid[uid]) imageListByUid[uid] = [];
+    imageListByUid[uid].push({
+      id: imageId,
+      streamerName: image.streamerName || '',
+      category: image.category || '',
+      createdAt: Number(image.createdAt) || 0,
+      thumbUrl: image.thumbUrl || '',
+      imageUrl: image.imageUrl || '',
+    });
+  });
+  Object.keys(imageListByUid).forEach((uid) => imageListByUid[uid].sort((a, b) => b.createdAt - a.createdAt));
+
+  const commentCountByUid = {};
+  const commentListByUid = {};
+  Object.keys(comments).forEach((imageId) => {
+    const imageComments = comments[imageId] || {};
+    Object.keys(imageComments).forEach((commentId) => {
+      const comment = imageComments[commentId] || {};
+      const uid = comment.uid;
+      if (!uid) return;
+      commentCountByUid[uid] = (commentCountByUid[uid] || 0) + 1;
+      if (!commentListByUid[uid]) commentListByUid[uid] = [];
+      commentListByUid[uid].push({
+        imageId,
+        commentId,
+        text: comment.text || '',
+        createdAt: Number(comment.createdAt) || 0,
+      });
+    });
+  });
+  Object.keys(commentListByUid).forEach((uid) => commentListByUid[uid].sort((a, b) => b.createdAt - a.createdAt));
+
+  const likedImageCountByUid = {};
+  Object.keys(userLikes).forEach((uid) => {
+    const likes = userLikes[uid] || {};
+    likedImageCountByUid[uid] = Object.keys(likes).filter((imageId) => likes[imageId] !== null).length;
+  });
+
+  const reportByUid = {};
+  function addReport(uid, report) {
+    if (!uid) return;
+    if (!reportByUid[uid]) reportByUid[uid] = { submitted: [], received: [] };
+    reportByUid[uid][report.relation].push(report.value);
+  }
+  Object.keys(imageReports).forEach((id) => {
+    const report = imageReports[id] || {};
+    const value = { id, kind: 'image', imageId: report.imageId || '', reason: report.reason || '', status: report.status || 'pending', createdAt: Number(report.createdAt) || 0 };
+    addReport(report.reporterUid, { relation: 'submitted', value });
+    const image = imageById[report.imageId];
+    addReport(image && image.uploaderUid, { relation: 'received', value });
+  });
+  Object.keys(commentReports).forEach((id) => {
+    const report = commentReports[id] || {};
+    const value = { id, kind: 'comment', imageId: report.imageId || '', commentId: report.commentId || '', reason: report.reason || '', status: report.status || 'pending', createdAt: Number(report.createdAt) || 0 };
+    addReport(report.reporterUid, { relation: 'submitted', value });
+    addReport(report.commentAuthorUid, { relation: 'received', value });
+  });
+  Object.keys(reportByUid).forEach((uid) => {
+    reportByUid[uid].submitted.sort((a, b) => b.createdAt - a.createdAt);
+    reportByUid[uid].received.sort((a, b) => b.createdAt - a.createdAt);
+  });
+
+  const candidateUids = new Set([
+    ...Object.keys(profiles),
+    ...Object.keys(byUid),
+    ...Object.keys(imageCountByUid),
+    ...Object.keys(commentCountByUid),
+    ...Object.keys(likedImageCountByUid),
+    ...Object.keys(reportByUid),
+    ...Object.keys(bannedAccounts),
+    ...Object.keys(verifiedByUid),
+  ]);
+  if (byPublicId[rawQuery.toUpperCase()]) candidateUids.add(byPublicId[rawQuery.toUpperCase()]);
+  if (byPublicId[rawQuery]) candidateUids.add(byPublicId[rawQuery]);
+
+  const matched = [];
+  candidateUids.forEach((uid) => {
+    const profile = profiles[uid] || {};
+    const publicId = byUid[uid] || publicIdFor(uid);
+    const verificationList = verifiedByUid[uid] || [];
+    const haystack = [uid, publicId, profile.nickname, profile.soopId]
+      .concat(verificationList.flatMap((item) => [item.nickname, item.soopId]))
+      .join(' ');
+    if (!adminQueueText(haystack).includes(query)) return;
+    const ban = bannedAccounts[uid] && bannedAccounts[uid].games && bannedAccounts[uid].games.gallery;
+    const userReports = reportByUid[uid] || { submitted: [], received: [] };
+    const imagesForUser = imageListByUid[uid] || [];
+    const commentsForUser = commentListByUid[uid] || [];
+    const verifiedProfile = verificationList[0] || {};
+    matched.push({
+      publicId,
+      profile: { nickname: profile.nickname || verifiedProfile.nickname || '', soopId: profile.soopId || verifiedProfile.soopId || '', avatarUrl: profile.avatarUrl || '' },
+      verifiedStreamer: verificationList.length > 0,
+      verifications: verificationList.slice(0, 5),
+      ban: ban ? { status: 'banned', reason: ban.reason || '', bannedAt: Number(ban.bannedAt) || 0 } : { status: 'clear' },
+      summary: {
+        imageCount: imageCountByUid[uid] || 0,
+        commentCount: commentCountByUid[uid] || 0,
+        submittedReportCount: userReports.submitted.length,
+        receivedReportCount: userReports.received.length,
+        totalLikes: imageLikesByUid[uid] || 0,
+        likedImageCount: likedImageCountByUid[uid] || 0,
+        latestImageAt: imagesForUser[0] ? imagesForUser[0].createdAt : 0,
+        latestCommentAt: commentsForUser[0] ? commentsForUser[0].createdAt : 0,
+      },
+      images: imagesForUser.slice(0, 10),
+      comments: commentsForUser.slice(0, 10),
+      reports: {
+        submitted: userReports.submitted.slice(0, 10),
+        received: userReports.received.slice(0, 10),
+      },
+    });
+  });
+  matched.sort((a, b) => {
+    const aLatest = Math.max(a.summary.latestImageAt || 0, a.summary.latestCommentAt || 0);
+    const bLatest = Math.max(b.summary.latestImageAt || 0, b.summary.latestCommentAt || 0);
+    return bLatest - aLatest;
+  });
+  return { results: matched.slice(0, limit), total: matched.length };
+});
+
 async function markAdminReport(reportPath, reportId, status, uid, actorName, action) {
   const ref = getDatabase().ref(`${reportPath}/${reportId}`);
   const snap = await ref.get();
@@ -557,5 +739,6 @@ module.exports = {
   adminUnlinkStreamerAccount,
   migrateGalleryPublicIdentityData,
   getGalleryAdminPage,
+  gallerySearchUsers,
   adminBulkGalleryAction,
 };

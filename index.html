@@ -276,7 +276,7 @@
             <button class="admin-nav-item" type="button" data-admin-tab="unlocks"><span>해금 신청</span><span class="admin-nav-count" id="admin-unlocks-count" hidden>0</span></button>
             <button class="admin-nav-item" type="button" data-admin-tab="bans"><span>정지 관리</span></button>
             <button class="admin-nav-item" type="button" data-admin-tab="links"><span>스트리머 연결</span></button>
-            <button class="admin-nav-item" type="button" data-admin-tab="users" disabled><span>사용자 검색</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="users"><span>사용자 검색</span></button>
           </div>
         </div>
         <div class="admin-nav-group">
@@ -335,6 +335,26 @@
                  차이로 자동 판별이 실패하는 경우를 관리자가 직접 보정한다. -->
             <div class="admin-panel-body" id="admin-links-panel" style="display:none;">
               <p class="empty-msg">인증 스트리머 목록을 불러오는 중...</p>
+            </div>
+            <div class="admin-panel-body admin-users-panel" id="admin-users-panel" style="display:none;">
+              <div class="admin-user-search-card">
+                <div>
+                  <span class="admin-detail-kicker">USER_LOOKUP</span>
+                  <h2>사용자 검색</h2>
+                  <p>UID·공개 ID·닉네임·SOOP ID로 검색합니다. 원본 UID는 서버에서만 비교하고 화면에는 공개 ID만 표시합니다.</p>
+                </div>
+                <div class="admin-user-search-form">
+                  <label class="admin-search admin-user-search-field" for="admin-users-search-input">
+                    <span aria-hidden="true">⌕</span>
+                    <input id="admin-users-search-input" type="search" maxlength="80" placeholder="UID · 공개 ID · 닉네임 · SOOP ID" autocomplete="off">
+                  </label>
+                  <button class="glitch-btn" id="admin-users-search-btn" type="button">검색</button>
+                </div>
+                <p class="admin-user-search-status" id="admin-users-search-status" aria-live="polite"></p>
+              </div>
+              <div class="admin-user-results" id="admin-users-results">
+                <p class="empty-msg">검색어를 입력하면 사용자 활동 요약이 표시됩니다.</p>
+              </div>
             </div>
           </section>
           <aside class="admin-detail-panel" id="admin-detail-panel" aria-label="선택한 항목 상세 정보">

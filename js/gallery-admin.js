@@ -13,6 +13,11 @@
   var unlocksPanel = document.getElementById('admin-unlocks-panel');
   var bansPanel = document.getElementById('admin-bans-panel');
   var linksPanel = document.getElementById('admin-links-panel');
+  var usersPanel = document.getElementById('admin-users-panel');
+  var usersSearchInput = document.getElementById('admin-users-search-input');
+  var usersSearchBtn = document.getElementById('admin-users-search-btn');
+  var usersSearchStatus = document.getElementById('admin-users-search-status');
+  var usersResults = document.getElementById('admin-users-results');
   var adminSidebar = document.getElementById('admin-sidebar');
   var mobileMenuBtn = document.getElementById('admin-mobile-menu-btn');
   var adminSearch = document.getElementById('admin-global-search');
@@ -79,6 +84,7 @@
     unlocks: { label: '해금 신청', types: [['all', '전체']], statuses: [['pending', '대기'], ['approved', '승인'], ['rejected', '거절'], ['all', '전체']], actions: [['approve', '해금 승인'], ['reject', '거절']] },
     bans: { label: '정지 관리', types: [['all', '전체']], statuses: [['banned', '정지 중'], ['all', '전체']], actions: [['unban', '정지 해제']] },
     links: { label: '스트리머 연결', types: [['all', '전체']], statuses: [['linked', '연결됨'], ['unlinked', '미연결'], ['all', '전체']], actions: [['unlink', '연결 해제']] },
+    users: { label: '사용자 검색', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
   };
 
   function escapeHtml(s) {
@@ -170,6 +176,84 @@
     else if (activeTab === 'bans') renderBans();
     else if (activeTab === 'links') renderLinks();
     updateSelectionUi();
+  }
+
+  function setUsersMode(isUsers) {
+    if (filterResetBtn) filterResetBtn.hidden = !!isUsers;
+    if (typeFilter && typeFilter.closest('.admin-filter-field')) typeFilter.closest('.admin-filter-field').hidden = !!isUsers;
+    if (statusFilter && statusFilter.closest('.admin-filter-field')) statusFilter.closest('.admin-filter-field').hidden = !!isUsers;
+    if (fromFilter && fromFilter.closest('.admin-filter-field')) fromFilter.closest('.admin-filter-field').hidden = !!isUsers;
+    if (toFilter && toFilter.closest('.admin-filter-field')) toFilter.closest('.admin-filter-field').hidden = !!isUsers;
+    if (sortFilter && sortFilter.closest('.admin-filter-field')) sortFilter.closest('.admin-filter-field').hidden = !!isUsers;
+    if (adminSearch && adminSearch.closest('.admin-search')) adminSearch.closest('.admin-search').hidden = !!isUsers;
+    if (bulkToolbar) bulkToolbar.hidden = !!isUsers || Object.keys(selectedItems).length === 0;
+    if (pagination) pagination.hidden = !!isUsers || !(pageHistory.length || pageHasMore);
+  }
+
+  function formatCount(value) { return Number(value || 0).toLocaleString('ko-KR'); }
+
+  function renderUserResults(results) {
+    if (!usersResults) return;
+    if (!results.length) {
+      usersResults.innerHTML = '<p class="empty-msg">일치하는 사용자가 없습니다.</p>';
+      return;
+    }
+    usersResults.innerHTML = results.map(function (user) {
+      var profile = user.profile || {};
+      var summary = user.summary || {};
+      var ban = user.ban && user.ban.status === 'banned';
+      var verification = user.verifiedStreamer ? '<span class="admin-user-badge is-verified">인증 스트리머</span>' : '<span class="admin-user-badge">일반 사용자</span>';
+      var banBadge = ban ? '<span class="admin-user-badge is-banned">갤러리 정지</span>' : '';
+      var avatar = profile.avatarUrl ? '<img src="' + escapeHtml(profile.avatarUrl) + '" alt="" loading="lazy">' : '<span class="admin-user-avatar-placeholder">USER</span>';
+      var images = (user.images || []).map(function (item) {
+        return '<li><span>' + escapeHtml(item.streamerName || '이미지') + '</span><time>' + escapeHtml(formatWhen(item.createdAt)) + '</time></li>';
+      }).join('');
+      var comments = (user.comments || []).map(function (item) {
+        return '<li><span>' + escapeHtml(item.text || '(내용 없음)') + '</span><time>' + escapeHtml(formatWhen(item.createdAt)) + '</time></li>';
+      }).join('');
+      var reports = [];
+      (user.reports && user.reports.submitted || []).forEach(function (item) { reports.push(Object.assign({ relation: '제출' }, item)); });
+      (user.reports && user.reports.received || []).forEach(function (item) { reports.push(Object.assign({ relation: '대상' }, item)); });
+      var reportHtml = reports.slice(0, 10).map(function (item) {
+        return '<li><span>' + escapeHtml(item.relation + ' · ' + (item.kind === 'comment' ? '댓글' : '이미지')) + '</span><small>' + escapeHtml(item.status || '대기') + ' · ' + escapeHtml(formatWhen(item.createdAt)) + '</small></li>';
+      }).join('');
+      return '<article class="admin-user-card">' +
+        '<div class="admin-user-card-header"><div class="admin-user-avatar">' + avatar + '</div><div class="admin-user-identity"><h3>' + escapeHtml(profile.nickname || '닉네임 없음') + '</h3><p>' + escapeHtml(profile.soopId ? '@' + profile.soopId : 'SOOP ID 없음') + '</p><p class="admin-user-public-id">' + escapeHtml(user.publicId || '') + '</p></div><div class="admin-user-badges">' + verification + banBadge + '</div></div>' +
+        '<div class="admin-user-summary"><span>이미지 <strong>' + formatCount(summary.imageCount) + '</strong></span><span>댓글 <strong>' + formatCount(summary.commentCount) + '</strong></span><span>좋아요 받은 수 <strong>' + formatCount(summary.totalLikes) + '</strong></span><span>좋아요 누른 수 <strong>' + formatCount(summary.likedImageCount) + '</strong></span><span>받은 신고 <strong>' + formatCount(summary.receivedReportCount) + '</strong></span><span>제출 신고 <strong>' + formatCount(summary.submittedReportCount) + '</strong></span></div>' +
+        '<div class="admin-user-sections">' +
+          '<section><h4>업로드 이미지 <em>' + formatCount(summary.imageCount) + '</em></h4>' + (images ? '<ul>' + images + '</ul>' : '<p>업로드 이미지가 없습니다.</p>') + '</section>' +
+          '<section><h4>댓글 <em>' + formatCount(summary.commentCount) + '</em></h4>' + (comments ? '<ul>' + comments + '</ul>' : '<p>댓글이 없습니다.</p>') + '</section>' +
+          '<section><h4>신고 이력 <em>' + formatCount((summary.submittedReportCount || 0) + (summary.receivedReportCount || 0)) + '</em></h4>' + (reportHtml ? '<ul>' + reportHtml + '</ul>' : '<p>신고 이력이 없습니다.</p>') + '</section>' +
+        '</div>' +
+        (ban ? '<p class="admin-user-ban-note">정지 사유: ' + escapeHtml(user.ban.reason || '(사유 없음)') + ' · ' + escapeHtml(formatWhen(user.ban.bannedAt)) + '</p>' : '') +
+      '</article>';
+    }).join('');
+  }
+
+  async function searchUsers() {
+    if (!usersSearchInput || !window.galFirebase) return;
+    var query = usersSearchInput.value.trim();
+    if (query.length < 2) {
+      if (usersSearchStatus) usersSearchStatus.textContent = '두 글자 이상 입력해 주세요.';
+      if (usersResults) usersResults.innerHTML = '<p class="empty-msg">검색어를 입력하면 사용자 활동 요약이 표시됩니다.</p>';
+      return;
+    }
+    if (usersSearchBtn) usersSearchBtn.disabled = true;
+    if (usersSearchStatus) usersSearchStatus.textContent = '서버에서 검색 중...';
+    if (usersResults) usersResults.innerHTML = '<p class="empty-msg">사용자 활동을 확인하는 중...</p>';
+    try {
+      var fn = window.galFirebase.httpsCallable('gallerySearchUsers');
+      var result = await fn({ query: query, limit: 20 });
+      var data = result.data || {};
+      renderUserResults(data.results || []);
+      if (usersSearchStatus) usersSearchStatus.textContent = (Number(data.total) || 0) + '명 검색됨 · 원본 UID는 표시하지 않습니다.';
+    } catch (e) {
+      if (usersResults) usersResults.innerHTML = '<p class="empty-msg">사용자 검색에 실패했어요. 다시 시도해 주세요.</p>';
+      if (usersSearchStatus) usersSearchStatus.textContent = '검색 중 오류가 발생했습니다.';
+      showToast('사용자 검색 실패: ' + (e && e.message ? e.message : e), true);
+    } finally {
+      if (usersSearchBtn) usersSearchBtn.disabled = false;
+    }
   }
 
   function formatWhen(timestamp) {
@@ -308,6 +392,12 @@
   async function loadAdminPage(options) {
     options = options || {};
     if (!window.galFirebase) return;
+    if (activeTab === 'users') {
+      setUsersMode(true);
+      if (currentSectionEl) currentSectionEl.textContent = TAB_CONFIG.users.label;
+      updatePaginationUi();
+      return;
+    }
     var token = ++pageRequestToken;
     pageLoading = true;
     updateSelectionUi();
@@ -357,6 +447,7 @@
     pageNextCursor = null;
     pageHistory = [];
     clearSelection();
+    setUsersMode(activeTab === 'users');
     loadAdminPage();
   }
 
@@ -665,10 +756,13 @@
     clearDetail();
     activeTab = 'reports';
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (item) { item.classList.toggle('active', item.dataset.adminTab === 'reports'); });
-    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
+    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
     if (toFilter) toFilter.value = '';
+    if (usersSearchInput) usersSearchInput.value = '';
+    if (usersSearchStatus) usersSearchStatus.textContent = '';
+    if (usersResults) usersResults.innerHTML = '<p class="empty-msg">검색어를 입력하면 사용자 활동 요약이 표시됩니다.</p>';
     configureFilters();
     resetPageAndLoad();
   });
@@ -690,9 +784,11 @@
     unlocksPanel.style.display = tab === 'unlocks' ? '' : 'none';
     bansPanel.style.display = tab === 'bans' ? '' : 'none';
     linksPanel.style.display = tab === 'links' ? '' : 'none';
-    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결' };
+    usersPanel.style.display = tab === 'users' ? '' : 'none';
+    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
     configureFilters();
+    setUsersMode(tab === 'users');
     resetPageAndLoad();
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
@@ -704,6 +800,10 @@
     filterLoadTimer = setTimeout(resetPageAndLoad, 250);
   }
   if (adminSearch) adminSearch.addEventListener('input', scheduleFilteredLoad);
+  if (usersSearchBtn) usersSearchBtn.addEventListener('click', searchUsers);
+  if (usersSearchInput) usersSearchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); searchUsers(); }
+  });
   [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
     if (field) field.addEventListener('change', resetPageAndLoad);
   });
