@@ -18,6 +18,14 @@
   var auditList = document.getElementById('admin-audit-list');
   var auditActionField = document.getElementById('admin-audit-action-field');
   var auditActionFilter = document.getElementById('admin-audit-action-filter');
+  var storagePanel = document.getElementById('admin-storage-panel');
+  var storageScanBtn = document.getElementById('admin-storage-scan-btn');
+  var storageDeleteBtn = document.getElementById('admin-storage-delete-btn');
+  var storageSelectAll = document.getElementById('admin-storage-select-all');
+  var storageStatus = document.getElementById('admin-storage-status');
+  var storageSummary = document.getElementById('admin-storage-summary');
+  var storageOrphans = document.getElementById('admin-storage-orphans');
+  var storageMissing = document.getElementById('admin-storage-missing');
   var usersSearchInput = document.getElementById('admin-users-search-input');
   var usersSearchBtn = document.getElementById('admin-users-search-btn');
   var usersSearchStatus = document.getElementById('admin-users-search-status');
@@ -80,6 +88,8 @@
   var selectedItems = {};
   var pageImages = {};
   var pageItems = [];
+  var storageOrphanItems = [];
+  var storageSelectedKeys = {};
 
   var TAB_CONFIG = {
     reports: { label: '신고 목록', types: [['all', '전체'], ['image', '이미지 신고']], statuses: [['pending', '대기'], ['dismissed', '무시 처리'], ['deleted', '삭제 처리'], ['all', '전체']], actions: [['dismiss', '신고 무시'], ['delete-image', '이미지 삭제']] },
@@ -90,6 +100,7 @@
     links: { label: '스트리머 연결', types: [['all', '전체']], statuses: [['linked', '연결됨'], ['unlinked', '미연결'], ['all', '전체']], actions: [['unlink', '연결 해제']] },
     users: { label: '사용자 검색', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
     audit: { label: '감사 로그', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
+    storage: { label: 'R2 파일 점검', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
   };
 
   function escapeHtml(s) {
@@ -200,6 +211,18 @@
     var hideQueueFilters = !!isAudit || activeTab === 'users';
     if (typeFilter && typeFilter.closest('.admin-filter-field')) typeFilter.closest('.admin-filter-field').hidden = hideQueueFilters;
     if (statusFilter && statusFilter.closest('.admin-filter-field')) statusFilter.closest('.admin-filter-field').hidden = hideQueueFilters;
+  }
+
+  function setStorageMode(isStorage) {
+    if (!isStorage) return;
+    if (adminSearch && adminSearch.closest('.admin-search')) adminSearch.closest('.admin-search').hidden = !!isStorage;
+    if (filterResetBtn) filterResetBtn.hidden = !!isStorage;
+    [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
+      if (field && field.closest('.admin-filter-field')) field.closest('.admin-filter-field').hidden = !!isStorage;
+    });
+    if (auditActionField) auditActionField.hidden = true;
+    if (bulkToolbar) bulkToolbar.hidden = true;
+    if (pagination) pagination.hidden = true;
   }
 
   function formatCount(value) { return Number(value || 0).toLocaleString('ko-KR'); }
@@ -329,6 +352,93 @@
         pageLoading = false;
         updateSelectionUi();
       }
+    }
+  }
+
+  function formatBytes(value) {
+    var bytes = Number(value) || 0;
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  }
+
+  function updateStorageSelectionUi() {
+    var selected = Object.keys(storageSelectedKeys);
+    if (storageDeleteBtn) storageDeleteBtn.disabled = selected.length === 0;
+    if (storageSelectAll) {
+      storageSelectAll.checked = storageOrphanItems.length > 0 && selected.length === storageOrphanItems.length;
+      storageSelectAll.indeterminate = selected.length > 0 && selected.length < storageOrphanItems.length;
+    }
+  }
+
+  function renderStorageScan(data) {
+    var totals = data.totals || {};
+    storageOrphanItems = data.orphanObjects || [];
+    storageSelectedKeys = {};
+    if (storageSummary) {
+      storageSummary.innerHTML = '<span>R2 파일 <strong>' + formatCount(totals.r2Objects) + '</strong></span>' +
+        '<span>참조된 파일 <strong>' + formatCount(totals.referencedObjects) + '</strong></span>' +
+        '<span>고아 후보 <strong class="is-warning">' + formatCount(totals.orphanObjects) + '</strong></span>' +
+        '<span>고아 용량 <strong>' + escapeHtml(formatBytes(totals.orphanBytes)) + '</strong></span>' +
+        '<span>메타데이터 누락 <strong class="is-warning">' + formatCount(totals.missingReferences) + '</strong></span>';
+    }
+    if (storageStatus) {
+      var status = data.scanTruncated ? 'R2 오브젝트가 10,000개를 넘어 전체 점검이 완료되지 않았습니다.' : '점검 완료 · ' + escapeHtml(formatWhen(data.scannedAt));
+      if (Number(totals.orphanObjects) > storageOrphanItems.length) status += ' 고아 후보는 화면에 최대 1,000건까지 표시됩니다.';
+      storageStatus.textContent = status;
+    }
+    if (storageOrphans) {
+      storageOrphans.innerHTML = storageOrphanItems.length ? storageOrphanItems.map(function (item) {
+        return '<label class="admin-storage-row"><input class="admin-storage-checkbox" type="checkbox" data-storage-key="' + escapeHtml(item.key) + '"><span class="admin-storage-key">' + escapeHtml(item.key) + '</span><span class="admin-storage-size">' + escapeHtml(formatBytes(item.size)) + '</span><time>' + escapeHtml(formatWhen(item.lastModified)) + '</time></label>';
+      }).join('') : '<p class="empty-msg">현재 고아 파일 후보가 없습니다.</p>';
+    }
+    if (storageMissing) {
+      var missing = data.missingReferences || [];
+      storageMissing.innerHTML = missing.length ? missing.map(function (item) {
+        return '<div class="admin-storage-missing-row"><code>' + escapeHtml(item.key) + '</code><span>R2에서 파일을 찾지 못했습니다.</span></div>';
+      }).join('') : '<p class="empty-msg">메타데이터와 R2 파일이 모두 일치합니다.</p>';
+    }
+    updateStorageSelectionUi();
+  }
+
+  async function loadStorageScan(options) {
+    options = options || {};
+    if (!window.galFirebase || activeTab !== 'storage') return;
+    if (storageScanBtn) storageScanBtn.disabled = true;
+    if (storageDeleteBtn) storageDeleteBtn.disabled = true;
+    if (storageStatus) storageStatus.textContent = 'R2와 RTDB 메타데이터를 대조하는 중...';
+    if (options.showLoading !== false && storageOrphans) storageOrphans.innerHTML = '<p class="empty-msg">R2 오브젝트를 확인하는 중...</p>';
+    try {
+      var fn = window.galFirebase.httpsCallable('galleryScanR2');
+      var result = await fn({});
+      renderStorageScan(result.data || {});
+    } catch (e) {
+      if (storageStatus) storageStatus.textContent = '점검에 실패했습니다.';
+      if (storageOrphans) storageOrphans.innerHTML = '<p class="empty-msg">R2 점검에 실패했어요. 다시 시도해 주세요.</p>';
+      showToast('R2 점검 실패: ' + (e && e.message ? e.message : e), true);
+    } finally {
+      if (storageScanBtn) storageScanBtn.disabled = false;
+      updateStorageSelectionUi();
+    }
+  }
+
+  async function deleteSelectedStorageObjects() {
+    var keys = Object.keys(storageSelectedKeys);
+    if (!keys.length) return;
+    if (!confirm(keys.length + '개 고아 파일을 R2에서 영구 삭제할까요? 되돌릴 수 없습니다.')) return;
+    if (storageDeleteBtn) storageDeleteBtn.disabled = true;
+    try {
+      var fn = window.galFirebase.httpsCallable('galleryDeleteR2Orphans');
+      var result = await fn({ keys: keys });
+      var data = result.data || {};
+      window.galSound && window.galSound.adminAction();
+      showToast('✅ ' + (data.deletedKeys || []).length + '개 파일을 삭제했습니다.' + ((data.skippedKeys || []).length ? ' 사용 중인 파일은 건너뛰었습니다.' : ''));
+      await loadStorageScan({ showLoading: false });
+    } catch (e) {
+      window.galSound && window.galSound.error(e);
+      showToast('R2 파일 삭제 실패: ' + (e && e.message ? e.message : e), true);
+      updateStorageSelectionUi();
     }
   }
 
@@ -468,6 +578,10 @@
   async function loadAdminPage(options) {
     options = options || {};
     if (!window.galFirebase) return;
+    if (activeTab === 'storage') {
+      loadStorageScan(options);
+      return;
+    }
     if (activeTab === 'audit') {
       loadAuditPage(options);
       return;
@@ -529,6 +643,7 @@
     clearSelection();
     setUsersMode(activeTab === 'users');
     setAuditMode(activeTab === 'audit');
+    setStorageMode(activeTab === 'storage');
     loadAdminPage();
   }
 
@@ -837,7 +952,7 @@
     clearDetail();
     activeTab = 'reports';
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (item) { item.classList.toggle('active', item.dataset.adminTab === 'reports'); });
-    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel, auditPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
+    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel, auditPanel, storagePanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
     if (toFilter) toFilter.value = '';
@@ -846,6 +961,12 @@
     if (usersResults) usersResults.innerHTML = '<p class="empty-msg">검색어를 입력하면 사용자 활동 요약이 표시됩니다.</p>';
     if (auditActionFilter) auditActionFilter.value = 'all';
     if (auditList) auditList.innerHTML = '<p class="empty-msg">감사 로그를 불러오는 중...</p>';
+    storageOrphanItems = [];
+    storageSelectedKeys = {};
+    if (storageSummary) storageSummary.innerHTML = '';
+    if (storageStatus) storageStatus.textContent = '';
+    if (storageOrphans) storageOrphans.innerHTML = '<p class="empty-msg">R2 점검을 실행하면 고아 후보가 표시됩니다.</p>';
+    if (storageMissing) storageMissing.innerHTML = '<p class="empty-msg">R2 점검을 실행하면 누락 파일이 표시됩니다.</p>';
     configureFilters();
     resetPageAndLoad();
   });
@@ -869,11 +990,13 @@
     linksPanel.style.display = tab === 'links' ? '' : 'none';
     usersPanel.style.display = tab === 'users' ? '' : 'none';
     auditPanel.style.display = tab === 'audit' ? '' : 'none';
-    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색', audit: '감사 로그' };
+    storagePanel.style.display = tab === 'storage' ? '' : 'none';
+    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색', audit: '감사 로그', storage: 'R2 파일 점검' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
     configureFilters();
     setUsersMode(tab === 'users');
     setAuditMode(tab === 'audit');
+    setStorageMode(tab === 'storage');
     resetPageAndLoad();
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
@@ -893,6 +1016,16 @@
     if (field) field.addEventListener('change', resetPageAndLoad);
   });
   if (auditActionFilter) auditActionFilter.addEventListener('change', resetPageAndLoad);
+  if (storageScanBtn) storageScanBtn.addEventListener('click', function () { loadStorageScan(); });
+  if (storageDeleteBtn) storageDeleteBtn.addEventListener('click', deleteSelectedStorageObjects);
+  if (storageSelectAll) storageSelectAll.addEventListener('change', function () {
+    storageOrphanItems.forEach(function (item) {
+      if (storageSelectAll.checked) storageSelectedKeys[item.key] = true;
+      else delete storageSelectedKeys[item.key];
+    });
+    document.querySelectorAll('.admin-storage-checkbox').forEach(function (checkbox) { checkbox.checked = storageSelectAll.checked; });
+    updateStorageSelectionUi();
+  });
   if (filterResetBtn) filterResetBtn.addEventListener('click', function () {
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
@@ -918,6 +1051,14 @@
     else loadAdminPage();
   });
   document.addEventListener('click', function (e) {
+    var storageCheckbox = e.target.closest && e.target.closest('.admin-storage-checkbox');
+    if (storageCheckbox) {
+      var storageKey = storageCheckbox.dataset.storageKey;
+      if (storageCheckbox.checked) storageSelectedKeys[storageKey] = true;
+      else delete storageSelectedKeys[storageKey];
+      updateStorageSelectionUi();
+      return;
+    }
     var checkbox = e.target.closest && e.target.closest('.admin-select-checkbox');
     if (!checkbox) return;
     e.stopPropagation();

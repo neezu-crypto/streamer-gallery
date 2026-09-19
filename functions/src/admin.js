@@ -3,7 +3,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
-const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
 const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
 
@@ -570,6 +570,106 @@ const galleryGetAuditLog = onCall(async (request) => {
   return { items: page, total, hasMore: !!nextCursor, nextCursor, actions: Array.from(actions).sort((a, b) => String(a).localeCompare(String(b), 'ko-KR')) };
 });
 
+// R2 파일 점검(2026-09-20) — RTDB 원본 메타데이터의 key/thumbKey와 R2
+// images/ 오브젝트를 서버에서 대조한다. 메타데이터에 연결되지 않은 오브젝트는
+// 바로 삭제하지 않고 관리자에게 후보로만 보여준다.
+const galleryScanR2 = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  await requireAdmin(request);
+  const db = getDatabase();
+  const [imagesSnap] = await Promise.all([db.ref('gallery/images').get()]);
+  const images = imagesSnap.val() || {};
+  const referenced = new Set();
+  Object.keys(images).forEach((imageId) => {
+    const image = images[imageId] || {};
+    const keys = [image.key, image.thumbKey].filter((key) => typeof key === 'string' && key.startsWith('images/'));
+    keys.forEach((key) => referenced.add(key));
+  });
+
+  const client = getR2Client();
+  const objects = [];
+  let continuationToken;
+  let scanTruncated = false;
+  const maxObjects = 10000;
+  do {
+    const result = await client.send(new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Prefix: 'images/',
+      MaxKeys: 1000,
+      ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+    }));
+    (result.Contents || []).forEach((item) => {
+      if (!item.Key || objects.length >= maxObjects) return;
+      objects.push({ key: item.Key, size: Number(item.Size) || 0, lastModified: item.LastModified ? new Date(item.LastModified).getTime() : 0, etag: item.ETag || '' });
+    });
+    if (objects.length >= maxObjects && result.IsTruncated) {
+      scanTruncated = true;
+      break;
+    }
+    continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+  } while (continuationToken);
+
+  const objectKeys = new Set(objects.map((item) => item.key));
+  const orphanObjects = objects.filter((item) => !referenced.has(item.key));
+  const missingReferences = [];
+  referenced.forEach((key) => {
+    if (!objectKeys.has(key)) missingReferences.push({ key });
+  });
+  orphanObjects.sort((a, b) => (a.lastModified || 0) - (b.lastModified || 0));
+  missingReferences.sort((a, b) => a.key.localeCompare(b.key));
+  return {
+    scannedAt: Date.now(),
+    scanTruncated,
+    totals: {
+      r2Objects: objects.length,
+      referencedObjects: objects.filter((item) => referenced.has(item.key)).length,
+      orphanObjects: orphanObjects.length,
+      missingReferences: missingReferences.length,
+      totalBytes: objects.reduce((sum, item) => sum + item.size, 0),
+      orphanBytes: orphanObjects.reduce((sum, item) => sum + item.size, 0),
+    },
+    orphanObjects: orphanObjects.slice(0, 1000),
+    missingReferences: missingReferences.slice(0, 1000),
+  };
+});
+
+// R2 고아 파일 삭제 — 클라이언트가 보낸 key만 대상으로 하되, 삭제 직전에
+// gallery/images 전체를 다시 읽어 현재 참조 여부를 재검증한다. images/ 밖의 key,
+// 현재 참조 중인 key는 서버에서 거절/건너뛰므로 점검 시점과 삭제 시점 사이에
+// 새 이미지가 등록돼도 사용 중인 파일이 지워지지 않는다.
+const galleryDeleteR2Orphans = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const adminUid = await requireAdmin(request);
+  const data = request.data || {};
+  if (!Array.isArray(data.keys) || data.keys.length === 0 || data.keys.length > 100) {
+    throw new HttpsError('invalid-argument', '삭제할 고아 파일을 1~100개 선택해 주세요.');
+  }
+  const requestedKeys = Array.from(new Set(data.keys.map((key) => String(key || '')).filter((key) => key.startsWith('images/') && key.length <= 300)));
+  if (!requestedKeys.length) throw new HttpsError('invalid-argument', '올바른 R2 파일을 선택해 주세요.');
+  const imagesSnap = await getDatabase().ref('gallery/images').get();
+  const images = imagesSnap.val() || {};
+  const referenced = new Set();
+  Object.keys(images).forEach((imageId) => {
+    const image = images[imageId] || {};
+    [image.key, image.thumbKey].forEach((key) => {
+      if (typeof key === 'string' && key.startsWith('images/')) referenced.add(key);
+    });
+  });
+  const safeKeys = requestedKeys.filter((key) => !referenced.has(key));
+  const skippedKeys = requestedKeys.filter((key) => referenced.has(key));
+  let deletedKeys = [];
+  if (safeKeys.length) {
+    const result = await getR2Client().send(new DeleteObjectsCommand({
+      Bucket: R2_BUCKET_NAME,
+      Delete: { Objects: safeKeys.map((Key) => ({ Key })), Quiet: true },
+    }));
+    const errors = (result.Errors || []).map((error) => ({ key: error.Key || '', code: error.Code || '', message: error.Message || '' }));
+    deletedKeys = safeKeys.filter((key) => !errors.some((error) => error.key === key));
+    if (errors.length) console.error('R2 고아 파일 일부 삭제 실패:', errors);
+  }
+  const actorName = (request.auth.token && (request.auth.token.email || request.auth.token.name)) || adminUid;
+  if (deletedKeys.length) await logAudit(adminUid, actorName, 'gallery.r2Cleanup', deletedKeys.length + '개 고아 파일 삭제');
+  return { deletedKeys, skippedKeys, failedCount: requestedKeys.length - deletedKeys.length - skippedKeys.length };
+});
+
 async function markAdminReport(reportPath, reportId, status, uid, actorName, action) {
   const ref = getDatabase().ref(`${reportPath}/${reportId}`);
   const snap = await ref.get();
@@ -785,5 +885,7 @@ module.exports = {
   getGalleryAdminPage,
   gallerySearchUsers,
   galleryGetAuditLog,
+  galleryScanR2,
+  galleryDeleteR2Orphans,
   adminBulkGalleryAction,
 };

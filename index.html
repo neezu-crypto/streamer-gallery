@@ -283,7 +283,7 @@
           <p class="admin-nav-heading">운영</p>
           <div class="admin-nav-list">
             <button class="admin-nav-item" type="button" data-admin-tab="audit"><span>감사 로그</span></button>
-            <button class="admin-nav-item" type="button" data-admin-tab="storage" disabled><span>R2 파일 점검</span><span class="admin-nav-soon">준비 중</span></button>
+            <button class="admin-nav-item" type="button" data-admin-tab="storage"><span>R2 파일 점검</span></button>
             <button class="admin-nav-item" type="button" data-admin-tab="stats" disabled><span>운영 통계</span><span class="admin-nav-soon">준비 중</span></button>
           </div>
         </div>
@@ -366,6 +366,26 @@
               <div id="admin-audit-list">
                 <p class="empty-msg">감사 로그를 불러오는 중...</p>
               </div>
+            </div>
+            <div class="admin-panel-body admin-storage-panel" id="admin-storage-panel" style="display:none;">
+              <div class="admin-storage-intro">
+                <div>
+                  <span class="admin-detail-kicker">R2_STORAGE</span>
+                  <h2>R2 파일 점검</h2>
+                  <p>RTDB 이미지 메타데이터와 R2의 <code>images/</code> 파일을 대조합니다. 고아 후보는 확인 후 선택 삭제하며, 현재 사용 중인 파일은 삭제할 수 없습니다.</p>
+                </div>
+                <div class="admin-storage-actions"><button class="glitch-btn" id="admin-storage-scan-btn" type="button">다시 점검</button><button class="text-link" id="admin-storage-delete-btn" type="button" disabled>선택 고아 파일 삭제</button></div>
+              </div>
+              <p class="admin-storage-status" id="admin-storage-status" aria-live="polite"></p>
+              <div class="admin-storage-summary" id="admin-storage-summary"></div>
+              <section class="admin-storage-section">
+                <div class="admin-storage-section-title"><h3>고아 파일 후보</h3><label><input id="admin-storage-select-all" type="checkbox"> 전체 선택</label></div>
+                <div id="admin-storage-orphans"><p class="empty-msg">R2 점검을 실행하면 고아 후보가 표시됩니다.</p></div>
+              </section>
+              <section class="admin-storage-section admin-storage-missing-section">
+                <div class="admin-storage-section-title"><h3>메타데이터에는 있으나 R2에서 찾을 수 없는 파일</h3></div>
+                <div id="admin-storage-missing"><p class="empty-msg">R2 점검을 실행하면 누락 파일이 표시됩니다.</p></div>
+              </section>
             </div>
           </section>
           <aside class="admin-detail-panel" id="admin-detail-panel" aria-label="선택한 항목 상세 정보">

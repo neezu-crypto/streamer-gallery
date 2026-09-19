@@ -79,8 +79,9 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
 });
 
 // 2단계: 클라이언트가 R2 업로드 성공 후 호출 — 메타데이터를 RTDB에 기록해야 갤러리에 노출된다.
-// (R2 업로드는 성공했는데 이 호출이 실패하면 "고아 파일"이 남는다 — 지금은 재시도 큐 없이
-// 클라이언트가 실패 시 알림만 띄우는 수준. 고아 파일 정리는 추후 관리자 도구에서 다룰 것.)
+// (R2 업로드는 성공했는데 이 호출이 실패하면 "고아 파일"이 남는다 — 클라이언트가
+// 실패 시 알림만 띄우는 수준이며, 관리자 패널의 R2 점검/고아 정리 도구에서
+// RTDB 메타데이터와 대조 후 수동 삭제한다.)
 const registerImage = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
