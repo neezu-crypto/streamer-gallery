@@ -526,6 +526,50 @@ const gallerySearchUsers = onCall(async (request) => {
   return { results: matched.slice(0, limit), total: matched.length };
 });
 
+// 관리자 감사 로그 조회(2026-09-20) — 로그 원장은 서버에서만 읽고, 관리자에게도
+// 원본 actorUid는 반환하지 않는다. 최근 200건으로 보관하는 gallery/auditLog를
+// 액션·기간·검색어·정렬·커서로 필터링해 현재 화면에 필요한 페이지만 내려준다.
+const galleryGetAuditLog = onCall(async (request) => {
+  await requireAdmin(request);
+  const data = request.data || {};
+  const pageSize = Math.min(100, Math.max(1, Number(data.pageSize) || 50));
+  const sort = data.sort === 'oldest' ? 'oldest' : 'latest';
+  const action = String(data.action || 'all').trim().slice(0, 120);
+  const search = adminQueueText(String(data.search || '').trim().slice(0, 80));
+  const from = Number(data.from) || 0;
+  const to = Number(data.to) || 0;
+  const cursor = decodeAdminQueueCursor(data.cursor);
+  const snap = await getDatabase().ref('gallery/auditLog').get();
+  const raw = snap.val() || {};
+  const actions = new Set();
+  let items = Object.keys(raw).map((id) => {
+    const entry = raw[id] || {};
+    const item = {
+      id,
+      actorName: entry.actorName || '알 수 없음',
+      action: entry.action || '기타',
+      detail: entry.detail || '',
+      at: Number(entry.at) || 0,
+    };
+    actions.add(item.action);
+    item._sortValue = item.at;
+    return item;
+  }).filter((item) => {
+    if (action !== 'all' && item.action !== action) return false;
+    if (from && item.at < from) return false;
+    if (to && item.at > to) return false;
+    if (search && !adminQueueText([item.actorName, item.action, item.detail].join(' ')).includes(search)) return false;
+    return true;
+  });
+  adminQueueSort(items, sort);
+  const total = items.length;
+  if (cursor) items = items.filter((item) => adminQueueMatchesCursor(item, cursor, sort));
+  const page = items.slice(0, pageSize);
+  const nextCursor = items.length > pageSize ? encodeAdminQueueCursor(page[page.length - 1]) : null;
+  page.forEach((item) => { delete item._sortValue; });
+  return { items: page, total, hasMore: !!nextCursor, nextCursor, actions: Array.from(actions).sort((a, b) => String(a).localeCompare(String(b), 'ko-KR')) };
+});
+
 async function markAdminReport(reportPath, reportId, status, uid, actorName, action) {
   const ref = getDatabase().ref(`${reportPath}/${reportId}`);
   const snap = await ref.get();
@@ -740,5 +784,6 @@ module.exports = {
   migrateGalleryPublicIdentityData,
   getGalleryAdminPage,
   gallerySearchUsers,
+  galleryGetAuditLog,
   adminBulkGalleryAction,
 };

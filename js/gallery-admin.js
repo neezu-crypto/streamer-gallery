@@ -14,6 +14,10 @@
   var bansPanel = document.getElementById('admin-bans-panel');
   var linksPanel = document.getElementById('admin-links-panel');
   var usersPanel = document.getElementById('admin-users-panel');
+  var auditPanel = document.getElementById('admin-audit-panel');
+  var auditList = document.getElementById('admin-audit-list');
+  var auditActionField = document.getElementById('admin-audit-action-field');
+  var auditActionFilter = document.getElementById('admin-audit-action-filter');
   var usersSearchInput = document.getElementById('admin-users-search-input');
   var usersSearchBtn = document.getElementById('admin-users-search-btn');
   var usersSearchStatus = document.getElementById('admin-users-search-status');
@@ -85,6 +89,7 @@
     bans: { label: '정지 관리', types: [['all', '전체']], statuses: [['banned', '정지 중'], ['all', '전체']], actions: [['unban', '정지 해제']] },
     links: { label: '스트리머 연결', types: [['all', '전체']], statuses: [['linked', '연결됨'], ['unlinked', '미연결'], ['all', '전체']], actions: [['unlink', '연결 해제']] },
     users: { label: '사용자 검색', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
+    audit: { label: '감사 로그', types: [['all', '전체']], statuses: [['all', '전체']], actions: [['lookup', '조회']] },
   };
 
   function escapeHtml(s) {
@@ -190,6 +195,13 @@
     if (pagination) pagination.hidden = !!isUsers || !(pageHistory.length || pageHasMore);
   }
 
+  function setAuditMode(isAudit) {
+    if (auditActionField) auditActionField.hidden = !isAudit;
+    var hideQueueFilters = !!isAudit || activeTab === 'users';
+    if (typeFilter && typeFilter.closest('.admin-filter-field')) typeFilter.closest('.admin-filter-field').hidden = hideQueueFilters;
+    if (statusFilter && statusFilter.closest('.admin-filter-field')) statusFilter.closest('.admin-filter-field').hidden = hideQueueFilters;
+  }
+
   function formatCount(value) { return Number(value || 0).toLocaleString('ko-KR'); }
 
   function renderUserResults(results) {
@@ -230,6 +242,28 @@
     }).join('');
   }
 
+  function renderAuditLogs() {
+    if (!auditList) return;
+    var items = pageItems || [];
+    if (!items.length) {
+      auditList.innerHTML = '<p class="empty-msg">조건에 맞는 감사 로그가 없습니다.</p>';
+      return;
+    }
+    auditList.innerHTML = items.map(function (item) {
+      return '<article class="admin-audit-row"><div class="admin-audit-row-main"><div><strong>' + escapeHtml(item.action || '기타') + '</strong><span class="admin-audit-actor">' + escapeHtml(item.actorName || '알 수 없음') + '</span></div><time>' + escapeHtml(formatWhen(item.at)) + '</time></div>' + (item.detail ? '<p>' + escapeHtml(item.detail) + '</p>' : '') + '<span class="admin-audit-id">기록 ID · ' + escapeHtml(item.id) + '</span></article>';
+    }).join('');
+  }
+
+  function setAuditActionOptions(actions) {
+    if (!auditActionFilter) return;
+    var selected = auditActionFilter.value || 'all';
+    var options = ['<option value="all">전체</option>'].concat((actions || []).map(function (action) {
+      return '<option value="' + escapeHtml(action) + '">' + escapeHtml(action) + '</option>';
+    }));
+    auditActionFilter.innerHTML = options.join('');
+    auditActionFilter.value = (actions || []).indexOf(selected) >= 0 ? selected : 'all';
+  }
+
   async function searchUsers() {
     if (!usersSearchInput || !window.galFirebase) return;
     var query = usersSearchInput.value.trim();
@@ -253,6 +287,48 @@
       showToast('사용자 검색 실패: ' + (e && e.message ? e.message : e), true);
     } finally {
       if (usersSearchBtn) usersSearchBtn.disabled = false;
+    }
+  }
+
+  async function loadAuditPage(options) {
+    options = options || {};
+    if (!window.galFirebase || activeTab !== 'audit') return;
+    var token = ++pageRequestToken;
+    pageLoading = true;
+    updateSelectionUi();
+    if (currentSectionEl) currentSectionEl.textContent = TAB_CONFIG.audit.label;
+    if (options.showLoading !== false && auditList) auditList.innerHTML = '<p class="empty-msg">감사 로그를 불러오는 중...</p>';
+    try {
+      var fn = window.galFirebase.httpsCallable('galleryGetAuditLog');
+      var filters = getFilters();
+      var result = await fn({
+        search: filters.search,
+        from: filters.from,
+        to: filters.to,
+        sort: filters.sort,
+        action: auditActionFilter ? auditActionFilter.value : 'all',
+        cursor: pageCursor,
+        pageSize: pageSize,
+      });
+      if (token !== pageRequestToken) return;
+      var data = result.data || {};
+      setAuditActionOptions(data.actions || []);
+      setPageItems(data.items || []);
+      pageTotal = Number(data.total) || 0;
+      pageHasMore = !!data.hasMore;
+      pageNextCursor = data.nextCursor || null;
+      renderAuditLogs();
+      if (resultSummary) resultSummary.textContent = pageTotal ? pageTotal + '개 중 ' + (data.items || []).length + '개 표시' : '';
+      updatePaginationUi();
+    } catch (e) {
+      if (token !== pageRequestToken) return;
+      if (auditList) auditList.innerHTML = '<p class="empty-msg">감사 로그를 불러오지 못했어요. 새로고침해 주세요.</p>';
+      showToast('감사 로그 조회 실패: ' + (e && e.message ? e.message : e), true);
+    } finally {
+      if (token === pageRequestToken) {
+        pageLoading = false;
+        updateSelectionUi();
+      }
     }
   }
 
@@ -392,6 +468,10 @@
   async function loadAdminPage(options) {
     options = options || {};
     if (!window.galFirebase) return;
+    if (activeTab === 'audit') {
+      loadAuditPage(options);
+      return;
+    }
     if (activeTab === 'users') {
       setUsersMode(true);
       if (currentSectionEl) currentSectionEl.textContent = TAB_CONFIG.users.label;
@@ -448,6 +528,7 @@
     pageHistory = [];
     clearSelection();
     setUsersMode(activeTab === 'users');
+    setAuditMode(activeTab === 'audit');
     loadAdminPage();
   }
 
@@ -756,13 +837,15 @@
     clearDetail();
     activeTab = 'reports';
     tabsWrap.querySelectorAll('.admin-nav-item').forEach(function (item) { item.classList.toggle('active', item.dataset.adminTab === 'reports'); });
-    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
+    [reportsPanel, commentsPanel, imagesPanel, unlocksPanel, bansPanel, linksPanel, usersPanel, auditPanel].forEach(function (panel) { if (panel) panel.style.display = panel === reportsPanel ? '' : 'none'; });
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
     if (toFilter) toFilter.value = '';
     if (usersSearchInput) usersSearchInput.value = '';
     if (usersSearchStatus) usersSearchStatus.textContent = '';
     if (usersResults) usersResults.innerHTML = '<p class="empty-msg">검색어를 입력하면 사용자 활동 요약이 표시됩니다.</p>';
+    if (auditActionFilter) auditActionFilter.value = 'all';
+    if (auditList) auditList.innerHTML = '<p class="empty-msg">감사 로그를 불러오는 중...</p>';
     configureFilters();
     resetPageAndLoad();
   });
@@ -785,10 +868,12 @@
     bansPanel.style.display = tab === 'bans' ? '' : 'none';
     linksPanel.style.display = tab === 'links' ? '' : 'none';
     usersPanel.style.display = tab === 'users' ? '' : 'none';
-    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색' };
+    auditPanel.style.display = tab === 'audit' ? '' : 'none';
+    var names = { reports: '신고 목록', comments: '댓글 검수', images: '전체 이미지', unlocks: '해금 신청', bans: '정지 관리', links: '스트리머 연결', users: '사용자 검색', audit: '감사 로그' };
     if (currentSectionEl) currentSectionEl.textContent = names[tab] || '관리자';
     configureFilters();
     setUsersMode(tab === 'users');
+    setAuditMode(tab === 'audit');
     resetPageAndLoad();
     if (adminSidebar) adminSidebar.classList.remove('open');
     if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
@@ -807,11 +892,13 @@
   [typeFilter, statusFilter, fromFilter, toFilter, sortFilter].forEach(function (field) {
     if (field) field.addEventListener('change', resetPageAndLoad);
   });
+  if (auditActionFilter) auditActionFilter.addEventListener('change', resetPageAndLoad);
   if (filterResetBtn) filterResetBtn.addEventListener('click', function () {
     if (adminSearch) adminSearch.value = '';
     if (fromFilter) fromFilter.value = '';
     if (toFilter) toFilter.value = '';
     if (sortFilter) sortFilter.value = 'latest';
+    if (auditActionFilter) auditActionFilter.value = 'all';
     configureFilters();
     resetPageAndLoad();
   });
@@ -820,13 +907,15 @@
     pageHistory.push(pageCursor);
     pageCursor = pageNextCursor;
     clearSelection();
-    loadAdminPage();
+    if (activeTab === 'audit') loadAuditPage();
+    else loadAdminPage();
   });
   if (pagePrevBtn) pagePrevBtn.addEventListener('click', function () {
     if (!pageHistory.length || pageLoading) return;
     pageCursor = pageHistory.pop();
     clearSelection();
-    loadAdminPage();
+    if (activeTab === 'audit') loadAuditPage();
+    else loadAdminPage();
   });
   document.addEventListener('click', function (e) {
     var checkbox = e.target.closest && e.target.closest('.admin-select-checkbox');
