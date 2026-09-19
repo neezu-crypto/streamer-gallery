@@ -346,6 +346,7 @@
           var s = stats[img.id];
           img.likeCount = (s && s.likeCount) || 0;
           img.commentCount = (s && s.commentCount) || 0;
+          img.viewCount = (s && s.viewCount) || 0;
         });
         window.galAllImages = allImages;
       } catch (e) {
@@ -367,6 +368,16 @@
     // 데이터만 바꾸고 끝내면 그리드 DOM은 다음 전체 재렌더링 전까지 그대로라 카드에
     // 호버해도 예전 숫자가 보인다(2026-09-06 실사용 테스트로 발견) — 바로 다시 그린다.
     renderGrid();
+  };
+
+  window.galPatchImageViewCount = function (imageId, viewCount) {
+    var img = allImages.find(function (i) { return i.id === imageId; });
+    if (!img) return;
+    img.viewCount = Math.max(0, Number(viewCount) || 0);
+    window.galAllImages = allImages;
+    // 조회수는 상세 패널에서 주로 표시하지만, 캐시에도 즉시 반영해 관리자/관련
+    // 이미지로 이동했다가 돌아왔을 때 서버 재조회 전에도 최신 숫자를 유지한다.
+    document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
   };
 
   // 댓글 등록/삭제는 imageStats의 commentCount만 바꾸므로 gallery/images 실시간

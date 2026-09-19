@@ -9,6 +9,7 @@
   var categoryEl = document.getElementById('detail-category');
   var likeBtn = document.getElementById('detail-like-btn');
   var likeCountEl = document.getElementById('detail-like-count');
+  var viewCountEl = document.getElementById('detail-view-count');
   var deleteBtn = document.getElementById('detail-delete-btn');
   var reportBtn = document.getElementById('detail-report-btn');
   var reportForm = document.getElementById('detail-report-form');
@@ -42,6 +43,27 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+
+  // 상세 패널이 열린 뒤 조회수를 비동기로 기록한다. 패널 표시를 서버 응답까지
+  // 기다리지 않으며, 응답이 늦어져 다른 이미지로 이동한 경우 이전 응답이 현재
+  // 패널 숫자를 덮어쓰지 않도록 imageId를 확인한다.
+  async function recordImageView(imageId) {
+    if (!window.galFirebase || !imageId) return;
+    try {
+      var fn = window.galFirebase.httpsCallable('recordImageView');
+      var result = await fn({ imageId: imageId });
+      var data = result.data || {};
+      if (currentImageId === imageId && viewCountEl && data.viewCount != null) {
+        viewCountEl.textContent = data.viewCount;
+      }
+      if (data.counted && window.galPatchImageViewCount) {
+        window.galPatchImageViewCount(imageId, data.viewCount);
+      }
+    } catch (e) {
+      // 조회수는 부가 통계이므로 기록 실패가 상세 열람을 막지 않게 한다.
+      console.warn('조회수 기록 실패', e);
+    }
   }
 
   function closeModal() {
@@ -275,6 +297,7 @@
     currentImageUrl = img.imageUrl || img.thumbUrl || '';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
+    if (viewCountEl) viewCountEl.textContent = img.viewCount || 0;
     // 본인이 업로드했거나, 인증 스트리머 본인을 대상으로 한 이미지면(2026-09-06
     // 추가) 삭제 버튼을 보여준다 — 서버(deleteOwnImage)도 동일하게 검증. 이름 대신
     // 관리자가 수동 연결해둔 streamerId(galLinkedStreamerId)가 있으면 그쪽을
@@ -293,6 +316,7 @@
     commentsWrap.innerHTML = '<p class="empty-msg">댓글을 불러오는 중...</p>';
     backdrop.classList.add('open');
     window.galPushModal(closeModal);
+    recordImageView(img.id);
     refreshLikedState(img.id);
     subscribeComments(img.id);
     loadRelatedPhotos(img);

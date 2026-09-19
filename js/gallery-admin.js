@@ -480,6 +480,7 @@
       statsTotals.innerHTML =
         statsMetricCard('전체 이미지', totals.images, '현재 게시 중') +
         statsMetricCard('전체 댓글', totals.comments, '현재 등록') +
+        statsMetricCard('누적 조회수', totals.views, '계정별 24시간 중복 제한') +
         statsMetricCard('누적 좋아요', totals.likes, '이미지 합계') +
         statsMetricCard('기간 업로드', totals.periodUploads, '선택 기간') +
         statsMetricCard('기간 활동 사용자', totals.activeUsers, '업로드·댓글 기준') +
@@ -526,8 +527,8 @@
     }
     if (statsStreamers) {
       var streamers = data.topStreamers || [];
-      statsStreamers.innerHTML = streamers.length ? '<div class="admin-stats-table"><div class="admin-stats-table-head"><span>스트리머</span><span>이미지</span><span>좋아요</span></div>' + streamers.map(function (item) {
-        return '<div class="admin-stats-table-row"><span>' + escapeHtml(item.name || '미지정') + '</span><strong>' + escapeHtml(formatCount(item.images)) + '</strong><strong>' + escapeHtml(formatCount(item.likes)) + '</strong></div>';
+      statsStreamers.innerHTML = streamers.length ? '<div class="admin-stats-table"><div class="admin-stats-table-head"><span>스트리머</span><span>이미지</span><span>조회</span><span>좋아요</span></div>' + streamers.map(function (item) {
+        return '<div class="admin-stats-table-row"><span>' + escapeHtml(item.name || '미지정') + '</span><strong>' + escapeHtml(formatCount(item.images)) + '</strong><strong>' + escapeHtml(formatCount(item.views)) + '</strong><strong>' + escapeHtml(formatCount(item.likes)) + '</strong></div>';
       }).join('') + '</div>' : '<p class="empty-msg">등록된 이미지가 없습니다.</p>';
     }
     if (statsModeration) {
@@ -870,7 +871,7 @@
           '<div class="admin-row-thumb clickable" title="클릭하면 풀이미지로 열어요"><img src="' + escapeHtml(img.thumbUrl) + '" alt=""></div>' +
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">' + escapeHtml(img.streamerName || '익명') + ' · ' + escapeHtml(labels[img.category] || img.category || '') + statusBadge(img.status) + '</div>' +
-            '<div class="admin-row-reason">♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
+            '<div class="admin-row-reason">조회 ' + (img.viewCount || 0) + ' · ♥ ' + (img.likeCount || 0) + ' · 💬 ' + (img.commentCount || 0) + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
             (img.status === 'active' ? (img.uploaderUid && img.uploaderUid !== (window.galUser && window.galUser.uid) ? '<button class="text-link admin-ban-btn" type="button" data-uid="' + escapeHtml(img.uploaderUid) + '">업로더 정지</button>' : '') +

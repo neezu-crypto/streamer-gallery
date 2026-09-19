@@ -279,6 +279,7 @@ async function getAdminQueueItems(kind) {
         status: adminQueueStatus(image, 'active'),
         likeCount: stat.likeCount || 0,
         commentCount: stat.commentCount || 0,
+        viewCount: stat.viewCount || 0,
         _sortValue: Number(image.createdAt) || 0,
       });
     });
@@ -647,6 +648,7 @@ const galleryGetOperationsStats = onCall(async (request) => {
   const categoryCounts = {};
   const streamerCounts = {};
   let totalLikes = 0;
+  let totalViews = 0;
   let totalComments = 0;
   let periodUploads = 0;
 
@@ -657,12 +659,14 @@ const galleryGetOperationsStats = onCall(async (request) => {
     if (uploaderUid) allUploaders.add(uploaderUid);
     const stats = imageStats[imageId] || {};
     totalLikes += Number(stats.likeCount) || 0;
+    totalViews += Number(stats.viewCount) || 0;
     const category = image.category || 'etc';
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     const streamerName = image.streamerName || '스트리머 미지정';
-    if (!streamerCounts[streamerName]) streamerCounts[streamerName] = { name: streamerName, images: 0, likes: 0 };
+    if (!streamerCounts[streamerName]) streamerCounts[streamerName] = { name: streamerName, images: 0, likes: 0, views: 0 };
     streamerCounts[streamerName].images += 1;
     streamerCounts[streamerName].likes += Number(stats.likeCount) || 0;
+    streamerCounts[streamerName].views += Number(stats.viewCount) || 0;
     if (createdAt >= from && createdAt <= to) {
       const day = buckets[galleryStatsDayKey(createdAt)];
       if (day) day.uploads += 1;
@@ -744,7 +748,7 @@ const galleryGetOperationsStats = onCall(async (request) => {
     .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category, 'ko-KR'));
   const topStreamers = Object.values(streamerCounts)
-    .sort((a, b) => b.images - a.images || b.likes - a.likes || a.name.localeCompare(b.name, 'ko-KR'))
+    .sort((a, b) => b.images - a.images || b.views - a.views || b.likes - a.likes || a.name.localeCompare(b.name, 'ko-KR'))
     .slice(0, 12);
   const latestImageAt = Object.values(images).reduce((max, image) => Math.max(max, Number(image && image.createdAt) || 0), 0);
   const latestCommentAt = Object.values(comments).reduce((max, imageComments) => Object.values(imageComments || {}).reduce((innerMax, comment) => Math.max(innerMax, Number(comment && comment.createdAt) || 0), max), 0);
@@ -755,6 +759,7 @@ const galleryGetOperationsStats = onCall(async (request) => {
       images: Object.keys(images).length,
       comments: totalComments,
       likes: totalLikes,
+      views: totalViews,
       uploaders: allUploaders.size,
       commenters: allCommenters.size,
       activeUsers: activeUsers.size,

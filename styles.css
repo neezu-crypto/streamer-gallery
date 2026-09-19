@@ -593,6 +593,8 @@ button{ font-family: inherit; cursor: pointer; }
 .detail-icon-btn:hover{ background:var(--panel-raised); }
 #detail-like-btn.active{ color:var(--gold-text); }
 #detail-like-btn.active svg{ fill:currentColor; }
+.detail-view-stat{ display:flex; align-items:center; gap:5px; color:var(--muted); font-weight:700; font-size:13px; padding:9px; }
+.detail-view-stat svg{ width:20px; height:20px; display:block; }
 
 .detail-more-wrap{ position:relative; margin-left:auto; }
 .detail-more-menu{
@@ -927,7 +929,7 @@ button{ font-family: inherit; cursor: pointer; }
 .admin-stats-bar-row strong{ color:var(--text); font:700 10px var(--font-mono); text-align:right; }
 .admin-stats-table-wrap{ overflow-x:auto; }
 .admin-stats-table{ min-width:250px; }
-.admin-stats-table-head,.admin-stats-table-row{ display:grid; grid-template-columns:minmax(0,1fr) 48px 48px; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--hairline); color:var(--muted); font-size:10px; }
+.admin-stats-table-head,.admin-stats-table-row{ display:grid; grid-template-columns:minmax(0,1fr) 42px 42px 48px; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--hairline); color:var(--muted); font-size:10px; }
 .admin-stats-table-head{ padding-top:0; color:var(--muted-2); font-size:9px; }
 .admin-stats-table-row:last-child{ border-bottom:0; }
 .admin-stats-table-row > span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }

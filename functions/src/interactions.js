@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getDatabase } = require('firebase-admin/database');
-const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
+const { requireAuth, requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { trimToLast } = require('./lib/capped-log');
 const { assertCooldown } = require('./lib/rate-limit');
 const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP, COMMENT_REPORTS_CAP, COMMENT_REPORT_COOLDOWN_MS, LIKE_COOLDOWN_MS, REPORT_COOLDOWN_MS } = require('./constants');
@@ -39,6 +39,49 @@ const toggleLike = onCall(async (request) => {
   }
 
   return { liked: !alreadyLiked, likeCount: countResult.snapshot.val() };
+});
+
+// 상세 패널 조회수 기록. 썸네일을 눌러 상세 패널을 연 시점에만 클라이언트가
+// 호출하며, Firebase가 발급한 인증 uid(익명 세션 포함) 기준으로 집계한다. 계정·이미지별
+// 마지막 기록 시각을 서버 전용 dedup 노드에 저장해 24시간 동안
+// 같은 계정의 재열람을 한 번으로 묶는다. 카운터와 dedup은 모두 RTDB 트랜잭션으로
+// 처리하므로 같은 순간 여러 탭에서 열어도 1회만 증가한다.
+const recordImageView = onCall(async (request) => {
+  const uid = requireAuth(request);
+  const { imageId } = request.data || {};
+  if (!imageId || typeof imageId !== 'string' || !/^[A-Za-z0-9_-]{1,180}$/.test(imageId)) {
+    throw new HttpsError('invalid-argument', '잘못된 이미지입니다.');
+  }
+
+  const db = getDatabase();
+  const imageSnap = await db.ref(`gallery/images/${imageId}`).get();
+  if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
+
+  await assertNotBanned(uid);
+
+  const now = Date.now();
+  const cutoff = now - 24 * 60 * 60 * 1000;
+  const dedupRef = db.ref(`gallery/viewDedup/${uid}/${imageId}`);
+  let accepted = false;
+  const dedupResult = await dedupRef.transaction((lastViewedAt) => {
+    const previous = Number(lastViewedAt) || 0;
+    if (previous > cutoff) {
+      accepted = false;
+      return;
+    }
+    accepted = true;
+    return now;
+  });
+  if (!dedupResult.committed) accepted = false;
+
+  const viewRef = db.ref(`gallery/imageStats/${imageId}/viewCount`);
+  if (accepted) {
+    const countResult = await viewRef.transaction((current) => Math.max(0, Number(current) || 0) + 1);
+    if (!countResult.committed) throw new HttpsError('aborted', '조회수 반영에 실패했습니다.');
+    return { counted: true, viewCount: Number(countResult.snapshot.val()) || 0 };
+  }
+  const countSnap = await viewRef.get();
+  return { counted: false, viewCount: Number(countSnap.val()) || 0, reason: 'within-24-hours' };
 });
 
 const postComment = onCall(async (request) => {
@@ -175,4 +218,4 @@ const unhideImage = onCall(async (request) => {
   return { hidden: false };
 });
 
-module.exports = { toggleLike, postComment, reportImage, reportComment, hideImage, unhideImage };
+module.exports = { toggleLike, recordImageView, postComment, reportImage, reportComment, hideImage, unhideImage };
