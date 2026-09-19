@@ -857,7 +857,7 @@ button{ font-family: inherit; cursor: pointer; }
 .admin-user-search-card p{ margin:0; color:var(--muted); font-size:11px; line-height:1.55; }
 .admin-user-search-form{ display:flex; align-items:center; gap:8px; margin-top:14px; }
 .admin-user-search-field{ flex:1 1 auto; min-width:0; }
-.admin-user-search-form .glitch-btn{ flex:none; margin:0; min-height:34px; padding:7px 14px; font-size:11px; }
+.admin-user-search-form .glitch-btn{ flex:none; width:auto; margin:0; min-height:34px; padding:7px 14px; font-size:11px; }
 .admin-user-search-form .glitch-btn:disabled{ opacity:.55; cursor:wait; }
 .admin-user-search-status{ min-height:16px; margin-top:8px !important; color:var(--gold-text) !important; }
 .admin-user-results{ display:flex; flex-direction:column; gap:12px; padding-top:2px; }
