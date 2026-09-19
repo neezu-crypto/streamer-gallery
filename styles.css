@@ -925,10 +925,13 @@ button{ font-family: inherit; cursor: pointer; }
   .admin-shell-header{ padding:13px 14px; }
   .admin-shell-subtitle{ display:none; }
   .admin-mobile-menu-btn{ display:inline-flex; align-items:center; justify-content:center; }
-  .admin-shell-layout{ display:block; position:relative; }
+  /* 본문을 모달 높이 안에 고정하고 admin-main을 유일한 세로 스크롤 컨테이너로
+     둔다. html/body는 모달이 열리면 스크롤 잠금 상태라, 이 높이 제약이 없으면
+     본문이 모달 바깥으로 넘쳐 overflow:hidden에 잘려 모바일에서 스크롤할 수 없다. */
+  .admin-shell-layout{ display:block; position:relative; min-height:0; height:100%; overflow:hidden; }
   .admin-sidebar{ position:absolute; inset:0 auto 0 0; width:min(270px,86vw); z-index:3; transform:translateX(-102%); transition:transform .18s ease; box-shadow:8px 0 24px rgba(23,20,18,.16); }
   .admin-sidebar.open{ transform:translateX(0); }
-  .admin-main{ min-height:calc(100vh - 65px); }
+  .admin-main{ height:100%; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
   .admin-toolbar{ align-items:flex-start; flex-direction:column; gap:10px; padding:15px 14px 12px; }
   .admin-search{ width:100%; flex-basis:auto; }
   .admin-filter-row{ align-items:stretch; padding:10px 14px; }
