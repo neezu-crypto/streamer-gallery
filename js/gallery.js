@@ -206,7 +206,7 @@
     var streamerQuery = (searchInput && searchInput.value || '').trim().toLowerCase();
     var filtered = allImages.filter(function (img) {
       if (window.galHiddenImages && window.galHiddenImages[img.id]) return false;
-      if (myGalleryOnly && (!window.galUser || img.uploaderUid !== window.galUser.uid)) return false;
+      if (myGalleryOnly && (!window.galPublicId || img.uploaderPublicId !== window.galPublicId)) return false;
       if (activeCategory !== 'all' && img.category !== activeCategory) return false;
       if (streamerQuery && !(img.streamerName || '').toLowerCase().includes(streamerQuery)) return false;
       return true;
@@ -392,7 +392,7 @@
     // 무작위 N개를 "최근 이미지"로 보여주는 버그가 있었다(2026-09-06 발견/수정) —
     // .indexOn에 createdAt이 이미 있어서 규칙 변경 없이 바로 쓸 수 있다.
     var imagesRef = window.galFirebase.query(
-      window.galFirebase.ref(window.galDb, 'gallery/images'),
+      window.galFirebase.ref(window.galDb, 'gallery/imagesPublic'),
       window.galFirebase.orderByChild('createdAt'),
       window.galFirebase.limitToLast(IMAGES_PAGE_SIZE)
     );
@@ -432,7 +432,7 @@
     isLoadingMore = true;
     try {
       var moreRef = window.galFirebase.query(
-        window.galFirebase.ref(window.galDb, 'gallery/images'),
+        window.galFirebase.ref(window.galDb, 'gallery/imagesPublic'),
         window.galFirebase.orderByChild('createdAt'),
         window.galFirebase.endBefore(oldest.createdAt || 0, oldest.id),
         window.galFirebase.limitToLast(IMAGES_PAGE_SIZE)

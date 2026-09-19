@@ -271,12 +271,8 @@
     var token = ++detailLoadToken;
     if (contentGrid) contentGrid.classList.add('admin-detail-open');
     if (detailContent) detailContent.innerHTML = '<span class="admin-detail-kicker">DETAIL</span><h2>불러오는 중...</h2><p>신고 대상 정보를 확인하고 있어요.</p>';
-    if (!selectedDetail.image && report.imageId && window.galFirebase && window.galDb) {
-      try {
-        var snap = await window.galFirebase.get(window.galFirebase.ref(window.galDb, 'gallery/images/' + report.imageId));
-        if (snap.exists()) selectedDetail.image = Object.assign({ id: report.imageId }, snap.val());
-      } catch (e) { console.error('관리자 상세 이미지 조회 실패', e); }
-    }
+    // 원본 gallery/images는 관리자 SDK 전용으로 전환됐다. getGalleryAdminPage가
+    // 함께 내려준 image 스냅샷만 사용해 브라우저에서 UID 경로를 직접 읽지 않는다.
     if (token !== detailLoadToken || !selectedDetail) return;
     renderDetailPanel();
   }

@@ -4,9 +4,10 @@ const { getDatabase } = require('firebase-admin/database');
 const { randomUUID } = require('crypto');
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
+const { requireTrustedAccount, requireAuth, assertNotBanned } = require('./lib/auth');
 const { assertCooldown } = require('./lib/rate-limit');
 const { FORBIDDEN_TEXT_RE, CATEGORIES, UPLOAD_COOLDOWN_MS } = require('./constants');
+const { ensurePublicId, publicImage } = require('./public-identity');
 
 // R2 크리덴셜은 Firebase Secret Manager로만 주입한다 — 소스에 절대 하드코딩하지 않는다.
 // `firebase functions:secrets:set R2_ACCESS_KEY_ID --project soop-stock-market` /
@@ -106,6 +107,7 @@ const registerImage = onCall(async (request) => {
   }
 
   const db = getDatabase();
+  const publicId = await ensurePublicId(db, uid);
   // 스트리머별 업로드 잠금은 2026-09-06부로 폐지 — 이제 로그인(신뢰 계정)한
   // 누구나 잠긴 스트리머 이미지도 올릴 수 있다. 다만 그 이미지의 상세보기는
   // 여전히 해금 전까지 막혀있다(js/gallery-detail.js의 잠금 체크는 그대로 유지).
@@ -123,8 +125,7 @@ const registerImage = onCall(async (request) => {
   // (2026-09-06) — 안 그러면 좋아요/댓글이 하나 달릴 때마다 gallery/images를 실시간
   // 구독 중인 모든 클라이언트에 이미지 목록 전체(URL 등 무거운 필드 포함)가 재전송된다.
   // 두 노드를 하나의 멀티패스 update()로 같이 써서 한쪽만 성공하는 경우를 방지한다.
-  await db.ref().update({
-    [`gallery/images/${imageId}`]: {
+  const image = {
       streamerId,
       streamerName: name,
       category,
@@ -135,7 +136,10 @@ const registerImage = onCall(async (request) => {
       ...(hasValidDimensions ? { width, height } : {}),
       uploaderUid: uid,
       createdAt: Date.now(),
-    },
+  };
+  await db.ref().update({
+    [`gallery/images/${imageId}`]: image,
+    [`gallery/imagesPublic/${imageId}`]: publicImage(image, publicId),
     [`gallery/imageStats/${imageId}`]: { likeCount: 0, commentCount: 0 },
   });
 
@@ -151,6 +155,12 @@ const registerImage = onCall(async (request) => {
   });
 
   return { imageId, imageUrl, thumbUrl };
+});
+
+// 공개 목록에서 본인 콘텐츠를 구분할 때만 쓰는 불투명 ID. 원 UID는 반환하지 않는다.
+const getGalleryPublicId = onCall(async (request) => {
+  const uid = requireAuth(request);
+  return { publicId: await ensurePublicId(getDatabase(), uid) };
 });
 
 // 이미지 다운로드(2026-09-10 추가) — 클라이언트가 공개 도메인(pub-*.r2.dev)을 직접
@@ -189,4 +199,4 @@ const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCES
   return { downloadUrl };
 });
 
-module.exports = { requestImageUpload, registerImage, getImageDownloadUrl, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };

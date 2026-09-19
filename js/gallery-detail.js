@@ -161,9 +161,9 @@
     var visibleList = list.filter(function (c) { return !pendingCommentDeletes[c.id]; });
     commentsLabel.textContent = '댓글 ' + visibleList.length + '개';
     if (!visibleList.length) { commentsWrap.innerHTML = '<p class="empty-msg">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</p>'; return; }
-    var myUid = window.galUser && window.galUser.uid;
+    var myPublicId = window.galPublicId;
     commentsWrap.innerHTML = visibleList.map(function (c) {
-      var mine = myUid && c.uid === myUid;
+      var mine = myPublicId && c.authorPublicId === myPublicId;
       return (
         '<div class="detail-comment-row" data-comment-id="' + escapeHtml(c.id) + '">' +
           '<span class="detail-comment-text">' + escapeHtml(c.text) + '</span>' +
@@ -176,7 +176,7 @@
   }
 
   function subscribeComments(imageId) {
-    var commentsRef = window.galFirebase.ref(window.galDb, 'gallery/comments/' + imageId);
+    var commentsRef = window.galFirebase.ref(window.galDb, 'gallery/commentsPublic/' + imageId);
     commentsUnsub = window.galFirebase.onValue(commentsRef, function (snap) {
       var data = snap.val() || {};
       var list = Object.keys(data).map(function (id) { return Object.assign({ id: id }, data[id]); })
@@ -199,7 +199,7 @@
     if (!img.streamerId) return;
     try {
       var q = window.galFirebase.query(
-        window.galFirebase.ref(window.galDb, 'gallery/images'),
+        window.galFirebase.ref(window.galDb, 'gallery/imagesPublic'),
         window.galFirebase.orderByChild('streamerId'),
         window.galFirebase.equalTo(img.streamerId)
       );
@@ -279,7 +279,7 @@
     // 추가) 삭제 버튼을 보여준다 — 서버(deleteOwnImage)도 동일하게 검증. 이름 대신
     // 관리자가 수동 연결해둔 streamerId(galLinkedStreamerId)가 있으면 그쪽을
     // 우선하고, 없으면 인증 닉네임과 이름을 대조한다(표기 차이로 실패할 수 있음).
-    var isUploader = !!(window.galUser && img.uploaderUid === window.galUser.uid);
+    var isUploader = !!(window.galPublicId && img.uploaderPublicId === window.galPublicId);
     var isDepictedByLink = !!(window.galLinkedStreamerId && window.galLinkedStreamerId === img.streamerId);
     var isDepictedByName = !!(window.galVerifiedStreamerNickname && window.galVerifiedStreamerNickname === img.streamerName);
     var isDepictedStreamer = isDepictedByLink || isDepictedByName;

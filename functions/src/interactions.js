@@ -4,6 +4,7 @@ const { requireTrustedAccount, assertNotBanned } = require('./lib/auth');
 const { trimToLast } = require('./lib/capped-log');
 const { assertCooldown } = require('./lib/rate-limit');
 const { FORBIDDEN_TEXT_RE, LINK_RE, COMMENT_MAX_LENGTH, REPORT_REASON_MAX_LENGTH, COMMENT_COOLDOWN_MS, IMAGE_REPORTS_CAP, COMMENT_REPORTS_CAP, COMMENT_REPORT_COOLDOWN_MS, LIKE_COOLDOWN_MS, REPORT_COOLDOWN_MS } = require('./constants');
+const { ensurePublicId, publicComment } = require('./public-identity');
 
 // 좋아요 토글. gallery/likes/{imageId}/{uid}가 "이 uid가 좋아요했다"의 근거이고,
 // gallery/userLikes/{uid}/{imageId}는 그 반대 방향 조회(내가 좋아요한 이미지 목록)를
@@ -58,7 +59,12 @@ const postComment = onCall(async (request) => {
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
 
   const commentRef = db.ref(`gallery/comments/${imageId}`).push();
-  await commentRef.set({ uid, text: trimmed, createdAt: Date.now() });
+  const publicId = await ensurePublicId(db, uid);
+  const comment = { uid, text: trimmed, createdAt: Date.now() };
+  await db.ref().update({
+    [`gallery/comments/${imageId}/${commentRef.key}`]: comment,
+    [`gallery/commentsPublic/${imageId}/${commentRef.key}`]: publicComment(comment, publicId),
+  });
   const countResult = await db.ref(`gallery/imageStats/${imageId}/commentCount`).transaction((current) => (current || 0) + 1);
 
   return { commentId: commentRef.key, commentCount: countResult.snapshot.val() || 0 };

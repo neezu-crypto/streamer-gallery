@@ -77,6 +77,7 @@ window.galIsVerifiedStreamer = false;
 window.galVerifiedStreamerNickname = null;
 window.galLinkedStreamerId = null;
 window.galTrusted = false;
+window.galPublicId = null;
 function updateTrusted() {
   window.galTrusted = !!(window.galRealUser || window.galIsAdmin || window.galIsVerifiedStreamer);
 }
@@ -188,10 +189,10 @@ async function autoFillProfileFromVerification(uid, nickname, soopId) {
 
 async function checkVerifiedStreamer(uid) {
   try {
-    const q = query(ref(db, 'streamerVerifications'), orderByChild('uid'), equalTo(uid), limitToFirst(1));
-    const snap = await get(q);
-    window.galIsVerifiedStreamer = snap.exists();
-    const record = snap.exists() ? Object.values(snap.val())[0] : null;
+    const snap = await get(ref(db, 'users/' + uid));
+    const user = snap.val() || {};
+    window.galIsVerifiedStreamer = user.streamerVerified === true;
+    const record = window.galIsVerifiedStreamer ? (user.streamerProfile || null) : null;
     window.galVerifiedStreamerNickname = record ? (record.nickname || null) : null;
     if (record) await autoFillProfileFromVerification(uid, record.nickname, record.soopId);
     // 인증 스트리머 접속 시 관리자 디스코드 알림(2026-09-06 추가) — 하루 한 번
@@ -214,6 +215,16 @@ async function checkVerifiedStreamer(uid) {
   } catch (e) {
     console.error('연결된 스트리머ID 확인 실패', e);
     window.galLinkedStreamerId = null;
+  }
+}
+
+async function loadGalleryPublicId() {
+  try {
+    const result = await httpsCallable(functions, 'getGalleryPublicId')();
+    window.galPublicId = result.data && result.data.publicId || null;
+  } catch (e) {
+    window.galPublicId = null;
+    console.error('공개 식별자 확인 실패', e);
   }
 }
 
@@ -249,6 +260,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   startPresenceRefreshLoop();
+  await loadGalleryPublicId();
   await checkVerifiedStreamer(user.uid); // 익명 세션이어도 인증만 됐으면 확인해야 한다
   if (window.galRealUser) {
     try {

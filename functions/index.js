@@ -2,9 +2,9 @@ const { initializeApp } = require('firebase-admin/app');
 initializeApp();
 
 const { galleryCheckAdmin } = require('./src/whoami');
-const { requestImageUpload, registerImage, getImageDownloadUrl } = require('./src/r2');
+const { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl } = require('./src/r2');
 const { toggleLike, postComment, reportImage, reportComment, hideImage, unhideImage } = require('./src/interactions');
-const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, getGalleryAdminPage, adminBulkGalleryAction } = require('./src/admin');
+const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, migrateGalleryPublicIdentityData, getGalleryAdminPage, adminBulkGalleryAction } = require('./src/admin');
 const { updateGalleryProfile } = require('./src/profile');
 const { requestStreamerUnlock, cancelStreamerUnlockRequest, adminApproveStreamerUnlock, adminRejectStreamerUnlock } = require('./src/unlock');
 const { logGalleryVisit } = require('./src/streamerVisitLog');
@@ -16,6 +16,7 @@ module.exports = {
   galleryCheckAdmin,
   requestImageUpload,
   registerImage,
+  getGalleryPublicId,
   getImageDownloadUrl,
   toggleLike,
   postComment,
@@ -33,6 +34,7 @@ module.exports = {
   unbanGalleryAccount,
   adminLinkStreamerAccount,
   adminUnlinkStreamerAccount,
+  migrateGalleryPublicIdentityData,
   getGalleryAdminPage,
   adminBulkGalleryAction,
   updateGalleryProfile,

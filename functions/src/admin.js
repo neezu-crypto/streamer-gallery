@@ -5,6 +5,7 @@ const { logAudit } = require('./lib/audit');
 const { getR2Client, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
 const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
+const { ensurePublicId, publicImage, publicComment } = require('./public-identity');
 
 async function requireAdmin(request) {
   const uid = requireAuth(request);
@@ -32,9 +33,11 @@ async function performImageDeletion(imageId) {
 
   const updates = {};
   updates[`gallery/images/${imageId}`] = null;
+  updates[`gallery/imagesPublic/${imageId}`] = null;
   updates[`gallery/imageStats/${imageId}`] = null;
   updates[`gallery/likes/${imageId}`] = null;
   updates[`gallery/comments/${imageId}`] = null;
+  updates[`gallery/commentsPublic/${imageId}`] = null;
   if (likesSnap.exists()) {
     likesSnap.forEach((child) => { updates[`gallery/userLikes/${child.key}/${imageId}`] = null; });
   }
@@ -66,6 +69,7 @@ async function performCommentDeletion(imageId, commentId) {
   if (!snap.exists()) throw new HttpsError('not-found', '존재하지 않는 댓글입니다.');
   const updates = {};
   updates[`gallery/comments/${imageId}/${commentId}`] = null;
+  updates[`gallery/commentsPublic/${imageId}/${commentId}`] = null;
   if (reportsSnap.exists()) {
     reportsSnap.forEach((child) => {
       const report = child.val() || {};
@@ -512,6 +516,34 @@ const adminUnlinkStreamerAccount = onCall(async (request) => {
   return { unlinked: true };
 });
 
+// 공개 미러 도입 전 데이터의 UID를 관리자만 읽을 수 있는 원본에서 변환한다.
+// 이미 변환된 항목은 같은 publicId로 덮어써 재실행해도 안전하다.
+const migrateGalleryPublicIdentityData = onCall(async (request) => {
+  await requireAdmin(request);
+  const db = getDatabase();
+  const [imagesSnap, commentsSnap] = await Promise.all([
+    db.ref('gallery/images').get(),
+    db.ref('gallery/comments').get(),
+  ]);
+  const updates = {};
+  const images = imagesSnap.val() || {};
+  for (const [imageId, image] of Object.entries(images)) {
+    if (!image || !image.uploaderUid) continue;
+    const publicId = await ensurePublicId(db, image.uploaderUid);
+    updates[`gallery/imagesPublic/${imageId}`] = publicImage(image, publicId);
+  }
+  const comments = commentsSnap.val() || {};
+  for (const [imageId, imageComments] of Object.entries(comments)) {
+    for (const [commentId, comment] of Object.entries(imageComments || {})) {
+      if (!comment || !comment.uid) continue;
+      const publicId = await ensurePublicId(db, comment.uid);
+      updates[`gallery/commentsPublic/${imageId}/${commentId}`] = publicComment(comment, publicId);
+    }
+  }
+  if (Object.keys(updates).length) await db.ref().update(updates);
+  return { migrated: Object.keys(updates).length };
+});
+
 module.exports = {
   adminDeleteImage,
   deleteOwnImage,
@@ -523,6 +555,7 @@ module.exports = {
   unbanGalleryAccount,
   adminLinkStreamerAccount,
   adminUnlinkStreamerAccount,
+  migrateGalleryPublicIdentityData,
   getGalleryAdminPage,
   adminBulkGalleryAction,
 };
