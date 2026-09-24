@@ -247,7 +247,10 @@ function startPresenceRefreshLoop() {
 // 페이지 접속 시(로딩 동안) 자동으로 익명 로그인 — auth != null 규칙을 만족시켜 로그인
 // 전에도 갤러리 목록 등 공개 데이터를 읽을 수 있게 한다. 업로드·좋아요·댓글은
 // requireTrustedAccount가 서버에서 막는다(functions/src/lib/auth.js).
-onAuthStateChanged(auth, async (user) => {
+// Wait for persisted Auth restoration before the anonymous fallback runs. This
+// origin and Firebase app are shared with sibling pages, so an early null can
+// otherwise overwrite their existing signed-in account with an anonymous one.
+auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   window.galUser = user;
   window.galRealUser = user && !user.isAnonymous ? user : null;
   window.galIsAdmin = false; // 서버 확인 전까지는 안전한 기본값 — 익명 계정은 애초에 관리자가 될 수 없다.
@@ -272,7 +275,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   updateTrusted();
   document.dispatchEvent(new CustomEvent('gal-auth-changed', { detail: { user, realUser: window.galRealUser, isAdmin: window.galIsAdmin, trusted: window.galTrusted } }));
-});
+}));
 
 // Ctrl+Enter 단축키로 어디서든 Google 로그인 팝업(게스트/익명 상태에서도 실계정 전환 가능)
 document.addEventListener('keydown', (e) => {
