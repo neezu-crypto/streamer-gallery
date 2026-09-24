@@ -8,8 +8,6 @@ import {
   linkWithPopup,
   signOut,
   onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import {
   getDatabase,
@@ -47,11 +45,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-// Match the sibling messenger's persistence store so both pages observe the
-// same account across tabs on neezu-crypto.github.io.
-const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('브라우저 로그인 유지 설정 실패:', error);
-});
 const db = getDatabase(app);
 const functions = getFunctions(app);
 const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
@@ -257,7 +250,15 @@ function startPresenceRefreshLoop() {
 // Wait for persisted Auth restoration before the anonymous fallback runs. This
 // origin and Firebase app are shared with sibling pages, so an early null can
 // otherwise overwrite their existing signed-in account with an anonymous one.
-authPersistenceReady.then(() => auth.authStateReady()).then(() => onAuthStateChanged(auth, async (user) => {
+let galleryHasRestoredAccount = false;
+auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
+  if (!user && galleryHasRestoredAccount) {
+    // Do not let a transient cross-tab null replace a restored account with
+    // anonymous auth. Firebase's default persistence is shared by sibling apps.
+    console.warn('공유 로그인 상태가 일시적으로 비어 있어 기존 갤러리 세션을 유지합니다.');
+    return;
+  }
+  if (user) galleryHasRestoredAccount = true;
   window.galUser = user;
   window.galRealUser = user && !user.isAnonymous ? user : null;
   window.galIsAdmin = false; // 서버 확인 전까지는 안전한 기본값 — 익명 계정은 애초에 관리자가 될 수 없다.
