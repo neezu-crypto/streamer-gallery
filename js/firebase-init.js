@@ -251,6 +251,7 @@ function startPresenceRefreshLoop() {
 // origin and Firebase app are shared with sibling pages, so an early null can
 // otherwise overwrite their existing signed-in account with an anonymous one.
 let galleryHasRestoredAccount = false;
+const openedFromMessenger = new URLSearchParams(window.location.search).get('from') === 'messenger';
 auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   if (!user && galleryHasRestoredAccount) {
     // Do not let a transient cross-tab null replace a restored account with
@@ -266,6 +267,13 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   document.dispatchEvent(new CustomEvent('gal-auth-changed', { detail: { user, realUser: window.galRealUser, isAdmin: false, trusted: window.galTrusted } }));
 
   if (!user) {
+    // Messenger shares this origin's Firebase Auth persistence. If this tab
+    // observes an initial null during cross-tab restoration, do not create an
+    // anonymous user that could replace the real account in the Messenger tab.
+    if (openedFromMessenger) {
+      console.warn('메신저에서 열린 갤러리 탭은 인증 복구 중 익명 로그인을 시작하지 않습니다.');
+      return;
+    }
     signInAnonymously(auth).catch((err) => console.error('익명 로그인 실패', err));
     return;
   }
