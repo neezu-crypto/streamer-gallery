@@ -69,6 +69,10 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
     throw new HttpsError('invalid-argument', '썸네일 생성에 실패했습니다. 다른 이미지로 시도해 주세요.');
   }
 
+  // 업로드 단위는 URL 발급 시 한 번만 제한한다. registerImage는 업로드 후
+  // RTDB 응답이 끊겼을 때 동일 요청을 안전하게 재시도할 수 있어야 한다.
+  await assertCooldown(uid, 'upload', UPLOAD_COOLDOWN_MS);
+
   const imageId = randomUUID();
   const key = `images/${imageId}.${ext}`;
   const thumbKey = `images/${imageId}_thumb.jpg`;
@@ -108,9 +112,6 @@ const requestImageUpload = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS
 const registerImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
-  // 매크로/스크립트로 이미지를 연속 대량 업로드하는 것을 막는다 — 이미지 하나씩
-  // 순차로 올리는 정상 사용 흐름엔 걸리지 않을 정도로 넉넉하게 잡았다.
-  await assertCooldown(uid, 'upload', UPLOAD_COOLDOWN_MS);
 
   const { imageId, key, thumbKey, streamerId, streamerName, category, width, height } = request.data || {};
   if (!imageId || !key || typeof key !== 'string' || !key.startsWith(`images/${imageId}.`)) {
@@ -163,6 +164,12 @@ const registerImage = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]
     throw error;
   }
   if (existing.exists()) {
+    const image = existing.val() || {};
+    if (image.uploaderUid === uid && image.key === key && image.thumbKey === thumbKey && image.streamerId === streamerId) {
+      await db.ref(`gallery/streamerFirstUpload/${streamerId}`).transaction((current) => current === null ? Date.now() : undefined);
+      await updateR2Lifecycle(imageId, { status: 'registered', registeredAt: Number(image.createdAt) || Date.now(), failureStage: null, failureMessage: null });
+      return { imageId, imageUrl: image.imageUrl || `${R2_PUBLIC_BASE_URL}/${key}`, thumbUrl: image.thumbUrl || `${R2_PUBLIC_BASE_URL}/${thumbKey}` };
+    }
     await updateR2Lifecycle(imageId, { status: 'register_failed', failureStage: 'duplicate_image', failureMessage: '이미 등록된 이미지 ID', failedAt: Date.now() });
     throw new HttpsError('already-exists', '이미 등록된 이미지입니다.');
   }
@@ -263,4 +270,4 @@ const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCES
   return { downloadUrl };
 });
 
-module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };

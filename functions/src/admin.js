@@ -1,9 +1,10 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getDatabase } = require('firebase-admin/database');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
-const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
-const { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
+const { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
 const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
 
@@ -15,6 +16,66 @@ async function requireAdmin(request) {
   }
   return uid;
 }
+
+async function preserveMessengerReportImages(imageId, image) {
+  const db = getDatabase();
+  const refsSnap = await db.ref(`streamerMessenger/reportImageRefs/${imageId}`).get();
+  if (!refsSnap.exists()) return;
+  const refs = refsSnap.val() || {};
+  const client = getR2Client();
+  const updates = {};
+  for (const [reportId, messages] of Object.entries(refs)) {
+    for (const [messageId, ref] of Object.entries(messages || {})) {
+      const retainUntil = Number(ref && ref.retainUntil || ref) || 0;
+      if (retainUntil <= Date.now()) {
+        updates[`streamerMessenger/reportImageRefs/${imageId}/${reportId}/${messageId}`] = null;
+        continue;
+      }
+      if (!image.key || !image.thumbKey) throw new HttpsError('failed-precondition', '신고 중인 이미지 파일을 보존할 수 없어 삭제를 중단했습니다.');
+      const extension = String(image.key).split('.').pop().replace(/[^a-z0-9]/gi, '') || 'jpg';
+      const originalKey = `report-evidence/${reportId}/${messageId}.${extension}`;
+      const thumbKey = `report-evidence/${reportId}/${messageId}_thumb.jpg`;
+      const sourceKey = (key) => `${R2_BUCKET_NAME}/${String(key).split('/').map(encodeURIComponent).join('/')}`;
+      try {
+        await Promise.all([
+          client.send(new CopyObjectCommand({ Bucket: R2_BUCKET_NAME, CopySource: sourceKey(image.key), Key: originalKey })),
+          client.send(new CopyObjectCommand({ Bucket: R2_BUCKET_NAME, CopySource: sourceKey(image.thumbKey), Key: thumbKey })),
+        ]);
+      } catch (error) {
+        console.error('메신저 신고 이미지 보존 실패:', imageId, reportId, messageId, error);
+        throw new HttpsError('unavailable', '신고 증거 이미지를 보존하지 못해 갤러리 이미지 삭제를 중단했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+      updates[`streamerMessenger/reportEvidence/${reportId}/${messageId}/reportImageUrl`] = `${R2_PUBLIC_BASE_URL}/${originalKey}`;
+      updates[`streamerMessenger/reportEvidence/${reportId}/${messageId}/reportThumbUrl`] = `${R2_PUBLIC_BASE_URL}/${thumbKey}`;
+      updates[`streamerMessenger/reportImageRefs/${imageId}/${reportId}/${messageId}`] = { retainUntil, originalKey, thumbKey };
+    }
+  }
+  if (Object.keys(updates).length) await db.ref().update(updates);
+}
+
+const cleanupMessengerReportEvidenceImages = onSchedule({ schedule: 'every 10 minutes', secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async () => {
+  const db = getDatabase();
+  const refsSnap = await db.ref('streamerMessenger/reportImageRefs').get();
+  const refs = refsSnap.val() || {};
+  const updates = {};
+  const client = getR2Client();
+  const t = Date.now();
+  for (const [imageId, reports] of Object.entries(refs)) {
+    for (const [reportId, messages] of Object.entries(reports || {})) {
+      for (const [messageId, ref] of Object.entries(messages || {})) {
+        const retainUntil = Number(ref && ref.retainUntil || ref) || 0;
+        if (retainUntil > t) continue;
+        if (ref && typeof ref === 'object') {
+          for (const key of [ref.originalKey, ref.thumbKey].filter(Boolean)) {
+            await client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+          }
+        }
+        updates[`streamerMessenger/reportImageRefs/${imageId}/${reportId}/${messageId}`] = null;
+      }
+    }
+  }
+  if (Object.keys(updates).length) await db.ref().update(updates);
+});
 
 // 이미지 삭제 — RTDB 메타데이터(이미지 본체·좋아요·댓글·이 이미지 대상 신고들)와
 // R2에 올라간 실제 파일을 함께 정리한다. 좋아요 미러(userLikes/{uid}/{imageId})는
@@ -30,6 +91,8 @@ async function performImageDeletion(imageId) {
     db.ref('gallery/imageReports').orderByChild('imageId').equalTo(imageId).get(),
   ]);
   if (!imageSnap.exists()) throw new HttpsError('not-found', '존재하지 않는 이미지입니다.');
+
+  await preserveMessengerReportImages(imageId, imageSnap.val() || {});
 
   await updateR2Lifecycle(imageId, { status: 'deleting', deletingAt: Date.now(), failureStage: null, failureMessage: null });
 
@@ -1141,5 +1204,6 @@ module.exports = {
   galleryGetOperationsStats,
   galleryScanR2,
   galleryDeleteR2Orphans,
+  cleanupMessengerReportEvidenceImages,
   adminBulkGalleryAction,
 };
