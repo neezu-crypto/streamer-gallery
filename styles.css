@@ -73,6 +73,38 @@ button{ font-family: inherit; cursor: pointer; }
 ::selection{ background: var(--gold-dim); color: var(--gold-text); }
 :focus-visible{ outline: 2px solid var(--gold); outline-offset: 2px; }
 
+/* 갤러리 전용 시그니처 오프닝. 화면을 덮지만 페이지/이미지 로딩은 차단하지 않는다. */
+#sig-opening-stage{
+  position:fixed; inset:0; z-index:2000; display:none; opacity:1;
+  align-items:center; justify-content:center; overflow:hidden;
+  background:radial-gradient(120% 140% at 50% 20%,#171c26,#10131a 70%);
+  font-family:var(--font-display); cursor:pointer; color:#f4f1e8;
+}
+#sig-opening-stage.is-playing{display:flex}
+#sig-opening-stage.is-leaving{transition:opacity .4s ease;opacity:0}
+#sig-opening-stage:focus{outline:none}
+#sig-opening-stage:focus-visible{outline:2px solid #c9a463;outline-offset:-8px}
+.sig-noise{position:absolute;inset:0;opacity:.05;background-image:repeating-linear-gradient(115deg,#fff 0 1px,transparent 1px 3px);pointer-events:none}
+.sig-series,.sig-title-frame{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0}
+.sig-series-tag{color:#c9a463;font-size:13px;font-weight:700;letter-spacing:.14em;margin:0 0 16px;opacity:0}
+.sig-reel{height:44px;overflow:hidden}
+.sig-reel-track{display:flex;flex-direction:column;align-items:center}
+.sig-reel-item{height:44px;display:flex;align-items:center;justify-content:center;color:#f4f1e8;font-size:clamp(22px,5vw,38px);font-weight:800;margin:0;white-space:nowrap;opacity:.55}
+.sig-reel-item.is-current{opacity:1}
+.sig-series-under{width:0;height:2px;background:#c9a463;margin-top:16px}
+.sig-title-kicker{color:#c9a463;font-size:13px;font-weight:700;letter-spacing:.14em;margin:0 0 10px}
+.sig-title-word{color:#f4f1e8;font-size:clamp(22px,3.8vw,34px);font-weight:800;letter-spacing:.16em;margin:0}
+#sig-opening-stage.is-playing.is-js-timeline .sig-series,
+#sig-opening-stage.is-playing.is-js-timeline .sig-series-tag,
+#sig-opening-stage.is-playing.is-js-timeline .sig-reel-track,
+#sig-opening-stage.is-playing.is-js-timeline .sig-series-under,
+#sig-opening-stage.is-playing.is-js-timeline .sig-title-frame{animation:none}
+@media(max-width:480px){
+  .sig-series-tag{font-size:11px}
+  .sig-reel-item{font-size:clamp(18px,5vw,28px)}
+  .sig-title-word{font-size:clamp(20px,6vw,30px)}
+}
+
 @keyframes glitch-anim {
   0% { transform: translate(0); clip-path: inset(0 0 0 0); }
   20% { transform: translate(-5px, 3px); clip-path: inset(50% 0 20% 0); }
