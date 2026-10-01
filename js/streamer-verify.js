@@ -59,6 +59,10 @@
         closeModal();
         alert('✅ 이미 스트리머 인증이 완료된 계정이에요.');
         window.location.reload();
+      } else if (action === 'auto-approved') {
+        closeModal();
+        alert('✅ 인생게임 검수 기록이 확인되어 스트리머 인증이 즉시 완료됐어요.');
+        window.location.reload();
       } else {
         showPending(nickname, isSwitch);
         if (!data.nickname) alert('아직 관리자 확인 전이에요. 잠시 후 다시 확인해주세요.');
