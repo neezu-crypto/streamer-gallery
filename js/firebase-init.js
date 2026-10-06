@@ -188,24 +188,6 @@ async function autoFillProfileFromVerification(uid, nickname, soopId) {
 }
 
 async function checkVerifiedStreamer(uid) {
-  try {
-    const snap = await get(ref(db, 'users/' + uid));
-    const user = snap.val() || {};
-    window.galIsVerifiedStreamer = user.streamerVerified === true;
-    const record = window.galIsVerifiedStreamer ? (user.streamerProfile || null) : null;
-    window.galVerifiedStreamerNickname = record ? (record.nickname || null) : null;
-    if (record) await autoFillProfileFromVerification(uid, record.nickname, record.soopId);
-    // 인증 스트리머 접속 시 관리자 디스코드 알림(2026-09-06 추가) — 하루 한 번
-    // 제한 등 실제 발송 여부는 서버(logGalleryVisit)가 판단한다.
-    if (window.galIsVerifiedStreamer) {
-      logGalleryVisitFn().catch((e) => console.error('접속 로그 실패', e));
-    }
-  } catch (e) {
-    console.error('스트리머 인증 여부 확인 실패', e);
-    window.galIsVerifiedStreamer = false;
-    window.galVerifiedStreamerNickname = null;
-  }
-
   // 관리자가 수동으로 연결해둔 streamerId(2026-09-06 추가) — 이름 표기 차이로
   // galVerifiedStreamerNickname 대조가 실패하는 경우의 보정 수단. 본인 uid
   // 아래에서만 읽을 수 있게 규칙이 스코프돼 있다.
@@ -215,6 +197,80 @@ async function checkVerifiedStreamer(uid) {
   } catch (e) {
     console.error('연결된 스트리머ID 확인 실패', e);
     window.galLinkedStreamerId = null;
+  }
+}
+
+let galVerifiedStatusUnsubscribe = null;
+let galSwitchApprovalUnsubscribe = null;
+let galSwitchHandoffInProgress = false;
+const galVisitLoggedUids = new Set();
+
+async function loadVerifiedStreamerProfile(uid) {
+  try {
+    const profileSnap = await get(ref(db, `users/${uid}/streamerProfile`));
+    if (auth.currentUser?.uid !== uid) return;
+    const record = window.galIsVerifiedStreamer ? profileSnap.val() : null;
+    window.galVerifiedStreamerNickname = record && record.nickname || null;
+    if (record) await autoFillProfileFromVerification(uid, record.nickname, record.soopId);
+  } catch (error) {
+    console.error('인증 스트리머 프로필을 불러오지 못했습니다:', error);
+  }
+}
+
+function subscribeVerifiedStreamer(uid) {
+  if (galVerifiedStatusUnsubscribe) galVerifiedStatusUnsubscribe();
+  window.galIsVerifiedStreamer = false;
+  window.galVerifiedStreamerNickname = null;
+  let hasInitialValue = false;
+  let previousValue = false;
+  galVerifiedStatusUnsubscribe = onValue(ref(db, `users/${uid}/streamerVerified`), async (snap) => {
+    if (auth.currentUser?.uid !== uid) return;
+    const verified = snap.val() === true;
+    window.galIsVerifiedStreamer = verified;
+    if (verified) {
+      await loadVerifiedStreamerProfile(uid);
+      if (auth.currentUser?.uid !== uid || window.galIsVerifiedStreamer !== verified) return;
+      if (!galVisitLoggedUids.has(uid)) {
+        galVisitLoggedUids.add(uid);
+        logGalleryVisitFn().catch((e) => console.error('접속 로그 실패', e));
+      }
+    } else {
+      window.galVerifiedStreamerNickname = null;
+    }
+    updateTrusted();
+    document.dispatchEvent(new CustomEvent('gal-auth-changed', {
+      detail: { user: window.galUser, realUser: window.galRealUser, isAdmin: window.galIsAdmin, trusted: window.galTrusted },
+    }));
+    if (hasInitialValue && !previousValue && verified) {
+      document.dispatchEvent(new CustomEvent('gal-streamer-verification-approved'));
+    }
+    previousValue = verified;
+    hasInitialValue = true;
+  }, (error) => console.error('인증 스트리머 상태 구독 실패:', error));
+}
+
+async function handleGalleryStreamerSwitchApproval(uid, requestId) {
+  if (!requestId || galSwitchHandoffInProgress || auth.currentUser?.uid !== uid) return;
+  const lockKey = 'soop.streamerVerificationSwitch.' + requestId;
+  try {
+    const lastAttemptAt = Number(localStorage.getItem(lockKey) || 0);
+    if (lastAttemptAt && Date.now() - lastAttemptAt < 20000) return;
+    localStorage.setItem(lockKey, String(Date.now()));
+  } catch (_) { /* Private browsing may disable localStorage. */ }
+  galSwitchHandoffInProgress = true;
+  try {
+    const response = await requestStreamerVerificationFn({ checkOnly: true, switchRequestId: requestId });
+    if (response.data?.action !== 'switch' || auth.currentUser?.uid !== uid) {
+      try { localStorage.removeItem(lockKey); } catch (_) {}
+      galSwitchHandoffInProgress = false;
+      return;
+    }
+    await signInWithCustomToken(auth, response.data.customToken);
+    window.location.reload();
+  } catch (error) {
+    try { localStorage.removeItem(lockKey); } catch (_) {}
+    galSwitchHandoffInProgress = false;
+    console.error('승인된 스트리머 계정 자동 전환 실패:', error);
   }
 }
 
@@ -259,9 +315,14 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
     console.warn('공유 로그인 상태가 일시적으로 비어 있어 기존 갤러리 세션을 유지합니다.');
     return;
   }
+  if (galVerifiedStatusUnsubscribe) { galVerifiedStatusUnsubscribe(); galVerifiedStatusUnsubscribe = null; }
+  if (galSwitchApprovalUnsubscribe) { galSwitchApprovalUnsubscribe(); galSwitchApprovalUnsubscribe = null; }
+  galSwitchHandoffInProgress = false;
   if (user) galleryHasRestoredAccount = true;
   window.galUser = user;
   window.galRealUser = user && !user.isAnonymous ? user : null;
+  window.galIsVerifiedStreamer = false;
+  window.galVerifiedStreamerNickname = null;
   window.galIsAdmin = false; // 서버 확인 전까지는 안전한 기본값 — 익명 계정은 애초에 관리자가 될 수 없다.
   updateTrusted();
   document.dispatchEvent(new CustomEvent('gal-auth-changed', { detail: { user, realUser: window.galRealUser, isAdmin: false, trusted: window.galTrusted } }));
@@ -278,9 +339,14 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
     return;
   }
 
+  subscribeVerifiedStreamer(user.uid);
+  galSwitchApprovalUnsubscribe = onValue(ref(db, `users/${user.uid}/streamerVerificationSwitchApproval`), (snap) => {
+    const requestId = snap.val() && snap.val().requestId;
+    if (requestId) handleGalleryStreamerSwitchApproval(user.uid, String(requestId));
+  }, (error) => console.error('계정 전환 승인 신호 구독 실패:', error));
   startPresenceRefreshLoop();
   await loadGalleryPublicId();
-  await checkVerifiedStreamer(user.uid); // 익명 세션이어도 인증만 됐으면 확인해야 한다
+  await checkVerifiedStreamer(user.uid); // 관리자가 수동 연결한 streamerId만 별도 확인한다
   if (window.galRealUser) {
     try {
       const result = await whoAmIFn();

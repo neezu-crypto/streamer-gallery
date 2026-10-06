@@ -19,6 +19,14 @@
   var renewBtn = document.getElementById('verify-renew-btn');
   if (!backdrop) return;
 
+  document.addEventListener('gal-streamer-verification-approved', function () {
+    if (!backdrop.classList.contains('open')) return;
+    form.style.display = 'none';
+    pending.style.display = '';
+    note.style.display = 'none';
+    pendingText.textContent = '✅ 관리자가 승인했어요. 스트리머 인증 권한이 새로고침 없이 적용됐습니다.';
+  });
+
   function openModal() {
     form.style.display = '';
     pending.style.display = 'none';
