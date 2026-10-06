@@ -561,6 +561,14 @@
     </div>
     <div id="verify-pending" style="display:none;">
       <p class="propose-modal-sub" id="verify-pending-text"></p>
+      <div id="verify-note" style="display:none;padding:12px;border:1px solid #666;border-radius:8px;margin-bottom:12px;">
+        <strong>SOOP 쪽지로 본인 확인</strong>
+        <p>6자리 코드를 복사해 관리자에게 보내주세요. 상태 확인은 코드를 바꾸지 않습니다.</p>
+        <button id="verify-note-code" type="button" style="width:100%;font-size:20px;letter-spacing:4px;"></button>
+        <a href="https://note.sooplive.com/app/index.php?page=write&amp;id_list=skftodwocks2" target="_blank" rel="noopener noreferrer" style="display:block;margin:10px 0;">SOOP 쪽지 보내기 ↗</a>
+        <p id="verify-note-status" role="status"></p>
+        <button id="verify-renew-btn" type="button">새 코드 발급 (이전 코드 무효화)</button>
+      </div>
       <button class="glitch-btn" id="verify-check-btn" type="button">🔄 승인됐는지 확인하기</button>
     </div>
   </div>
