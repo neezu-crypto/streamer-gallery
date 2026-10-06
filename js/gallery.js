@@ -73,6 +73,18 @@
   var selectedStreamerId = null;
   var selectedStreamerName = '';
   var GRID_CACHE_KEY = 'galGridCache';
+  // 팬페이지에서 스트리머·분류를 지정해 넘어오면 기존 전체 갤러리 화면에서도
+  // 해당 조건을 이어서 보여준다. 목록은 기존 페이지네이션을 그대로 사용한다.
+  var routeParams = new URLSearchParams(window.location.search);
+  var routeStreamer = (routeParams.get('streamer') || '').trim().slice(0, 20);
+  var routeCategory = routeParams.get('category') || 'all';
+  if (searchInput && routeStreamer) searchInput.value = routeStreamer;
+  if (routeCategory === 'all' || Object.prototype.hasOwnProperty.call(CATEGORY_LABELS, routeCategory)) {
+    activeCategory = routeCategory;
+    if (chipsWrap) chipsWrap.querySelectorAll('.chip').forEach(function (chip) {
+      chip.classList.toggle('active', chip.dataset.category === activeCategory);
+    });
+  }
 
   // 스트리머 이름 목록 - 정적 파일(수동 스크립트로만 갱신)에서 RTDB 파생 노드로
   // 전환(2026-09). /stocks 변경을 감시하는 Cloud Function 트리거
