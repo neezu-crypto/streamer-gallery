@@ -47,10 +47,11 @@
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
 
-  function showPending(nickname, isSwitch, verificationCode, expiresAt) {
+  function showPending(nickname, isSwitch, verificationCode, expiresAt, noteEligible) {
     form.style.display = 'none';
     pending.style.display = '';
-    note.style.display = isSwitch ? 'none' : '';
+    var canSendNote = noteEligible === true || (!isSwitch && noteEligible !== false);
+    note.style.display = canSendNote ? '' : 'none';
     var code = Number(expiresAt) > Date.now() ? verificationCode || '' : '';
     codeBtn.textContent = code || '코드 없음';
     codeBtn.disabled = !code;
@@ -58,9 +59,11 @@
       try { await navigator.clipboard.writeText(code); noteStatus.textContent = '복사했어요. 쪽지 본문에 붙여넣어 보내주세요.'; }
       catch (e) { noteStatus.textContent = '코드를 선택해 직접 복사해주세요.'; }
     };
-    noteStatus.textContent = !isSwitch && !code ? '코드가 없거나 만료됐어요. 새 코드를 발급해주세요.' : '';
+    noteStatus.textContent = canSendNote && !code ? '코드가 없거나 만료됐어요. 새 코드를 발급해주세요.' : '';
     pendingText.textContent = isSwitch
-      ? '"' + nickname + '" 계정 전환 신청이 관리자에게 전달됐어요. 확인 후 이 기기에서도 기존 계정을 이어서 쓸 수 있어요.'
+      ? (canSendNote
+        ? '"' + nickname + '" 계정 전환 신청이 접수됐어요. 기존 인증 스트리머의 SOOP 아이디로 아래 코드를 쪽지로 보내면 확인 후 기존 계정으로 전환됩니다.'
+        : '"' + nickname + '" 계정 전환 신청은 관리자 수동 검수가 필요합니다.')
       : '"' + nickname + '" 인증 신청이 접수됐어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.';
   }
 
@@ -87,7 +90,7 @@
         alert('✅ 인생게임 검수 기록이 확인되어 스트리머 인증이 즉시 완료됐어요.');
         window.location.reload();
       } else {
-        showPending(nickname, isSwitch, result.data.verificationCode || (data.checkOnly ? previousCode : ''), result.data.verificationCodeExpiresAt);
+        showPending(nickname, isSwitch, result.data.verificationCode || (data.checkOnly ? previousCode : ''), result.data.verificationCodeExpiresAt, result.data.noteEligible);
         if (data.checkOnly) alert('아직 관리자 확인 전이에요. 잠시 후 다시 확인해주세요.');
       }
     } catch (e) {
