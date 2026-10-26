@@ -9,6 +9,7 @@
   var codeEl = document.getElementById('gallery-subscription-code');
   var copyBtn = document.getElementById('gallery-subscription-copy');
   var renewBtn = document.getElementById('gallery-subscription-renew');
+  var loginBtn = document.getElementById('gallery-subscription-login');
   var refreshBtn = document.getElementById('gallery-subscription-refresh');
   var cancelBtn = document.getElementById('gallery-subscription-cancel');
   var statusEl = document.getElementById('gallery-subscription-status');
@@ -56,6 +57,7 @@
     purchase.hidden = active || !state.accountProtected || pending;
     codeStep.hidden = active || !state.accountProtected || !codeRequest || processing;
     cancelBtn.hidden = active || !pending || processing;
+    loginBtn.hidden = active || !!state.accountProtected;
     renewBtn.hidden = !codeRequest || !state.pendingCanRenewCode;
     copyBtn.hidden = !verificationCode || !codeRequest || processing;
     codeEl.textContent = verificationCode || '새 코드를 발급해 주세요';
@@ -162,6 +164,11 @@
   });
 
   refreshBtn.addEventListener('click', function () { refreshStatus(); });
+
+  loginBtn.addEventListener('click', function () {
+    window.galCloseUnlockModal && window.galCloseUnlockModal();
+    window.galOpenLoginModal && window.galOpenLoginModal();
+  });
 
   cancelBtn.addEventListener('click', async function () {
     if (!state.pendingRequestId || !confirm('구독 인증 신청과 발급 코드를 취소할까요?')) return;

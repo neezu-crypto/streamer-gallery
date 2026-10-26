@@ -22,8 +22,8 @@
   var currentStreamerName = '';
   var currentPendingRequestId = null;
 
-  function openModal(streamerId, streamerName) {
-    if (!window.galTrusted) {
+  function openModal(streamerId, streamerName, allowAnonymous) {
+    if (!window.galTrusted && !allowAnonymous) {
       window.galCloseLoginModal && window.galCloseLoginModal();
       window.galOpenLoginModal && window.galOpenLoginModal();
       return;
@@ -47,7 +47,7 @@
   }
   function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
   window.galOpenUnlockModal = openModal;
-  window.galOpenSubscriptionModal = function () { openModal('', ''); };
+  window.galOpenSubscriptionModal = function () { openModal('', '', true); };
   window.galCloseUnlockModal = closeModal;
 
   if (openSubscriptionBtn) openSubscriptionBtn.addEventListener('click', window.galOpenSubscriptionModal);
