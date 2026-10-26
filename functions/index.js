@@ -2,7 +2,8 @@ const { initializeApp } = require('firebase-admin/app');
 initializeApp();
 
 const { galleryCheckAdmin } = require('./src/whoami');
-const { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl } = require('./src/r2');
+const { requestImageUpload, registerImage, getGalleryPublicId, getGalleryImageAccess, getImageDownloadUrl } = require('./src/r2');
+const { gallerySubscriptionStatus } = require('./src/subscription-access');
 const { toggleLike, recordImageView, postComment, reportImage, reportComment, hideImage, unhideImage } = require('./src/interactions');
 const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, migrateGalleryPublicIdentityData, getGalleryAdminPage, gallerySearchUsers, galleryGetAuditLog, galleryGetOperationsStats, galleryScanR2, galleryDeleteR2Orphans, cleanupMessengerReportEvidenceImages, adminBulkGalleryAction } = require('./src/admin');
 const { updateGalleryProfile } = require('./src/profile');
@@ -17,7 +18,9 @@ module.exports = {
   requestImageUpload,
   registerImage,
   getGalleryPublicId,
+  getGalleryImageAccess,
   getImageDownloadUrl,
+  gallerySubscriptionStatus,
   toggleLike,
   recordImageView,
   postComment,

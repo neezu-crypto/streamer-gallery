@@ -8,6 +8,7 @@ const { requireTrustedAccount, requireAuth, assertNotBanned } = require('./lib/a
 const { assertCooldown } = require('./lib/rate-limit');
 const { FORBIDDEN_TEXT_RE, CATEGORIES, UPLOAD_COOLDOWN_MS } = require('./constants');
 const { ensurePublicId, publicImage } = require('./public-identity');
+const { galleryContentAccess } = require('./subscription-access');
 
 // R2 크리덴셜은 Firebase Secret Manager로만 주입한다 — 소스에 절대 하드코딩하지 않는다.
 // `firebase functions:secrets:set R2_ACCESS_KEY_ID --project soop-stock-market` /
@@ -35,6 +36,30 @@ function getR2Client() {
       secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
     },
   });
+}
+
+async function requireGalleryContentAccess(request, imageId) {
+  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
+  const snap = await getDatabase().ref(`gallery/images/${imageId}`).get();
+  if (!snap.exists()) throw new HttpsError('not-found', '이미지를 찾을 수 없습니다.');
+  const image = snap.val() || {};
+  const access = await galleryContentAccess(request, image.streamerId);
+  if (!access.allowed) {
+    throw new HttpsError('permission-denied', '통합 구독 또는 이 스트리머의 유효한 열람 기간이 필요합니다.');
+  }
+  if (!image.key || typeof image.key !== 'string') {
+    throw new HttpsError('failed-precondition', '이미지 파일 정보를 찾을 수 없습니다.');
+  }
+  return { image, access };
+}
+
+async function signedImageUrl(image, responseContentDisposition) {
+  const command = {
+    Bucket: R2_BUCKET_NAME,
+    Key: image.key,
+    ...(responseContentDisposition ? { ResponseContentDisposition: responseContentDisposition } : {}),
+  };
+  return getSignedUrl(getR2Client(), new GetObjectCommand(command), { expiresIn: 300 });
 }
 
 // R2 파일 생명주기 로그는 원본 UID/키가 포함될 수 있어 서버 전용 노드에만 기록한다.
@@ -242,15 +267,21 @@ const getGalleryPublicId = onCall(async (request) => {
 // URL로 이동(navigation)만 해도 R2가 강제로 "다운로드"로 응답하게 만들 수 있어
 // CORS 문제 자체를 완전히 회피한다. 게다가 presigned URL은 서명·만료시각이 매번
 // 달라 캐시가 안 되므로 그 엣지 캐시 불일치 문제도 같이 사라진다.
+const getGalleryImageAccess = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
+  const { imageId } = request.data || {};
+  const { image, access } = await requireGalleryContentAccess(request, imageId);
+  const viewUrl = await signedImageUrl(image);
+  return {
+    viewUrl,
+    expiresAt: Date.now() + 5 * 60 * 1000,
+    accessSource: access.subscribed ? 'unified-subscription' : 'streamer-access',
+  };
+});
+
 const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async (request) => {
   const { imageId } = request.data || {};
-  if (!imageId || typeof imageId !== 'string') throw new HttpsError('invalid-argument', '잘못된 요청입니다.');
-
-  const db = getDatabase();
-  const snap = await db.ref(`gallery/images/${imageId}`).get();
-  if (!snap.exists()) throw new HttpsError('not-found', '이미지를 찾을 수 없습니다.');
-  const { key, streamerName } = snap.val();
-  if (!key || typeof key !== 'string') throw new HttpsError('failed-precondition', '이미지 파일 정보를 찾을 수 없습니다.');
+  const { image } = await requireGalleryContentAccess(request, imageId);
+  const { key, streamerName } = image;
 
   const ext = key.includes('.') ? key.slice(key.lastIndexOf('.') + 1) : 'jpg';
   // 파일명에 스트리머명(한글)을 넣되, Content-Disposition 헤더는 원래 ASCII만
@@ -260,14 +291,9 @@ const getImageDownloadUrl = onCall({ secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCES
   const filenameUtf8 = `${streamerName || '이미지'}_${imageId}.${ext}`;
   const contentDisposition = `attachment; filename="${filenameAscii}"; filename*=UTF-8''${encodeURIComponent(filenameUtf8)}`;
 
-  const client = getR2Client();
-  const downloadUrl = await getSignedUrl(client, new GetObjectCommand({
-    Bucket: R2_BUCKET_NAME,
-    Key: key,
-    ResponseContentDisposition: contentDisposition,
-  }), { expiresIn: 300 });
+  const downloadUrl = await signedImageUrl(image, contentDisposition);
 
   return { downloadUrl };
 });
 
-module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getImageDownloadUrl, getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+module.exports = { requestImageUpload, registerImage, getGalleryPublicId, getGalleryImageAccess, getImageDownloadUrl, getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };

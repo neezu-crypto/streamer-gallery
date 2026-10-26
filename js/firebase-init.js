@@ -49,6 +49,7 @@ const db = getDatabase(app);
 const functions = getFunctions(app);
 const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
 const logGalleryVisitFn = httpsCallable(functions, 'logGalleryVisit');
+const gallerySubscriptionStatusFn = httpsCallable(functions, 'gallerySubscriptionStatus');
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -
@@ -78,9 +79,56 @@ window.galVerifiedStreamerNickname = null;
 window.galLinkedStreamerId = null;
 window.galTrusted = false;
 window.galPublicId = null;
+window.galUnifiedSubscriptionActive = false;
+window.galUnifiedSubscriptionExpiresAt = 0;
+let gallerySubscriptionRefreshTimer = null;
+let gallerySubscriptionLastCheckedAt = 0;
 function updateTrusted() {
   window.galTrusted = !!(window.galRealUser || window.galIsAdmin || window.galIsVerifiedStreamer);
 }
+
+function scheduleGallerySubscriptionRefresh(uid) {
+  if (gallerySubscriptionRefreshTimer) clearTimeout(gallerySubscriptionRefreshTimer);
+  gallerySubscriptionRefreshTimer = null;
+  const expiresAt = Number(window.galUnifiedSubscriptionExpiresAt) || 0;
+  if (!expiresAt || expiresAt <= Date.now()) return;
+  gallerySubscriptionRefreshTimer = setTimeout(() => {
+    if (auth.currentUser?.uid === uid) loadGallerySubscriptionStatus(uid);
+  }, Math.min(expiresAt - Date.now() + 1000, 2147483647));
+}
+
+async function loadGallerySubscriptionStatus(uid) {
+  try {
+    const result = await gallerySubscriptionStatusFn();
+    if (auth.currentUser?.uid !== uid) return;
+    const data = result.data || {};
+    window.galUnifiedSubscriptionActive = data.subscribed === true;
+    window.galUnifiedSubscriptionExpiresAt = Math.max(0, Number(data.expiresAt) || 0);
+  } catch (error) {
+    if (auth.currentUser?.uid !== uid) return;
+    window.galUnifiedSubscriptionActive = false;
+    window.galUnifiedSubscriptionExpiresAt = 0;
+    console.error('통합 구독 상태 확인 실패:', error);
+  }
+  gallerySubscriptionLastCheckedAt = Date.now();
+  scheduleGallerySubscriptionRefresh(uid);
+  document.dispatchEvent(new CustomEvent('gal-subscription-changed', {
+    detail: {
+      active: window.galUnifiedSubscriptionActive,
+      expiresAt: window.galUnifiedSubscriptionExpiresAt,
+    },
+  }));
+}
+
+function refreshGallerySubscriptionAfterReturn() {
+  const uid = auth.currentUser && auth.currentUser.uid;
+  if (!uid || Date.now() - gallerySubscriptionLastCheckedAt < 5000) return;
+  loadGallerySubscriptionStatus(uid);
+}
+window.addEventListener('focus', refreshGallerySubscriptionAfterReturn);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshGallerySubscriptionAfterReturn();
+});
 
 // 로그인 후에는 계정 표시 이름을 그대로 노출하는 대신(실명 노출 우려) "OO 로그인
 // 완료"를 보여주는 용도 — 카카오는 signInWithCustomToken 기반이라 providerData에
@@ -318,6 +366,11 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   if (galVerifiedStatusUnsubscribe) { galVerifiedStatusUnsubscribe(); galVerifiedStatusUnsubscribe = null; }
   if (galSwitchApprovalUnsubscribe) { galSwitchApprovalUnsubscribe(); galSwitchApprovalUnsubscribe = null; }
   galSwitchHandoffInProgress = false;
+  if (gallerySubscriptionRefreshTimer) clearTimeout(gallerySubscriptionRefreshTimer);
+  gallerySubscriptionRefreshTimer = null;
+  window.galUnifiedSubscriptionActive = false;
+  window.galUnifiedSubscriptionExpiresAt = 0;
+  gallerySubscriptionLastCheckedAt = 0;
   if (user) galleryHasRestoredAccount = true;
   window.galUser = user;
   window.galRealUser = user && !user.isAnonymous ? user : null;
@@ -347,6 +400,7 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   startPresenceRefreshLoop();
   await loadGalleryPublicId();
   await checkVerifiedStreamer(user.uid); // 관리자가 수동 연결한 streamerId만 별도 확인한다
+  await loadGallerySubscriptionStatus(user.uid);
   if (window.galRealUser) {
     try {
       const result = await whoAmIFn();

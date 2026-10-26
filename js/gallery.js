@@ -72,7 +72,18 @@
   var allStreamers = [];
   var selectedStreamerId = null;
   var selectedStreamerName = '';
-  var GRID_CACHE_KEY = 'galGridCache';
+  // v2부터 공개 목록 캐시에 원본 URL·R2 객체 키를 저장하지 않는다. 예전 캐시 키를
+  // 재사용하면 서버 공개 미러를 정리한 뒤에도 브라우저에 남은 원본 주소가 잠깐
+  // 복원될 수 있어 새 키로 분리한다.
+  var GRID_CACHE_KEY = 'galGridCache.v2';
+
+  function sanitizePublicImage(id, value) {
+    var image = Object.assign({ id: id }, value || {});
+    delete image.imageUrl;
+    delete image.key;
+    delete image.thumbKey;
+    return image;
+  }
   // 팬페이지에서 스트리머·분류를 지정해 넘어오면 기존 전체 갤러리 화면에서도
   // 해당 조건을 이어서 보여준다. 목록은 기존 페이지네이션을 그대로 사용한다.
   var routeParams = new URLSearchParams(window.location.search);
@@ -170,6 +181,7 @@
   }
 
   function isStreamerUnlocked(streamerId) {
+    if (window.galUnifiedSubscriptionActive) return true;
     if (!streamerId) return false;
     var now = Date.now();
     var firstUpload = window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId];
@@ -179,6 +191,10 @@
     return false;
   }
   window.galIsStreamerUnlocked = isStreamerUnlocked;
+  document.addEventListener('gal-subscription-changed', function () {
+    renderGrid();
+    document.dispatchEvent(new CustomEvent('gal-unlocked-updated'));
+  });
 
   // isStreamerUnlocked()는 "만료됨"과 "애초에 업로드가 한 번도 없었음"을 둘 다
   // false로 뭉뚱그린다(firstUpload가 falsy면 둘 다 같은 경로) — 업로드 모달에서
@@ -424,7 +440,7 @@
       var keys = Object.keys(data);
       hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
       var rawRecentImages = keys.map(function (id) {
-        return Object.assign({ id: id }, data[id]);
+        return sanitizePublicImage(id, data[id]);
       }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       Object.keys(pendingImageDeletes).forEach(function (imageId) {
         if (pendingImageDeletes[imageId].confirmed && !rawRecentImages.some(function (img) { return img.id === imageId; })) {
@@ -464,7 +480,7 @@
       var data = snap.val() || {};
       var keys = Object.keys(data);
       hasMoreImages = keys.length >= IMAGES_PAGE_SIZE;
-      var page = keys.map(function (id) { return Object.assign({ id: id }, data[id]); })
+      var page = keys.map(function (id) { return sanitizePublicImage(id, data[id]); })
         .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       page = page.filter(function (img) { return !pendingImageDeletes[img.id]; });
       olderImages = olderImages.concat(page);
@@ -786,7 +802,7 @@
   try {
     var cachedGrid = JSON.parse(localStorage.getItem(GRID_CACHE_KEY) || 'null');
     if (cachedGrid && Array.isArray(cachedGrid.images) && cachedGrid.images.length) {
-      recentImages = cachedGrid.images;
+      recentImages = cachedGrid.images.map(function (image) { return sanitizePublicImage(image.id, image); });
       allImages = recentImages;
       window.galAllImages = allImages;
       renderGrid();

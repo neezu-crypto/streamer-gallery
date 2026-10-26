@@ -38,6 +38,7 @@
   var latestCommentList = [];
   var pendingCommentDeletes = {};
   var relatedItems = [];
+  var detailAccessToken = 0;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -67,6 +68,7 @@
   }
 
   function closeModal() {
+    detailAccessToken += 1;
     backdrop.classList.remove('open');
     window.galPopModal(closeModal);
     if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
@@ -269,6 +271,7 @@
   // "최근에 확인함" 표시(2026-09-05 추가) — 계정 동기화가 필요 없는 브라우저 로컬
   // UX 힌트라 RTDB가 아니라 localStorage에 마지막 1개만 기록한다.
   function openModal(img) {
+    var accessToken = ++detailAccessToken;
     currentImageId = img.id;
     localStorage.setItem('galLastViewedImageId', img.id);
     // 그리드는 이 값이 바뀐다고 저절로 다시 그려지지 않으므로(2026-09-06 실사용
@@ -284,17 +287,10 @@
     // 이전에 보던 이미지가 열린 것처럼 보이는 버그가 있었다(2026-09-06 실사용
     // 확인). 그리드에서 이미 로드돼 캐시돼있는 썸네일을 먼저 즉시 보여주고, 원본은
     // 백그라운드에서 불러와 로드가 끝나면 그때 교체한다.
-    imageEl.src = img.thumbUrl || img.imageUrl || '';
-    if (img.imageUrl && img.imageUrl !== img.thumbUrl) {
-      var fullImg = new Image();
-      fullImg.onload = function () {
-        if (currentImageId === img.id) imageEl.src = img.imageUrl;
-      };
-      fullImg.src = img.imageUrl;
-    }
+    imageEl.src = img.thumbUrl || '';
     streamerEl.textContent = img.streamerName || '익명';
     currentStreamerName = img.streamerName || '';
-    currentImageUrl = img.imageUrl || img.thumbUrl || '';
+    currentImageUrl = '';
     categoryEl.textContent = (window.galCategoryLabels && window.galCategoryLabels[img.category]) || img.category || '';
     likeCountEl.textContent = img.likeCount || 0;
     if (viewCountEl) viewCountEl.textContent = img.viewCount || 0;
@@ -320,6 +316,28 @@
     refreshLikedState(img.id);
     subscribeComments(img.id);
     loadRelatedPhotos(img);
+    // 공개 목록에는 썸네일만 들어 있다. 원본은 서버가 통합 구독 또는 기존
+    // 스트리머별 공개 기간을 다시 확인한 뒤 발급하는 5분짜리 서명 URL로 교체한다.
+    var accessFn = window.galFirebase.httpsCallable('getGalleryImageAccess');
+    accessFn({ imageId: img.id }).then(function (result) {
+      if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+      var viewUrl = result.data && result.data.viewUrl || '';
+      if (!viewUrl) throw new Error('원본 이미지 주소가 없습니다.');
+      currentImageUrl = viewUrl;
+      var fullImg = new Image();
+      fullImg.onload = function () {
+        if (currentImageId === img.id && detailAccessToken === accessToken) imageEl.src = viewUrl;
+      };
+      fullImg.src = viewUrl;
+    }).catch(function (error) {
+      if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+      console.error('원본 이미지 권한 확인 실패', error);
+      var code = String(error && error.code || '');
+      if (code.indexOf('permission-denied') !== -1) {
+        closeModal();
+        window.galOpenUnlockModal && window.galOpenUnlockModal(img.streamerId, img.streamerName);
+      }
+    });
   }
 
   document.addEventListener('click', function (e) {
