@@ -1,5 +1,10 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  getToken as getAppCheckToken,
+} from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
+import {
   getAuth,
   GoogleAuthProvider,
   signInAnonymously,
@@ -44,12 +49,26 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// 통합 구독 신청 callable은 고점체크 앱의 App Check가 강제된다. 갤러리의 기본
+// Firebase 앱/Auth 세션은 그대로 두고, App Check 토큰 발급만 고점체크에 등록된
+// 별도 앱 설정으로 수행한다. 두 앱은 같은 Firebase 프로젝트와 같은 공개 도메인을
+// 사용하며, 실제 사용자 인증은 아래 galCallViewerSubscription에서 갤러리의 현재
+// Firebase ID 토큰을 명시적으로 전달한다.
+const subscriptionApp = initializeApp({
+  ...firebaseConfig,
+  appId: '1:997788925900:web:b58db2970489bf18a3a769',
+}, 'gallery-subscription-appcheck');
+const subscriptionAppCheck = initializeAppCheck(subscriptionApp, {
+  provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'),
+  isTokenAutoRefreshEnabled: true,
+});
 const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app);
 const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
 const logGalleryVisitFn = httpsCallable(functions, 'logGalleryVisit');
 const gallerySubscriptionStatusFn = httpsCallable(functions, 'gallerySubscriptionStatus');
+const VIEWER_SUBSCRIPTION_URL = 'https://us-central1-soop-stock-market.cloudfunctions.net/streamerFanPageViewerSubscription';
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -
@@ -144,6 +163,38 @@ window.galLoginMethodLabel = function () {
   return null;
 };
 window.galSignInWithCustomToken = (token) => signInWithCustomToken(auth, token);
+window.galCallViewerSubscription = async (data) => {
+  const user = auth.currentUser;
+  if (!user) throw Object.assign(new Error('로그인이 필요합니다.'), { code: 'functions/unauthenticated' });
+  const [idToken, appCheckResult] = await Promise.all([
+    user.getIdToken(),
+    getAppCheckToken(subscriptionAppCheck, false),
+  ]);
+  const response = await fetch(VIEWER_SUBSCRIPTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+      'X-Firebase-AppCheck': appCheckResult.token,
+    },
+    body: JSON.stringify({ data: data || {} }),
+  });
+  let payload = {};
+  try { payload = await response.json(); } catch (_) {}
+  if (!response.ok || payload.error) {
+    const callableError = payload.error || {};
+    const status = String(callableError.status || 'internal').toLowerCase().replaceAll('_', '-');
+    throw Object.assign(new Error(callableError.message || '구독 서버 요청에 실패했습니다.'), {
+      code: `functions/${status}`,
+      details: callableError.details,
+    });
+  }
+  return { data: payload.result || payload.data || {} };
+};
+window.galRefreshUnifiedSubscriptionStatus = () => {
+  const uid = auth.currentUser && auth.currentUser.uid;
+  return uid ? loadGallerySubscriptionStatus(uid) : Promise.resolve();
+};
 
 // 구글 팝업이 닫힌 직후엔 COOP 정책 때문에 브라우저가 이 탭을 잠깐 "활성 탭이
 // 아니다"로 오판하고, 그 상태에서 네이티브 confirm()을 부르면 크롬이 다이얼로그

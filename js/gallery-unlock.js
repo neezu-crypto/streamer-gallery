@@ -7,7 +7,11 @@
   var UNLOCK_DONATION_URL = 'https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&szWork=BJ_STATION&sys_type=web&location=station';
   var backdrop = document.getElementById('unlock-backdrop');
   var closeBtn = document.getElementById('unlock-modal-close');
+  var openSubscriptionBtn = document.getElementById('open-subscription-btn');
+  var titleEl = document.getElementById('unlock-modal-title');
   var nameEl = document.getElementById('unlock-streamer-name');
+  var contextEl = document.getElementById('unlock-streamer-context');
+  var legacySection = document.getElementById('unlock-legacy-section');
   var nicknameInput = document.getElementById('unlock-nickname');
   var submitBtn = document.getElementById('unlock-submit-btn');
   var statusEl = document.getElementById('unlock-status');
@@ -27,18 +31,26 @@
     currentStreamerId = streamerId;
     currentStreamerName = streamerName;
     currentPendingRequestId = null;
+    titleEl.textContent = streamerId ? '🔒 스트리머 열람 갱신 신청' : '통합 구독 신청';
     nameEl.textContent = streamerName;
+    contextEl.hidden = !streamerId;
+    legacySection.hidden = !streamerId;
     nicknameInput.value = '';
     statusEl.textContent = '';
     submitBtn.disabled = false;
     cancelBtn.style.display = 'none';
     backdrop.classList.add('open');
     window.galPushModal(closeModal);
+    document.dispatchEvent(new CustomEvent('gal-unlock-opened', {
+      detail: { streamerId: streamerId, streamerName: streamerName },
+    }));
   }
   function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
   window.galOpenUnlockModal = openModal;
+  window.galOpenSubscriptionModal = function () { openModal('', ''); };
   window.galCloseUnlockModal = closeModal;
 
+  if (openSubscriptionBtn) openSubscriptionBtn.addEventListener('click', window.galOpenSubscriptionModal);
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
 
