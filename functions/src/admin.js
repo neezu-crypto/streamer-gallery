@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { getApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
@@ -7,6 +8,15 @@ const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_A
 const { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { UNLOCK_DURATION_MS } = require('./constants');
 const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
+const MESSENGER_DATABASE_URL = 'https://streamer-messenger-rtdb.firebaseio.com';
+const messengerDatabase = () => getDatabase(getApp(), MESSENGER_DATABASE_URL);
+
+async function assertMessengerDatabaseReady() {
+  const state = (await getDatabase().ref('messengerDatabaseMigration/state').get()).val() || {};
+  if (state.phase && state.phase !== 'ready') {
+    throw new HttpsError('unavailable', '메신저 데이터베이스 전환 중이므로 잠시 후 다시 시도해 주세요.');
+  }
+}
 
 async function requireAdmin(request) {
   const uid = requireAuth(request);
@@ -18,7 +28,8 @@ async function requireAdmin(request) {
 }
 
 async function preserveMessengerReportImages(imageId, image) {
-  const db = getDatabase();
+  await assertMessengerDatabaseReady();
+  const db = messengerDatabase();
   const refsSnap = await db.ref(`streamerMessenger/reportImageRefs/${imageId}`).get();
   if (!refsSnap.exists()) return;
   const refs = refsSnap.val() || {};
@@ -54,7 +65,9 @@ async function preserveMessengerReportImages(imageId, image) {
 }
 
 const cleanupMessengerReportEvidenceImages = onSchedule({ schedule: 'every 10 minutes', secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async () => {
-  const db = getDatabase();
+  try { await assertMessengerDatabaseReady(); }
+  catch (error) { if (error && error.code === 'unavailable') return; throw error; }
+  const db = messengerDatabase();
   const refsSnap = await db.ref('streamerMessenger/reportImageRefs').get();
   const refs = refsSnap.val() || {};
   const updates = {};
