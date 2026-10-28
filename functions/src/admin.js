@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getApp } = require('firebase-admin/app');
-const { getDatabase } = require('firebase-admin/database');
+const { getDatabase, getDatabaseWithUrl } = require('firebase-admin/database');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
 const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
@@ -9,7 +9,7 @@ const { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObject
 const { UNLOCK_DURATION_MS } = require('./constants');
 const { ensurePublicId, publicImage, publicComment, publicIdFor } = require('./public-identity');
 const MESSENGER_DATABASE_URL = 'https://streamer-messenger-rtdb.firebaseio.com';
-const messengerDatabase = () => getDatabase(getApp(), MESSENGER_DATABASE_URL);
+const messengerDatabase = () => getDatabaseWithUrl(MESSENGER_DATABASE_URL, getApp());
 
 async function assertMessengerDatabaseReady() {
   const state = (await getDatabase().ref('messengerDatabaseMigration/state').get()).val() || {};
