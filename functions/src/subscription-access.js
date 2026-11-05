@@ -8,16 +8,12 @@ const UNIFIED_SUBSCRIPTIONS_PATH = 'streamerFanPageViewerSubscriptions';
 async function unifiedSubscriptionAccess(request) {
   const uid = requireAuth(request);
   const db = getDatabase();
-  const [subscriptionSnap, admin] = await Promise.all([
-    db.ref(`${UNIFIED_SUBSCRIPTIONS_PATH}/${uid}`).get(),
-    isAdmin(uid, request.auth.token && request.auth.token.email),
-  ]);
-  const expiresAt = Math.max(0, Number(subscriptionSnap.val() && subscriptionSnap.val().expiresAt) || 0);
+  const admin = await isAdmin(uid, request.auth.token && request.auth.token.email);
   return {
     uid,
     isAdmin: admin,
-    subscribed: admin || expiresAt > Date.now(),
-    expiresAt,
+    subscribed: admin,
+    expiresAt: 0,
   };
 }
 

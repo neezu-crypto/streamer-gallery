@@ -54,9 +54,9 @@
     var processing = codeRequest && state.pendingRequestStatus === 'processing' && !state.pendingCanRenewCode;
     var active = state.isAdmin || state.subscribed;
 
-    purchase.hidden = active || !state.accountProtected || pending;
-    codeStep.hidden = active || !state.accountProtected || !codeRequest || processing;
-    cancelBtn.hidden = active || !pending || processing;
+    purchase.hidden = true;
+    codeStep.hidden = true;
+    cancelBtn.hidden = true;
     loginBtn.hidden = active || !!state.accountProtected;
     renewBtn.hidden = !codeRequest || !state.pendingCanRenewCode;
     copyBtn.hidden = !verificationCode || !codeRequest || processing;
@@ -66,8 +66,8 @@
       statusEl.textContent = message;
     } else if (state.isAdmin) {
       statusEl.textContent = '관리자 권한으로 갤러리의 모든 구독 콘텐츠를 이용할 수 있어요.';
-    } else if (state.subscribed) {
-      statusEl.textContent = formatDate(state.expiresAt) + '까지 스트리머 시리즈 통합 구독 중이에요.';
+    } else if (!state.isAdmin) {
+      statusEl.textContent = '통합 구독에 따른 갤러리 원본 열람 혜택은 종료되었습니다.';
     } else if (!state.accountProtected) {
       statusEl.textContent = 'Google·Kakao 로그인 또는 스트리머 인증을 완료한 계정에서 신청할 수 있어요.';
     } else if (pending && codeRequest) {
