@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl } = require('firebase-admin/database');
+const { isServicePaused } = require('./service-pause');
 const { requireAuth, isAdmin, assertNotBanned, getVerifiedStreamerNickname } = require('./lib/auth');
 const { logAudit } = require('./lib/audit');
 const { getR2Client, updateR2Lifecycle, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = require('./r2');
@@ -65,6 +66,8 @@ async function preserveMessengerReportImages(imageId, image) {
 }
 
 const cleanupMessengerReportEvidenceImages = onSchedule({ schedule: 'every 10 minutes', secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY] }, async () => {
+  // 서비스 일시정지 중에는 건너뛴다(관리자 센터 서비스 일시정지, 기본 상태: 일시정지).
+  if (await isServicePaused(getDatabase(), 'gallery', true)) return;
   try { await assertMessengerDatabaseReady(); }
   catch (error) { if (error && error.code === 'unavailable') return; throw error; }
   const db = messengerDatabase();
