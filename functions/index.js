@@ -8,6 +8,7 @@ const { toggleLike, recordImageView, postComment, reportImage, reportComment, hi
 const { adminDeleteImage, deleteOwnImage, adminDeleteComment, deleteOwnComment, adminDismissImageReport, adminDismissCommentReport, banGalleryAccount, unbanGalleryAccount, adminLinkStreamerAccount, adminUnlinkStreamerAccount, migrateGalleryPublicIdentityData, getGalleryAdminPage, gallerySearchUsers, galleryGetAuditLog, galleryGetOperationsStats, galleryScanR2, galleryDeleteR2Orphans, cleanupMessengerReportEvidenceImages, adminBulkGalleryAction } = require('./src/admin');
 const { updateGalleryProfile } = require('./src/profile');
 const { requestStreamerUnlock, cancelStreamerUnlockRequest, adminApproveStreamerUnlock, adminRejectStreamerUnlock } = require('./src/unlock');
+const { galleryStreamerUnlockPurchase } = require('./src/unlock-purchase');
 const { logGalleryVisit } = require('./src/streamerVisitLog');
 
 // r2.js는 admin.js가 재사용할 getR2Client/R2_BUCKET_NAME/시크릿 참조도 같이 export하므로
@@ -53,4 +54,5 @@ module.exports = {
   adminApproveStreamerUnlock,
   adminRejectStreamerUnlock,
   logGalleryVisit,
+  galleryStreamerUnlockPurchase,
 };

@@ -44,6 +44,7 @@ const CATEGORIES = ['screenshot', 'ai-art', 'fan-art', 'meme', 'etc'];
 // (SOOP API로 실제 후원 내역을 자동 확인하지 않음) — 이 상수는 안내 문구
 // 표시용일 뿐, 서버가 실제 후원 여부를 검증하지는 않는다.
 const UNLOCK_BALLOON_COST = 10;
+const UNLOCK_CASH_PRICE = 10; // 통합 캐시 결제(2026-11-13~): 별풍선 1개 = 1캐시라 기존 후원 금액과 같다
 const UNLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 — 무료체험/갱신 둘 다 이 값 재사용
 const UNLOCK_NICKNAME_MAX_LENGTH = 20;
 
@@ -65,6 +66,7 @@ module.exports = {
   PROFILE_NICKNAME_MAX_LENGTH,
   SOOP_ID_RE,
   UNLOCK_BALLOON_COST,
+  UNLOCK_CASH_PRICE,
   UNLOCK_DURATION_MS,
   UNLOCK_NICKNAME_MAX_LENGTH,
 };

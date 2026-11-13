@@ -1,108 +1,120 @@
-// 스트리머별 업로드 잠금 해금 신청 모달(2026-09-05 추가) — 업로드 시도(js/gallery.js)나
-// 잠긴 스트리머 이미지 클릭(js/gallery-detail.js) 시 window.galOpenUnlockModal로 열린다.
-// 실제 후원 확인은 관리자가 수동으로 한다 — 이 모달은 신청 접수만 담당.
+// 스트리머 상세보기 열람 연장 모달 — 업로드 시도(js/gallery.js)나 잠긴 스트리머 이미지 클릭(js/gallery-detail.js) 시
+// window.galOpenUnlockModal로 열린다. 2026-11-13부터 통합 캐시 결제만 받는다(galleryStreamerUnlockPurchase).
+// 결제가 끝나면 서버가 gallery/streamerUnlockedUntil을 늘리고, 화면은 그 값을 실시간으로 받아 잠금을 푼다.
 (function () {
-  // soop-stock-market/StreamBet-Market 보물상자 후원과 동일한 관리자 SOOP 계정 후원 페이지 —
-  // 이 사이트도 실제 후원은 관리자 본인 채널로 받고, 관리자가 방송에서 수동 확인 후 해금한다.
-  var UNLOCK_DONATION_URL = 'https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&szWork=BJ_STATION&sys_type=web&location=station';
   var backdrop = document.getElementById('unlock-backdrop');
   var closeBtn = document.getElementById('unlock-modal-close');
-  var openSubscriptionBtn = document.getElementById('open-subscription-btn');
-  var titleEl = document.getElementById('unlock-modal-title');
   var nameEl = document.getElementById('unlock-streamer-name');
-  var contextEl = document.getElementById('unlock-streamer-context');
-  var legacySection = document.getElementById('unlock-legacy-section');
-  var nicknameInput = document.getElementById('unlock-nickname');
-  var submitBtn = document.getElementById('unlock-submit-btn');
+  var priceEl = document.getElementById('unlock-cash-price');
   var statusEl = document.getElementById('unlock-status');
-  var cancelBtn = document.getElementById('unlock-cancel-btn');
+  var payBtn = document.getElementById('unlock-pay-btn');
+  var chargeLink = document.getElementById('unlock-charge-link');
   if (!backdrop) return;
 
-  var currentStreamerId = null;
-  var currentStreamerName = '';
-  var currentPendingRequestId = null;
+  var currentStreamerId = '';
+  var priceCash = 10;
+  var busy = false;
+  var checking = false;
+  var timer = 0;
 
-  function openModal(streamerId, streamerName, allowAnonymous) {
-    if (!window.galTrusted && !allowAnonymous) {
+  function callPurchase(data) { return window.galFirebase.httpsCallable('galleryStreamerUnlockPurchase')(data); }
+  function message(err, fallback) {
+    var text = err && err.message ? String(err.message) : '';
+    return text && !/^FirebaseError:|^internal$/i.test(text) ? text : fallback;
+  }
+  function formatDate(at) {
+    return new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(at));
+  }
+  function payLabel() { payBtn.textContent = priceCash + '캐시로 열기'; }
+
+  // 결과를 모르는 채로 끊긴 결제는 같은 요청 번호로 다시 보내 이중 차감을 막는다.
+  function requestKey(streamerId) { return 'galUnlockRequest:' + streamerId; }
+  function requestId(streamerId) {
+    try {
+      var saved = sessionStorage.getItem(requestKey(streamerId));
+      if (saved) return saved;
+    } catch (_) { /* 무시 */ }
+    var bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+    var id = 'gu_' + Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    try { sessionStorage.setItem(requestKey(streamerId), id); } catch (_) { /* 무시 */ }
+    return id;
+  }
+  function dropRequestId(streamerId) { try { sessionStorage.removeItem(requestKey(streamerId)); } catch (_) { /* 무시 */ } }
+  // 확정 실패(잔액 부족·이미 환불됨 등)면 다음 시도는 새 번호로, 결과 불명(네트워크 등)이면 같은 번호를 유지한다.
+  function definiteFailure(err) {
+    var code = String(err && err.code || '').replace(/^functions\//, '');
+    return ['failed-precondition', 'invalid-argument', 'already-exists', 'not-found', 'permission-denied', 'resource-exhausted'].indexOf(code) >= 0;
+  }
+
+  function refreshStatus() {
+    if (checking || busy || !currentStreamerId || !backdrop.classList.contains('open')) return;
+    checking = true;
+    var streamerId = currentStreamerId;
+    callPurchase({ action: 'status', streamerId: streamerId }).then(function (res) {
+      if (busy || streamerId !== currentStreamerId) return;
+      var data = res.data || {};
+      priceCash = Number(data.priceCash) || priceCash;
+      priceEl.textContent = String(priceCash); payLabel();
+      var cash = Number(data.balanceCash) || 0;
+      var enough = cash >= priceCash;
+      statusEl.textContent = enough
+        ? '현재 통합 캐시 ' + cash.toLocaleString('ko-KR') + '캐시'
+        : '통합 캐시가 부족해요. (보유 ' + cash.toLocaleString('ko-KR') + '캐시 / 필요 ' + priceCash + '캐시) 충전하면 이 창에 바로 반영돼요.';
+      payBtn.disabled = !enough;
+      chargeLink.hidden = enough;
+    }).catch(function (err) {
+      if (streamerId === currentStreamerId) statusEl.textContent = message(err, '잔액을 확인하지 못했어요.');
+    }).finally(function () { checking = false; });
+  }
+
+  function openModal(streamerId, streamerName) {
+    if (!window.galTrusted) {
       window.galCloseLoginModal && window.galCloseLoginModal();
       window.galOpenLoginModal && window.galOpenLoginModal();
       return;
     }
-    currentStreamerId = streamerId;
-    currentStreamerName = streamerName;
-    currentPendingRequestId = null;
-    titleEl.textContent = streamerId ? '🔒 스트리머 열람 갱신 신청' : '통합 구독 신청';
-    nameEl.textContent = streamerName;
-    contextEl.hidden = !streamerId;
-    legacySection.hidden = !streamerId;
-    nicknameInput.value = '';
-    statusEl.textContent = '';
-    submitBtn.disabled = false;
-    cancelBtn.style.display = 'none';
+    currentStreamerId = String(streamerId || '');
+    nameEl.textContent = streamerName || currentStreamerId;
+    statusEl.textContent = '통합 캐시 잔액을 확인하고 있어요.';
+    payBtn.disabled = true; payLabel();
+    chargeLink.hidden = true;
     backdrop.classList.add('open');
     window.galPushModal(closeModal);
-    document.dispatchEvent(new CustomEvent('gal-unlock-opened', {
-      detail: { streamerId: streamerId, streamerName: streamerName },
-    }));
+    refreshStatus();
+    clearInterval(timer);
+    timer = setInterval(function () { if (!document.hidden) refreshStatus(); }, 15000);
   }
-  function closeModal() { backdrop.classList.remove('open'); window.galPopModal(closeModal); }
+  function closeModal() {
+    if (busy) return;
+    clearInterval(timer);
+    backdrop.classList.remove('open');
+    window.galPopModal(closeModal);
+  }
   window.galOpenUnlockModal = openModal;
-  window.galOpenSubscriptionModal = function () { openModal('', '', true); };
   window.galCloseUnlockModal = closeModal;
 
-  if (openSubscriptionBtn) openSubscriptionBtn.addEventListener('click', window.galOpenSubscriptionModal);
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
+  // 충전 탭에서 돌아오면 잔액을 바로 다시 확인한다.
+  window.addEventListener('focus', refreshStatus);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshStatus(); });
 
-  submitBtn.addEventListener('click', async function () {
-    if (!currentStreamerId) return;
-    var nickname = nicknameInput.value.trim();
-    if (!nickname) { statusEl.textContent = '⚠️ 신청자 SOOP 닉네임을 입력해 주세요.'; return; }
-
-    submitBtn.disabled = true;
-    statusEl.textContent = '⏳ 신청 처리 중...';
+  payBtn.addEventListener('click', async function () {
+    if (busy || !currentStreamerId) return;
+    var streamerId = currentStreamerId;
+    busy = true; payBtn.disabled = true; closeBtn.disabled = true; payBtn.textContent = '결제 중…';
     try {
-      var fn = window.galFirebase.httpsCallable('requestStreamerUnlock');
-      var result = await fn({ streamerId: currentStreamerId, streamerName: currentStreamerName, nickname: nickname });
-      var action = result.data.action;
-      if (action === 'already-unlocked') {
-        statusEl.textContent = '✅ 이미 해금된 스트리머예요! 새로고침하면 반영돼요.';
-      } else if (action === 'already-pending-mine') {
-        statusEl.textContent = '⏳ 이미 대기 중인 내 해금 신청이 있어요. 후원창에서 별풍선을 보내주세요.';
-        currentPendingRequestId = result.data.requestId;
-        cancelBtn.style.display = '';
-        window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
-      } else if (action === 'already-pending') {
-        statusEl.textContent = '⏳ 이미 대기 중인 해금 신청이 있어요. 후원창에서 별풍선을 보내주세요.';
-        window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
-      } else {
-        statusEl.textContent = '✅ 해금 신청이 접수됐어요. 후원창에서 별풍선을 보내주시면 관리자가 확인 후 해금해드려요.';
-        currentPendingRequestId = result.data.requestId;
-        cancelBtn.style.display = '';
-        window.open(UNLOCK_DONATION_URL, '_blank', 'noopener');
-      }
+      var res = await callPurchase({ action: 'purchase', streamerId: streamerId, requestId: requestId(streamerId) });
+      dropRequestId(streamerId);
+      var data = res.data || {};
+      statusEl.textContent = '✅ 열었어요! ' + (data.unlockedUntil ? formatDate(data.unlockedUntil) + '까지 모두 볼 수 있어요.' : '');
+      chargeLink.hidden = true;
     } catch (err) {
-      console.error('해금 신청 실패', err);
-      statusEl.textContent = '❌ 신청 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
+      if (definiteFailure(err)) dropRequestId(streamerId);
+      statusEl.textContent = message(err, '결제하지 못했어요. 차감된 캐시는 자동으로 확인돼요.');
+      payBtn.disabled = false;
     } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  cancelBtn.addEventListener('click', async function () {
-    if (!currentPendingRequestId) return;
-    if (!confirm('해금 신청을 취소할까요?')) return;
-    cancelBtn.disabled = true;
-    try {
-      var fn = window.galFirebase.httpsCallable('cancelStreamerUnlockRequest');
-      await fn({ requestId: currentPendingRequestId });
-      currentPendingRequestId = null;
-      cancelBtn.style.display = 'none';
-      statusEl.textContent = '신청을 취소했어요. 다시 신청할 수 있어요.';
-    } catch (err) {
-      alert('신청 취소 중 오류: ' + (err && err.message ? err.message : err));
-    } finally {
-      cancelBtn.disabled = false;
+      busy = false; closeBtn.disabled = false; payLabel();
     }
   });
 })();

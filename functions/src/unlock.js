@@ -35,9 +35,12 @@ async function isStreamerAccessible(db, streamerId) {
 // 실제 후원을 수동으로 확인하고 승인한다(soop-stock-market의 "동결 해제(후원)"와
 // 동일 원칙 — SOOP API로 자동 확인하지 않음). 이미 해금된 스트리머거나, 이미
 // 대기 중인 신청이 있으면 새로 만들지 않고 그 상태를 그대로 알려준다.
+// 2026-11-13: 새 후원 신청은 받지 않는다(통합 캐시 결제 galleryStreamerUnlockPurchase로 대체).
+// 이미 대기 중인 신청은 관리자 승인·거절과 본인 취소로 정리할 수 있게 아래 함수들은 남겨 둔다.
 const requestStreamerUnlock = onCall(async (request) => {
   const uid = await requireTrustedAccount(request);
   await assertNotBanned(uid);
+  throw new HttpsError('failed-precondition', '이제 통합 캐시로 바로 열 수 있어요. 페이지를 새로고침해 주세요.');
 
   const { streamerId, streamerName, nickname } = request.data || {};
   if (!streamerId || typeof streamerId !== 'string') {
