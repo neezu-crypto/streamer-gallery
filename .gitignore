@@ -4,3 +4,5 @@ node_modules/
 .firebase/
 .claude/
 functions/
+CLAUDE.md
+AGENTS.md
