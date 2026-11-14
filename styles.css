@@ -202,7 +202,7 @@ button{ font-family: inherit; cursor: pointer; }
   z-index:20;
 }
 .sidebar-mark{
-  width:44px; height:44px; border-radius:14px; margin-bottom:8px;
+  width:44px; height:44px; border-radius: 14.26px; margin-bottom:8px;
   display:flex; align-items:center; justify-content:center;
   background:linear-gradient(155deg, var(--gold), var(--mint));
   box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
@@ -1144,3 +1144,4 @@ button{ font-family: inherit; cursor: pointer; }
     .mtab-chip-fan .mtab-chip.confirm-pulse{ animation:none; }
   }
 }
+:root{--ss-maker:"skftod2";--ss-room:"gal"}

@@ -1,10 +1,10 @@
-// 갤러리 그리드 렌더링 + 검색/카테고리 필터 + 업로드(requestImageUpload로 presigned URL
-// 발급 → R2에 직접 PUT → registerImage로 메타데이터 등록, 3단계).
-// gallery/images 노드 읽기는 이미 database.rules.json에 반영돼 있어 지금부터도 동작한다.
+//  갤러리 그리드 렌더링 + 검색/카테고리 필터 + 업로드(requestImageUpload로 presigned URL
+//  발급 → R2에 직접 PUT → registerImage로 메타데이터 등록, 3단계).
+//  gallery/images 노드 읽기는 이미 database.rules.json에 반영돼 있어 지금부터도 동작한다.
 //
 // 스트리머별 업로드 잠금(2026-09-05 추가) — 스트리머 이름은 자유 텍스트가 아니라
 // streamer-names.json(정적 목록)에서 검색해서 선택하는 방식으로 바꿨다. 오타/띄어쓰기
-// 차이로 같은 스트리머가 다르게 취급되면 해금 여부 판별 자체가 무의미해지기 때문.
+//  차이로 같은 스트리머가 다르게 취급되면 해금 여부 판별 자체가 무의미해지기 때문.
 (function () {
   var grid = document.getElementById('gallery-grid');
   var myGalleryBanner = document.getElementById('mygallery-banner');
@@ -22,8 +22,8 @@
   var uploadDropzone = document.getElementById('upload-dropzone');
   var uploadDropzoneContent = document.getElementById('upload-dropzone-content');
 
-  // 업로드 진행바(2026-09-07) — "⏳ ~~ 중..." 텍스트 한 줄 대신 4단계
-  // 계단식 진행바로 대체. 검증 실패(⚠️)/에러(❌) 메시지는 그대로 uploadStatus
+  //  업로드 진행바(2026-09-07) — "⏳ ~~ 중..." 텍스트 한 줄 대신 4단계
+  //  계단식 진행바로 대체. 검증 실패(⚠️)/에러(❌) 메시지는 그대로 uploadStatus
   // 텍스트로 남기고, "진행 중" 상태만 이쪽으로 옮겼다.
   var uploadProgress = document.getElementById('upload-progress');
   var uploadProgressStage = document.getElementById('upload-progress-stage');
@@ -52,10 +52,10 @@
   window.galCategoryLabels = CATEGORY_LABELS;
 
   var IMAGES_PAGE_SIZE = 60;
-  // recentImages(최신 페이지)만 실시간(onValue) 구독하고, "더 보기"로 추가되는
+  //  recentImages(최신 페이지)만 실시간(onValue) 구독하고, "더 보기"로 추가되는
   // olderImages는 1회성 get()만 한다(2026-09-06 재설계) — 예전엔 "더 보기"를 누를
   // 때마다 limit을 60→120→180으로 늘려 매번 처음부터 다시 구독해서 이미 받은 것까지
-  // 통째로 재전송받았다.
+  //  통째로 재전송받았다.
   var recentImages = [];
   var olderImages = [];
   var imagesUnsub = null;
@@ -72,9 +72,9 @@
   var allStreamers = [];
   var selectedStreamerId = null;
   var selectedStreamerName = '';
-  // v2부터 공개 목록 캐시에 원본 URL·R2 객체 키를 저장하지 않는다. 예전 캐시 키를
+  //  v2부터 공개 목록 캐시에 원본 URL·R2 객체 키를 저장하지 않는다. 예전 캐시 키를
   // 재사용하면 서버 공개 미러를 정리한 뒤에도 브라우저에 남은 원본 주소가 잠깐
-  // 복원될 수 있어 새 키로 분리한다.
+  //  복원될 수 있어 새 키로 분리한다.
   var GRID_CACHE_KEY = 'galGridCache.v2';
 
   function sanitizePublicImage(id, value) {
@@ -99,11 +99,11 @@
 
   // 스트리머 이름 목록 - 정적 파일(수동 스크립트로만 갱신)에서 RTDB 파생 노드로
   // 전환(2026-09). /stocks 변경을 감시하는 Cloud Function 트리거
-  // (soop-stock-market의 syncStreamerNameOnStockChange)가 이름만 뽑은 가벼운
+  //  (soop-stock-market의 syncStreamerNameOnStockChange)가 이름만 뽑은 가벼운
   // 파생 노드(streamerNames)를 자동으로 최신화한다 - 새 종목이 등록돼도 사람이
-  // 스크립트를 수동 실행 안 하면 검색에 며칠씩 안 나타나던 문제가 이제 없다.
+  //  스크립트를 수동 실행 안 하면 검색에 며칠씩 안 나타나던 문제가 이제 없다.
   // stocks를 직접 구독하지 않는 이유는 그대로 유효(가격·거래량이 거래마다 바뀌는
-  // 무거운 노드). streamerNamesMeta/updatedAt(작은 값 하나)만 먼저 확인해서
+  //  무거운 노드). streamerNamesMeta/updatedAt(작은 값 하나)만 먼저 확인해서
   // localStorage 캐시와 같으면 재다운로드 없이 캐시를 쓰고, 다를 때만 전체를 다시
   // 받는다 - onValue(실시간 구독)는 쓰지 않는다(거래마다 재전송되는 문제 재발 방지).
   var STREAMER_NAMES_CACHE_KEY = 'galStreamerNamesCache';
@@ -131,13 +131,13 @@
   }
   loadStreamerNames();
 
-  // 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
-  // 열림이고, streamerFirstUpload(첫 업로드 시각)로부터 30일 무료체험, 이후
+  //  스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
+  //  열림이고, streamerFirstUpload(첫 업로드 시각)로부터 30일 무료체험, 이후
   // streamerUnlockedUntil(별풍선 갱신으로 연장된 만료 시각)이 지금보다 미래면
   // 접근 가능. 두 노드 다 작고(스트리머당 숫자 하나) 새 업로드/갱신 승인 때만
-  // 드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
-  // 노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
-  // 반드시 같은 공식을 유지할 것.
+  //  드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
+  //  노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
+  //  반드시 같은 공식을 유지할 것.
   var UNLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 - 서버 UNLOCK_DURATION_MS와 동일해야 함
   window.galStreamerFirstUpload = {};
   window.galStreamerUnlockedUntil = {};
@@ -198,20 +198,20 @@
 
   // isStreamerUnlocked()는 "만료됨"과 "애초에 업로드가 한 번도 없었음"을 둘 다
   // false로 뭉뚱그린다(firstUpload가 falsy면 둘 다 같은 경로) — 업로드 모달에서
-  // 이 둘을 구분해 보여주려면 firstUpload 존재 여부를 따로 확인해야 한다.
+  //  이 둘을 구분해 보여주려면 firstUpload 존재 여부를 따로 확인해야 한다.
   function hasStreamerEverUploaded(streamerId) {
     return !!(streamerId && window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId]);
   }
 
-  // 매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
+  //  매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
   // 반드시 같은 값이어야 한다(둘 중 하나만 바꾸면 span 계산이 어긋난다).
   var MASONRY_ROW_UNIT = 4;
   var MASONRY_GAP = 16;
   var DEFAULT_ASPECT_RATIO = 4 / 3; // width/height — 비율 정보 없는(마이그레이션 이전) 이미지용 기본값
 
-  // 카드 너비(반응형이라 컬럼 수에 따라 바뀜)는 실제 DOM에 붙은 뒤에만 알 수 있어서,
-  // grid.innerHTML을 채운 직후 한 번 읽어(reflow 1회) 각 카드의 grid-row-end span을
-  // 계산해 넣는다. 이미지의 실제 로드를 기다리지 않아도 되는 게 핵심 — width/height를
+  //  카드 너비(반응형이라 컬럼 수에 따라 바뀜)는 실제 DOM에 붙은 뒤에만 알 수 있어서,
+  //  grid.innerHTML을 채운 직후 한 번 읽어(reflow 1회) 각 카드의 grid-row-end span을
+  //  계산해 넣는다. 이미지의 실제 로드를 기다리지 않아도 되는 게 핵심 — width/height를
   // 업로드 시점에 이미 저장해뒀기 때문에(registerImage) 레이아웃이 튀지 않는다.
   function applyMasonrySpans() {
     grid.querySelectorAll('.gallery-card').forEach(function (card) {
@@ -240,8 +240,8 @@
       return true;
     });
 
-    // 더 보기는 "내 갤러리" 모드에선 의미 없다 — uploaderUid 필터링은 클라이언트에서
-    // 하는데, 서버 페이지네이션(limitToLast)은 필터와 무관하게 최근 N개를 이미
+    //  더 보기는 "내 갤러리" 모드에선 의미 없다 — uploaderUid 필터링은 클라이언트에서
+    //  하는데, 서버 페이지네이션(limitToLast)은 필터와 무관하게 최근 N개를 이미
     // 끊어서 가져오므로 "더 보기"를 눌러 페이지를 늘리는 흐름 자체는 그대로 유효하다.
     if (loadMoreBtn) loadMoreBtn.style.display = hasMoreImages ? '' : 'none';
 
@@ -289,7 +289,7 @@
     cacheRecentImages();
   }
 
-  // 상세 화면/관리자 화면에서 이미지 삭제를 시작할 때 호출한다. 반환 토큰은
+  //  상세 화면/관리자 화면에서 이미지 삭제를 시작할 때 호출한다. 반환 토큰은
   // 서버 실패 시 원래 목록 위치로 복구하는 데 사용한다.
   window.galBeginImageDelete = function (imageId) {
     if (!imageId || pendingImageDeletes[imageId]) return null;
@@ -308,9 +308,9 @@
     return { imageId: imageId };
   };
 
-  // 서버가 삭제를 확정했음을 기록한다. RTDB 구독에서 실제로 항목이 사라질 때까지
-  // pending 상태를 유지해, 서버 응답 직후 도착하는 이전 스냅샷으로 카드가 되살아나는
-  // 깜빡임을 막는다.
+  //  서버가 삭제를 확정했음을 기록한다. RTDB 구독에서 실제로 항목이 사라질 때까지
+  //  pending 상태를 유지해, 서버 응답 직후 도착하는 이전 스냅샷으로 카드가 되살아나는
+  //  깜빡임을 막는다.
   window.galConfirmImageDelete = function (imageId) {
     if (pendingImageDeletes[imageId]) pendingImageDeletes[imageId].confirmed = true;
   };
@@ -329,12 +329,12 @@
 
   // 배지 하나 옮기자고 그리드 전체를 innerHTML로 통째로 다시 그리면(renderGrid())
   // 새 카드들이 masonry span(grid-row-end)을 다시 계산받기 전까지 한순간 전부
-  // 기본 높이로 쪼그라들어 문서 전체 높이가 스크롤 위치보다 짧아지는 순간이
+  //  기본 높이로 쪼그라들어 문서 전체 높이가 스크롤 위치보다 짧아지는 순간이
   // 생기고, 브라우저가 그 순간 스크롤을 강제로 클램프해버린다 - applyMasonrySpans()가
   // 같은 틱에 바로 이어져도 한 번 내려간 스크롤 위치는 자동으로 안 돌아온다.
-  // "썸네일 탭하면 페이지가 최상단으로 튄다"는 실제 버그(2026-09-08 제보)의 진짜
-  // 원인이 이거였다 - modal-stack.js 스크롤 잠금과는 무관. 배지 두 개(이전 위치·
-  // 새 위치)만 DOM에서 직접 옮기면 그리드 재배치/reflow 자체가 안 생겨서 이 문제가
+  //  "썸네일 탭하면 페이지가 최상단으로 튄다"는 실제 버그(2026-09-08 제보)의 진짜
+  //  원인이 이거였다 - modal-stack.js 스크롤 잠금과는 무관. 배지 두 개(이전 위치·
+  //  새 위치)만 DOM에서 직접 옮기면 그리드 재배치/reflow 자체가 안 생겨서 이 문제가
   // 구조적으로 발생할 수 없다.
   function updateRecentBadge(newId) {
     if (!grid) return;
@@ -357,9 +357,9 @@
   });
 
   // 좋아요/댓글 수는 gallery/imageStats에 따로 있다(2026-09-06, gallery/images에서
-  // 분리) — 라이브로 또 구독하면 결국 똑같이 "아무 좋아요에나 전체 목록 재전송"
-  // 문제가 재발하므로, 이미지 목록이 구조적으로 바뀔 때만(신규 업로드/더 보기) 1회성
-  // get()으로 읽어와 병합한다. 내가 직접 누른 좋아요는 이 재조회를 기다리지 않고
+  //  분리) — 라이브로 또 구독하면 결국 똑같이 "아무 좋아요에나 전체 목록 재전송"
+  //  문제가 재발하므로, 이미지 목록이 구조적으로 바뀔 때만(신규 업로드/더 보기) 1회성
+  //  get()으로 읽어와 병합한다. 내가 직접 누른 좋아요는 이 재조회를 기다리지 않고
   // window.galPatchImageLikeCount로 그 자리에서 바로 반영한다.
   async function mergeStatsAndRender() {
     recentImages = recentImages.filter(function (img) { return !pendingImageDeletes[img.id]; });
@@ -383,7 +383,7 @@
     }
     renderGrid();
     document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
-    // 초기 로드 체감 속도(2026-09-06 추가) — 최신 페이지만 캐싱해서 다음 방문 때
+    //  초기 로드 체감 속도(2026-09-06 추가) — 최신 페이지만 캐싱해서 다음 방문 때
     // 실시간 구독 응답을 기다리지 않고 바로 그려준다(용량 방지 위해 olderImages는
     // 캐싱 안 함).
     cacheRecentImages();
@@ -393,7 +393,7 @@
     var img = allImages.find(function (i) { return i.id === imageId; });
     if (!img) return;
     img.likeCount = likeCount;
-    // 데이터만 바꾸고 끝내면 그리드 DOM은 다음 전체 재렌더링 전까지 그대로라 카드에
+    //  데이터만 바꾸고 끝내면 그리드 DOM은 다음 전체 재렌더링 전까지 그대로라 카드에
     // 호버해도 예전 숫자가 보인다(2026-09-06 실사용 테스트로 발견) — 바로 다시 그린다.
     renderGrid();
   };
@@ -408,9 +408,9 @@
     document.dispatchEvent(new CustomEvent('gal-images-updated', { detail: { images: allImages } }));
   };
 
-  // 댓글 등록/삭제는 imageStats의 commentCount만 바꾸므로 gallery/images 실시간
+  //  댓글 등록/삭제는 imageStats의 commentCount만 바꾸므로 gallery/images 실시간
   // 구독만으로는 관리자 전체 이미지 목록의 숫자가 갱신되지 않는다. 상세보기와
-  // 관리자 검수 화면이 같은 캐시를 보도록, 서버가 돌려준 최신 카운트를 이 창구로
+  //  관리자 검수 화면이 같은 캐시를 보도록, 서버가 돌려준 최신 카운트를 이 창구로
   // 반영하고 목록 갱신 이벤트도 함께 발행한다.
   window.galPatchImageCommentCount = function (imageId, commentCount) {
     var img = allImages.find(function (i) { return i.id === imageId; });
@@ -429,7 +429,7 @@
     // orderByChild('createdAt') 없이 limitToLast만 걸면 RTDB 기본 정렬 기준인 키
     // (imageId가 randomUUID라 생성 순서와 무관)로 마지막 N개를 가져와서, 사실상
     // 무작위 N개를 "최근 이미지"로 보여주는 버그가 있었다(2026-09-06 발견/수정) —
-    // .indexOn에 createdAt이 이미 있어서 규칙 변경 없이 바로 쓸 수 있다.
+    //  .indexOn에 createdAt이 이미 있어서 규칙 변경 없이 바로 쓸 수 있다.
     var imagesRef = window.galFirebase.query(
       window.galFirebase.ref(window.galDb, 'gallery/imagesPublic'),
       window.galFirebase.orderByChild('createdAt'),
@@ -449,7 +449,7 @@
       });
       recentImages = rawRecentImages.filter(function (img) { return !pendingImageDeletes[img.id]; });
       // "더 보기"로 이미 불러온 과거 페이지 중 이번 최신 윈도우와 겹치는 항목은
-      // 제거 — 최신 윈도우 쪽이 항상 더 신선한 데이터라 그쪽을 우선한다.
+      //  제거 — 최신 윈도우 쪽이 항상 더 신선한 데이터라 그쪽을 우선한다.
       var recentIds = {};
       recentImages.forEach(function (img) { recentIds[img.id] = true; });
       olderImages = olderImages.filter(function (img) { return !recentIds[img.id]; });
@@ -461,7 +461,7 @@
   }
 
   // "더 보기" — 커서 기반 페이지네이션(2026-09-06 변경). 예전엔 limit을 60→120→180
-  // 늘려서 매번 처음부터 다시 구독해 이미 받은 데이터까지 통째로 재전송받았는데,
+  //  늘려서 매번 처음부터 다시 구독해 이미 받은 데이터까지 통째로 재전송받았는데,
   // 이제는 지금까지 로드된 것 중 가장 오래된 항목의 createdAt/키를 기준 삼아 그보다
   // 오래된 PAGE_SIZE개만 1회성으로 읽어와 이어붙인다(과거 페이지는 재구독하지 않음).
   async function loadMoreImages() {
@@ -494,8 +494,8 @@
 
   if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMoreImages);
 
-  // 숨기기 버튼 — 카드 안에 있어서 클릭이 버블링되면 상세보기(gallery-detail.js의
-  // document 클릭 리스너)까지 열려버리므로 stopPropagation으로 막는다. 확인창은
+  //  숨기기 버튼 — 카드 안에 있어서 클릭이 버블링되면 상세보기(gallery-detail.js의
+  //  document 클릭 리스너)까지 열려버리므로 stopPropagation으로 막는다. 확인창은
   // 이 코드베이스에서 이미지/댓글 삭제 때 쓰던 것과 동일하게 네이티브 confirm() 사용.
   if (grid) {
     grid.addEventListener('click', function (e) {
@@ -530,8 +530,8 @@
   if (searchInput) searchInput.addEventListener('input', renderGrid);
 
   // 모바일 하단 탭바(js/gallery-mobile-nav.js)의 카테고리 제스처가 이 클로저 밖에서
-  // 필터를 바꿀 수 있게 노출하는 창구 — 데스크톱 카테고리 원형 배지와 동일하게
-  // activeCategory를 갱신하고 그 배지의 active 표시도 같이 맞춰준다.
+  //  필터를 바꿀 수 있게 노출하는 창구 — 데스크톱 카테고리 원형 배지와 동일하게
+  //  activeCategory를 갱신하고 그 배지의 active 표시도 같이 맞춰준다.
   window.galSetCategory = function (category) {
     activeCategory = category;
     if (chipsWrap) {
@@ -542,7 +542,7 @@
 
   var myGalleryBtn = document.getElementById('open-mygallery-btn');
 
-  // 홈 버튼 — 검색어/카테고리/내 갤러리 필터를 전부 초기 상태로 되돌린다.
+  //  홈 버튼 — 검색어/카테고리/내 갤러리 필터를 전부 초기 상태로 되돌린다.
   var sidebarHomeBtn = document.getElementById('sidebar-home-btn');
   if (sidebarHomeBtn) {
     sidebarHomeBtn.addEventListener('click', function () {
@@ -623,7 +623,7 @@
   // 업로드 드롭존(2026-09-10 추가) — 클릭 선택/드래그앤드롭 둘 다 최종적으로는
   // 실제 input[type=file]의 files를 채우고 그 input의 change 이벤트를 발생시키는
   // 한 경로로 합류시킨다 — 그래야 검증/업로드(uploadSubmitBtn 핸들러)를 그대로
-  // 재사용하고 두 경로를 따로 검증하지 않아도 된다.
+  //  재사용하고 두 경로를 따로 검증하지 않아도 된다.
   var uploadFileInput = document.getElementById('upload-file');
   var dropzoneDefaultHtml = uploadDropzoneContent ? uploadDropzoneContent.innerHTML : '';
   var dropzonePreviewUrl = null;
@@ -683,7 +683,7 @@
     hideUploadProgress();
     resetStreamerPicker();
     resetDropzonePreview();
-    // 같은 스트리머 이미지를 연속으로 올리는 경우가 많아서, 마지막으로
+    //  같은 스트리머 이미지를 연속으로 올리는 경우가 많아서, 마지막으로
     // 업로드에 성공한 스트리머를 열 때마다 미리 선택해둔다(2026-09-05 추가).
     try {
       var lastStreamer = JSON.parse(localStorage.getItem('galLastUploadStreamer') || 'null');
@@ -704,9 +704,9 @@
   var MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
   var THUMB_MAX_DIMENSION = 480;
 
-  // 실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
-  // 그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
-  // 축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
+  //  실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
+  //  그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
+  //  축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
   // 나오는데, 썸네일은 정지 이미지로 충분하고 원본(imageUrl)은 애니메이션 그대로다.
   // 이 김에 원본 실제 크기(width/height)도 같이 얻어서 매소너리 그리드가 이미지
   // 로드를 기다리지 않고 바로 비율대로 배치할 수 있게 registerImage에 같이 넘긴다.
@@ -792,8 +792,8 @@
     });
   }
 
-  // #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
-  // 모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
+  //  #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
+  //  모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
   // 경합해서 로그인 후에도 항상 로그인 모달만 뜨는 버그가 생긴다).
 
   // 초기 로드 체감 속도(2026-09-06 추가) — 실시간 구독 응답을 기다리지 않고 지난
