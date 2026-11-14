@@ -30,6 +30,7 @@ import {
   getFunctions,
   httpsCallable,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 
 // 갤러리 전용 Web App 등록 (자매 저장소들과 같은 프로젝트 soop-stock-market, appId만 별개)
 const firebaseConfig = {
@@ -44,6 +45,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+try { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'), isTokenAutoRefreshEnabled: true }); } catch (error) { console.warn('App Check 초기화 실패', error); }
 const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app);
