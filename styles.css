@@ -1177,3 +1177,8 @@ button{ font-family: inherit; cursor: pointer; }
 .gal-viewas button[aria-pressed=true]{background:#333;color:#fff;border-color:#333}
 .gal-viewas small{width:100%;color:#a0650a;font-size:11px}
 @media (min-width:768px){.gal-viewas{bottom:16px}}
+/* 하루 업로드 한도·업로드 늘리기(2026-11-17) */
+.upload-quota{margin:6px 0 8px;font-size:12px;opacity:.9}
+.upload-quota[hidden]{display:none}
+.upload-quota-more{margin-left:4px;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
+.upload-quota-more[hidden]{display:none}

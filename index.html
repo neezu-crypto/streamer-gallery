@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261117-viewas1">
+<link rel="stylesheet" href="styles.css?v=20261117-pass1">
 </head>
 <body data-ss-series="gallery-2026" data-ssroom="skftod2-gal">
 
@@ -162,6 +162,7 @@
     </div>
     <p class="propose-modal-title">🖼️ 이미지 업로드</p>
     <p class="propose-modal-sub">방송 스크린샷이나 AI 일러스트를 올려서 함께 공유해보세요.</p>
+    <p class="upload-quota" id="upload-quota" hidden><span id="upload-quota-text"></span> <button type="button" class="text-link upload-quota-more" id="upload-quota-more">업로드 늘리기</button></p>
     <input type="text" id="upload-streamer-search" placeholder="SOOP 스트리머 닉네임이나 아이디로 검색" autocomplete="off">
     <div class="streamer-search-results" id="upload-streamer-results"></div>
     <p class="propose-modal-sub" id="upload-streamer-selected" style="display:none;"></p>
@@ -230,6 +231,34 @@
       <div class="unlock-subscription-actions">
         <a class="text-link" id="unlock-charge-link" href="https://neezu-crypto.github.io/streamer-game-series-shop/customer-center.html?open=charge" target="_blank" rel="noopener noreferrer" hidden>통합 캐시 충전하기 ↗</a>
         <button class="glitch-btn" id="unlock-pay-btn" type="button" disabled>10캐시로 열기</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 업로드 늘리기 이용권(2026-11-17, js/gallery-upload-pass.js) -->
+<div class="propose-backdrop" id="upload-pass-backdrop">
+  <div class="propose-modal">
+    <div class="terminal-header">
+      <span class="terminal-title">UPLOAD_PASS</span>
+      <div class="terminal-dots">
+        <button class="propose-modal-close" id="upload-pass-close" type="button" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <p class="propose-modal-title">📤 업로드 늘리기</p>
+    <p class="propose-modal-sub" id="upload-pass-today"></p>
+    <section class="unlock-subscription" aria-labelledby="upload-pass-title">
+      <h3 id="upload-pass-title">통합 캐시 <span id="upload-pass-price">30</span>캐시로 30일 동안 하루 <span id="upload-pass-limit">50</span>장</h3>
+      <ul class="unlock-subscription-steps">
+        <li>결제하면 바로 30일 동안 하루 업로드 한도가 <b id="upload-pass-free">10</b>장에서 <b id="upload-pass-limit2">50</b>장으로 늘어나요(한국 시간 자정 기준).</li>
+        <li>내 한도는 다른 이용자가 얼마나 올렸든 보장돼요. SOOP 게시글에서 불러온 사진도 장수만큼 세요.</li>
+        <li>이용 중에 다시 사면 끝나는 날 뒤로 30일이 더해져요.</li>
+        <li>결제 즉시 적용되며 일반 취소·환불은 되지 않아요. 결제 오류나 이중 차감은 자동으로 환불돼요. 통합 캐시는 별풍선 1개 = 1캐시예요.</li>
+      </ul>
+      <p class="unlock-subscription-status" id="upload-pass-status" role="status" aria-live="polite"></p>
+      <div class="unlock-subscription-actions">
+        <a class="text-link" id="upload-pass-charge" href="https://neezu-crypto.github.io/streamer-game-series-shop/customer-center.html?open=charge" target="_blank" rel="noopener noreferrer" hidden>통합 캐시 충전하기 ↗</a>
+        <button class="glitch-btn" id="upload-pass-buy" type="button" disabled>30캐시로 이용권 사기</button>
       </div>
     </section>
   </div>
@@ -608,9 +637,10 @@
 <script defer src="js/profile-modal.js"></script>
 <script defer src="js/kakao-login.js"></script>
 <script defer src="js/streamer-verify.js?v=20261006-live-verification"></script>
-<script defer src="js/gallery.js?v=20261117-soopid1"></script>
-<script defer src="js/gallery-soop.js?v=20261117-soop3"></script>
+<script defer src="js/gallery.js?v=20261117-pass1"></script>
+<script defer src="js/gallery-soop.js?v=20261117-pass1"></script>
 <script defer src="js/gallery-view-as.js?v=20261117-viewas1"></script>
+<script defer src="js/gallery-upload-pass.js?v=20261117-pass1"></script>
 <script defer src="js/image-viewer.js"></script>
 <script defer src="js/gallery-unlock.js?v=20261113-cash-unlock"></script>
 <script defer src="js/gallery-detail.js?v=20261117-soop2"></script>

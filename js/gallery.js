@@ -789,6 +789,7 @@
 
         setUploadProgress('완료!', 100);
         uploadStatus.textContent = '✅ 업로드 완료!';
+        window.galNoteUploaded && window.galNoteUploaded(1);
         window.galSound && window.galSound.uploadSuccess();
         try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
         resetStreamerPicker();
@@ -800,6 +801,8 @@
         window.galSound && window.galSound.error(err);
         hideUploadProgress();
         uploadStatus.textContent = '❌ 업로드 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err);
+        // 하루 한도에 닿았으면 업로드 늘리기 창으로 이어 준다(관리자·이용권 이용자는 안내만).
+        if (err && err.details && err.details.reason === 'daily-limit' && !err.details.hasPass) window.galOpenUploadPass && window.galOpenUploadPass();
       } finally {
         uploadSubmitBtn.disabled = false;
       }

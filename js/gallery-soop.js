@@ -61,8 +61,17 @@
         b.setAttribute('aria-pressed', picked.has(p.photoNo) ? 'true' : 'false');
         b.addEventListener('click', function () {
           if (picked.has(p.photoNo)) picked.delete(p.photoNo);
-          else if (picked.size < MAX_PICK) picked.add(p.photoNo);
-          else { msg('⚠️ 한 번에 ' + MAX_PICK + '장까지 등록할 수 있어요.'); return; }
+          else {
+            // 오늘 남은 업로드 장수까지만 고를 수 있다(하루 업로드 제한).
+            var left = window.galUploadRemaining ? window.galUploadRemaining() : null;
+            var cap = Math.min(MAX_PICK, left === null ? MAX_PICK : left);
+            if (picked.size >= cap) {
+              msg(cap < MAX_PICK ? '⚠️ 오늘은 ' + cap + '장까지 더 올릴 수 있어요.' : '⚠️ 한 번에 ' + MAX_PICK + '장까지 등록할 수 있어요.');
+              if (cap < MAX_PICK && left === 0 && window.galOpenUploadPass) window.galOpenUploadPass();
+              return;
+            }
+            picked.add(p.photoNo);
+          }
           b.setAttribute('aria-pressed', picked.has(p.photoNo) ? 'true' : 'false');
           updateSubmit();
         });
@@ -157,6 +166,7 @@
       var ok = (reg.data && reg.data.registered || []).length; var bad = (reg.data && reg.data.failed || []).length;
       s.setProgress('완료!', 100);
       msg('✅ 사진 ' + ok + '장을 등록했어요.' + (bad ? ' (' + bad + '장은 실패)' : ''));
+      window.galNoteUploaded && window.galNoteUploaded(ok);
       window.galSound && window.galSound.uploadSuccess();
       Object.keys(previewCache).forEach(function (k) { delete previewCache[k]; });
       current = null; picked = new Set(); urlInput.value = ''; render();
@@ -166,6 +176,7 @@
       window.galSound && window.galSound.error(err);
       s.hideProgress();
       msg('❌ ' + errText(err));
+      if (err && err.details && err.details.reason === 'daily-limit' && !err.details.hasPass) window.galOpenUploadPass && window.galOpenUploadPass();
     } finally { loadBtn.disabled = false; updateSubmit(); }
   });
 })();
