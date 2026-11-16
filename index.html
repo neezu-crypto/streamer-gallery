@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261027-subscription-benefits-guide">
+<link rel="stylesheet" href="styles.css?v=20261117-soop2">
 </head>
 <body data-ss-series="gallery-2026" data-ssroom="skftod2-gal">
 
@@ -172,6 +172,20 @@
       <option value="meme">밈</option>
       <option value="etc">기타</option>
     </select>
+    <div class="upload-source-tabs" role="tablist">
+      <button type="button" class="upload-source-tab active" id="upload-tab-file" role="tab" aria-selected="true">내 파일</button>
+      <button type="button" class="upload-source-tab" id="upload-tab-soop" role="tab" aria-selected="false">SOOP 게시글 링크</button>
+    </div>
+    <div class="soop-import" id="soop-import" hidden>
+      <p class="propose-modal-sub">고른 스트리머 방송국의 <b>전체 공개</b> 게시글 링크를 붙여 넣으세요. 이미지는 SOOP에서 그대로 보여 주고, 목록용 작은 미리보기만 저장해요. 작성자 정보는 저장하지 않아요.</p>
+      <div class="soop-import-row">
+        <input type="url" id="soop-post-url" placeholder="https://www.sooplive.com/station/아이디/post/번호" autocomplete="off">
+        <button type="button" class="glitch-btn" id="soop-post-load">불러오기</button>
+      </div>
+      <div class="soop-notice" id="soop-notice" role="alert" hidden></div>
+      <div class="soop-photo-grid" id="soop-photo-grid"></div>
+      <button class="glitch-btn" id="soop-submit-btn" type="button" hidden>고른 사진 등록하기</button>
+    </div>
     <label class="upload-dropzone" id="upload-dropzone" for="upload-file">
       <input type="file" id="upload-file" accept="image/*" hidden>
       <div class="upload-dropzone-content" id="upload-dropzone-content">
@@ -258,6 +272,7 @@
         <div class="detail-meta-row">
           <span class="gallery-card-streamer detail-streamer-link" id="detail-streamer"></span>
           <span class="gallery-badge" id="detail-category"></span>
+          <a class="detail-soop-link" id="detail-soop-link" target="_blank" rel="noopener noreferrer" hidden></a>
         </div>
         <div class="detail-related" id="detail-related" style="display:none;">
           <p class="detail-related-title">이 스트리머의 다른 사진</p>
@@ -265,6 +280,7 @@
         </div>
         <div class="detail-report-form" id="detail-report-form" style="display:none;">
           <input type="text" id="detail-report-reason" maxlength="300" placeholder="신고 사유(선택)">
+          <button type="button" class="detail-report-chip" id="detail-report-soop-reason" hidden>원본 글에서 삭제된 이미지</button>
           <button id="detail-report-submit" type="button">신고 제출</button>
           <p class="propose-modal-sub" id="detail-report-status"></p>
         </div>
@@ -592,11 +608,12 @@
 <script defer src="js/profile-modal.js"></script>
 <script defer src="js/kakao-login.js"></script>
 <script defer src="js/streamer-verify.js?v=20261006-live-verification"></script>
-<script defer src="js/gallery.js?v=20261027-unified-subscription"></script>
+<script defer src="js/gallery.js?v=20261117-soop1"></script>
+<script defer src="js/gallery-soop.js?v=20261117-soop2"></script>
 <script defer src="js/image-viewer.js"></script>
 <script defer src="js/gallery-unlock.js?v=20261113-cash-unlock"></script>
-<script defer src="js/gallery-detail.js?v=20261027-unified-subscription"></script>
-<script defer src="js/gallery-admin.js?v=20261117-r2scan2"></script>
+<script defer src="js/gallery-detail.js?v=20261117-soop2"></script>
+<script defer src="js/gallery-admin.js?v=20261117-soop1"></script>
 <script defer src="js/gallery-mobile-nav.js"></script>
 </body>
 </html>

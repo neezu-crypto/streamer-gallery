@@ -14,6 +14,10 @@
   var reportBtn = document.getElementById('detail-report-btn');
   var reportForm = document.getElementById('detail-report-form');
   var reportReasonInput = document.getElementById('detail-report-reason');
+  var soopReasonPick = document.getElementById('detail-report-soop-reason');
+  if (soopReasonPick) soopReasonPick.addEventListener('click', function () {
+    reportReasonInput.value = 'SOOP 원본 글에서 삭제된 이미지(작성자 요청 포함)';
+  });
   var reportSubmitBtn = document.getElementById('detail-report-submit');
   var reportStatus = document.getElementById('detail-report-status');
   var commentsWrap = document.getElementById('detail-comments');
@@ -111,6 +115,12 @@
   // 문제도 같이 사라진다.
   downloadBtn.addEventListener('click', async function () {
     if (!currentImageId) return;
+    var curImg = (window.galAllImages || []).find(function (i) { return i.id === currentImageId; });
+    if (curImg && curImg.source === 'soop') {
+      if (curImg._soopRemoved) return; // 원본이 SOOP에 있어 새 탭으로 연다(서버 호출 없음)
+      if (/^https:\/\/stimg\.sooplive\.com\//.test(String(curImg.sourceUrl || ''))) window.open(curImg.sourceUrl, '_blank', 'noopener');
+      return;
+    }
     var originalText = downloadBtn.textContent;
     downloadBtn.disabled = true;
     downloadBtn.textContent = '다운로드 중...';
@@ -306,6 +316,8 @@
     deleteBtn.textContent = isUploader ? '내 이미지 삭제' : '내 사진 삭제(스트리머 인증)';
     reportForm.style.display = 'none';
     reportReasonInput.value = '';
+    var soopReasonBtn = document.getElementById('detail-report-soop-reason');
+    if (soopReasonBtn) soopReasonBtn.hidden = img.source !== 'soop';
     reportStatus.textContent = '';
     commentInput.value = '';
     latestCommentList = [];
@@ -316,6 +328,39 @@
     refreshLikedState(img.id);
     subscribeComments(img.id);
     loadRelatedPhotos(img);
+    // SOOP 게시글에서 불러온 이미지는 원래 공개 이미지라 서버 호출 없이 SOOP 주소로 바로 보여 준다.
+    var soopLink = document.getElementById('detail-soop-link');
+    if (soopLink) soopLink.hidden = img.source !== 'soop';
+    if (img.source === 'soop') {
+      if (soopLink) { soopLink.href = img.sourcePostUrl || '#'; soopLink.textContent = 'SOOP 원본 글 보기 ↗'; }
+      // 원본 글에서 사진이 내려갔는지 서버가 확인한다(같은 글은 서버가 10분 기억). 내려갔으면 원본을 보여 주지 않는다.
+      var shownFull = false;
+      window.galFirebase.httpsCallable('galleryCheckSoopImage')({ imageId: img.id }).then(function (r) {
+        if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+        if (r.data && r.data.available === false) {
+          if (shownFull) imageEl.src = img.thumbUrl || '';
+          currentImageUrl = '';
+          img._soopRemoved = true;
+          if (soopLink) soopLink.textContent = '원본 글에서 내려간 사진이라 원본을 보여 주지 않아요';
+        }
+      }).catch(function (e) { console.warn('SOOP 원본 확인 실패', e); });
+      var soopUrl = String(img.sourceUrl || '');
+      if (/^https:\/\/stimg\.sooplive\.com\//.test(soopUrl)) {
+        var soopImg = new Image();
+        soopImg.referrerPolicy = 'no-referrer';
+        soopImg.onload = function () {
+          if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+          if (img._soopRemoved) return;
+          shownFull = true; currentImageUrl = soopUrl; imageEl.src = soopUrl;
+        };
+        soopImg.onerror = function () {
+          if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+          if (soopLink) soopLink.textContent = '원본 글이 삭제되었거나 볼 수 없어요 (미리보기만 표시)';
+        };
+        soopImg.src = soopUrl;
+      }
+      return;
+    }
     // 공개 목록에는 썸네일만 들어 있다. 원본은 서버가 통합 구독 또는 기존
     // 스트리머별 공개 기간을 다시 확인한 뒤 발급하는 5분짜리 서명 URL로 교체한다.
     var accessFn = window.galFirebase.httpsCallable('getGalleryImageAccess');
@@ -348,7 +393,7 @@
     if (!img) return;
     // 스트리머별 업로드 잠금(2026-09-05 추가) — 잠긴 스트리머 이미지는 그리드엔
     // 나오지만(🔒 배지), 클릭하면 상세보기(좋아요/댓글) 대신 해금 신청 모달로 유도한다.
-    if (window.galIsStreamerUnlocked && !window.galIsStreamerUnlocked(img.streamerId)) {
+    if (img.source !== 'soop' && window.galIsStreamerUnlocked && !window.galIsStreamerUnlocked(img.streamerId)) {
       window.galOpenUnlockModal && window.galOpenUnlockModal(img.streamerId, img.streamerName);
       return;
     }

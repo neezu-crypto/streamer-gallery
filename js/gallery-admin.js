@@ -671,7 +671,7 @@
       '<div class="admin-detail-meta">' +
         '<span><strong>이미지</strong> ' + escapeHtml(targetName) + '</span>' +
         '<span><strong>신고 접수</strong> ' + escapeHtml(formatWhen(report.createdAt)) + '</span>' +
-        '<span><strong>신고자</strong> ' + escapeHtml(report.reporterUid || '(알 수 없음)') + '</span>' +
+        '<span><strong>신고자</strong> ' + escapeHtml(report.reporterUid || (report.auto ? '자동 점검' : '(알 수 없음)')) + '</span>' +
         '<span><strong>작성자 UID</strong> ' + escapeHtml(authorUid || '(알 수 없음)') + '</span>' +
       '</div>' +
       reportText +
@@ -862,7 +862,7 @@
           '<div class="admin-row-body">' +
             '<div class="admin-row-meta">댓글 신고 · ' + escapeHtml((img && img.streamerName) || r.streamerName || r.imageId || '(이미지 없음)') + ' · ' + when + statusBadge(r.status) + '</div>' +
             '<div class="admin-row-reason"><strong>댓글:</strong> ' + (escapeHtml(r.commentText) || '(내용 없음)') + '</div>' +
-            '<div class="admin-row-reason"><strong>작성자:</strong> ' + author + ' · <strong>신고자:</strong> ' + escapeHtml(r.reporterUid || '(알 수 없음)') + '</div>' +
+            '<div class="admin-row-reason"><strong>작성자:</strong> ' + author + ' · <strong>신고자:</strong> ' + escapeHtml(r.reporterUid || (r.auto ? '자동 점검' : '(알 수 없음)')) + '</div>' +
             '<div class="admin-row-reason"><strong>사유:</strong> ' + (escapeHtml(r.reason) || '(사유 없음)') + '</div>' +
           '</div>' +
           '<div class="admin-row-actions">' +
@@ -1390,10 +1390,13 @@
     btn.disabled = true;
     try {
       var fn = window.galFirebase.httpsCallable('adminDismissImageReport');
-      await fn({ reportId: reportId });
+      var res = await fn({ reportId: reportId });
       window.galSound && window.galSound.adminAction();
       if (selectedDetail && selectedDetail.kind === 'image' && selectedDetail.reportId === reportId) clearDetail();
-      showToast('✅ 이미지 신고를 무시했어요.');
+      var soopRestored = res && res.data ? res.data.soopRestored : undefined;
+      showToast(soopRestored === true ? '✅ 신고를 무시하고, SOOP 원본에 사진이 있어 다시 공개했어요.'
+        : soopRestored === false ? '신고를 무시했어요. SOOP 원본 글에 사진이 없어 숨김은 유지돼요(지우려면 삭제).'
+        : '✅ 이미지 신고를 무시했어요.');
       loadAdminPage({ showLoading: false });
     } catch (err) {
       window.galSound && window.galSound.error(err);

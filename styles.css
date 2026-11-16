@@ -1145,3 +1145,26 @@ button{ font-family: inherit; cursor: pointer; }
   }
 }
 :root{--ss-maker:"skftod2";--ss-room:"gal"}
+
+/* SOOP 게시글 이미지 불러오기(2026-11-17) */
+.upload-source-tabs{display:flex;gap:6px;margin:10px 0 8px}
+.upload-source-tab{flex:1;padding:9px 8px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.upload-source-tab.active{border-color:currentColor;font-weight:700}
+.soop-import[hidden],.upload-dropzone[hidden],#upload-submit-btn[hidden],#soop-submit-btn[hidden]{display:none}
+.soop-import-row{display:flex;gap:6px}
+.soop-import-row input{flex:1;min-width:0}
+.soop-import-row .glitch-btn{flex:none;margin:0}
+.soop-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin:10px 0;max-height:260px;overflow-y:auto}
+.soop-photo{position:relative;aspect-ratio:1;padding:0;border:2px solid transparent;border-radius:9px;overflow:hidden;background:rgba(255,255,255,.06);cursor:pointer}
+.soop-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.soop-photo[aria-pressed=true]{border-color:#7c95f2;box-shadow:0 0 0 2px rgba(124,149,242,.35)}
+.soop-photo[aria-pressed=true]::after{content:'✓';position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:#5d79e4;color:#fff;font-size:12px;line-height:20px;text-align:center}
+.soop-photo.registered{opacity:.45;cursor:default}
+.soop-photo.registered span{position:absolute;left:0;right:0;bottom:0;padding:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10px}
+.detail-soop-link{font-size:12px;opacity:.85;text-decoration:underline}
+.detail-soop-link[hidden]{display:none}
+.detail-report-chip{margin:6px 0;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.detail-report-chip[hidden]{display:none}
+.soop-notice{margin:10px 0 0;padding:11px 13px;border:1px solid rgba(255,196,92,.55);border-radius:11px;background:rgba(255,196,92,.12);font-size:13px;line-height:1.55}
+.soop-notice[hidden]{display:none}
+.soop-notice p{margin:4px 0 0}

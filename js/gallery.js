@@ -258,7 +258,7 @@
     // 하다가 바로 눈에 띄어야 하는 용도라서. localStorage에 마지막 1개만 기록.
     var lastViewedId = localStorage.getItem('galLastViewedImageId');
     grid.innerHTML = filtered.map(function (img) {
-      var locked = !isStreamerUnlocked(img.streamerId);
+      var locked = img.source !== 'soop' && !isStreamerUnlocked(img.streamerId);
       var ratio = (img.width && img.height) ? (img.width / img.height) : '';
       return (
         '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
@@ -731,6 +731,18 @@
       img.src = url;
     });
   }
+
+  // SOOP 게시글 불러오기(js/gallery-soop.js)가 같은 스트리머 선택·진행 표시를 쓰도록 열어 둔다.
+  window.galUploadShared = {
+    picked: function () { return { id: selectedStreamerId, name: selectedStreamerName }; },
+    setProgress: setUploadProgress, hideProgress: hideUploadProgress,
+    status: function (t) { uploadStatus.textContent = t; },
+    done: function () {
+      try { localStorage.setItem('galLastUploadStreamer', JSON.stringify({ id: selectedStreamerId, name: selectedStreamerName })); } catch (e) {}
+      resetStreamerPicker(); setTimeout(closeUploadModal, 900);
+    },
+    thumbMax: THUMB_MAX_DIMENSION,
+  };
 
   if (uploadSubmitBtn) {
     uploadSubmitBtn.addEventListener('click', async function () {
