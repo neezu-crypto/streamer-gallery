@@ -49,9 +49,20 @@ try { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0A
 const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app);
-const whoAmIFn = httpsCallable(functions, 'galleryCheckAdmin');
+// 관리자 보기 모드(2026-11-17, js/gallery-view-as.js): 탭(sessionStorage)에 고른 '팬'/'스트리머'를
+// 모든 서버 호출에 viewAs로 붙인다. 서버는 진짜 관리자일 때만 받아들이고, 권한을 낮추는 쪽으로만 쓴다.
+const GAL_VIEW_AS_KEY = 'galViewAs.v1';
+function galViewAs() {
+  try { const v = sessionStorage.getItem(GAL_VIEW_AS_KEY); return v === 'fan' || v === 'streamer' ? v : ''; } catch (_) { return ''; }
+}
+window.galViewAs = galViewAs;
+function callable(name) {
+  const fn = httpsCallable(functions, name);
+  return (data) => { const v = galViewAs(); return fn(v ? Object.assign({}, data || {}, { viewAs: v }) : data); };
+}
+const whoAmIFn = callable('galleryCheckAdmin');
 const logGalleryVisitFn = httpsCallable(functions, 'logGalleryVisit');
-const gallerySubscriptionStatusFn = httpsCallable(functions, 'gallerySubscriptionStatus');
+const gallerySubscriptionStatusFn = callable('gallerySubscriptionStatus');
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -
@@ -63,7 +74,7 @@ const googleProvider = new GoogleAuthProvider();
 
 window.galFirebase = {
   ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, endBefore, limitToFirst, limitToLast, serverTimestamp,
-  httpsCallable: (name) => httpsCallable(functions, name),
+  httpsCallable: (name) => callable(name),
   GoogleAuthProvider,
 };
 window.galAuth = auth;
@@ -410,7 +421,20 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
   if (window.galRealUser) {
     try {
       const result = await whoAmIFn();
-      window.galIsAdmin = !!(result.data && result.data.isAdmin);
+      const who = result.data || {};
+      window.galIsAdmin = !!who.isAdmin;
+      window.galRealAdmin = !!(who.isAdmin || who.realAdmin);
+      window.galActiveViewAs = who.viewAs || '';
+      if (who.viewAs === 'streamer' && who.testStreamer) {
+        // 스트리머 보기: 관리자 방송국 스트리머 본인처럼 화면을 그린다(서버도 같은 스트리머로 판단).
+        window.galLinkedStreamerId = who.testStreamer.streamerId;
+        window.galVerifiedStreamerNickname = who.testStreamer.streamerName;
+        window.galIsVerifiedStreamer = true;
+      } else if (who.viewAs === 'fan') {
+        window.galLinkedStreamerId = null;
+        window.galVerifiedStreamerNickname = null;
+        window.galIsVerifiedStreamer = false;
+      }
     } catch (e) {
       console.error('관리자 여부 확인 실패', e);
     }

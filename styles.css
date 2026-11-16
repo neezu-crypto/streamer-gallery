@@ -1169,3 +1169,11 @@ button{ font-family: inherit; cursor: pointer; }
 .soop-notice{margin:10px 0 0;padding:11px 13px;border:1px solid rgba(255,196,92,.55);border-radius:11px;background:rgba(255,196,92,.12);font-size:13px;line-height:1.55}
 .soop-notice[hidden]{display:none}
 .soop-notice p{margin:4px 0 0}
+/* 관리자 보기 모드 전환(2026-11-17) */
+.gal-viewas{position:fixed;left:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9000;display:flex;flex-wrap:wrap;align-items:center;gap:5px;max-width:calc(100vw - 24px);padding:7px 9px;border:1px solid rgba(0,0,0,.15);border-radius:12px;background:rgba(255,255,255,.95);color:#333;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+.gal-viewas.active{background:#fff4d6;border-color:#e0a520}
+.gal-viewas-label{font-weight:700;margin-right:2px}
+.gal-viewas button{padding:4px 9px;border:1px solid rgba(0,0,0,.18);border-radius:8px;background:#fff;color:inherit;font:inherit;cursor:pointer}
+.gal-viewas button[aria-pressed=true]{background:#333;color:#fff;border-color:#333}
+.gal-viewas small{width:100%;color:#a0650a;font-size:11px}
+@media (min-width:768px){.gal-viewas{bottom:16px}}
