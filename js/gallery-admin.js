@@ -1617,17 +1617,20 @@
     }
   });
 
-  linksPanel.addEventListener('input', function (e) {
-    if (!e.target.classList.contains('admin-link-search-input')) return;
-    var row = e.target.closest('.admin-row');
-    var resultsEl = row.querySelector('.admin-link-search-results');
-    var q = e.target.value.trim();
-    resultsEl.innerHTML = '';
-    if (!q) return;
-    var matches = (window.galAllStreamers || []).filter(function (s) { return s.name.includes(q); }).slice(0, 12);
-    if (!matches.length) { resultsEl.innerHTML = '<p class="empty-msg">일치하는 스트리머가 없어요.</p>'; return; }
-    resultsEl.innerHTML = matches.map(function (s) {
-      return '<div class="streamer-row" data-streamer-id="' + escapeHtml(s.id) + '" data-streamer-name="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</div>';
-    }).join('');
+  // 스트리머 연결 검색도 SOOP 검색(2026-11-17, 갤러리 스트리머 = SOOP 아이디).
+  var linkSearchBound = new WeakSet();
+  linksPanel.addEventListener('focusin', function (e) {
+    var input = e.target;
+    if (!input.classList.contains('admin-link-search-input') || linkSearchBound.has(input)) return;
+    linkSearchBound.add(input);
+    var resultsEl = input.closest('.admin-row').querySelector('.admin-link-search-results');
+    window.galBindSoopSearch(input, function (list) {
+      if (!list) return;
+      resultsEl.innerHTML = list.map(function (s) {
+        return '<div class="streamer-row" data-streamer-id="' + escapeHtml(s.soopId) + '" data-streamer-name="' + escapeHtml(s.nickname) + '">' + escapeHtml(s.nickname) + ' (' + escapeHtml(s.soopId) + ')</div>';
+      }).join('');
+    }, function (msg) {
+      if (msg) resultsEl.innerHTML = '<p class="empty-msg">' + escapeHtml(msg) + '</p>';
+    });
   });
 })();

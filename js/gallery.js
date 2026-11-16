@@ -69,7 +69,6 @@
   window.galPendingImageDeletes = pendingImageDeletes;
   var activeCategory = 'all';
   var myGalleryOnly = false;
-  var allStreamers = [];
   var selectedStreamerId = null;
   var selectedStreamerName = '';
   //  v2부터 공개 목록 캐시에 원본 URL·R2 객체 키를 저장하지 않는다. 예전 캐시 키를
@@ -97,39 +96,44 @@
     });
   }
 
-  // 스트리머 이름 목록 - 정적 파일(수동 스크립트로만 갱신)에서 RTDB 파생 노드로
-  // 전환(2026-09). /stocks 변경을 감시하는 Cloud Function 트리거
-  //  (soop-stock-market의 syncStreamerNameOnStockChange)가 이름만 뽑은 가벼운
-  // 파생 노드(streamerNames)를 자동으로 최신화한다 - 새 종목이 등록돼도 사람이
-  //  스크립트를 수동 실행 안 하면 검색에 며칠씩 안 나타나던 문제가 이제 없다.
-  // stocks를 직접 구독하지 않는 이유는 그대로 유효(가격·거래량이 거래마다 바뀌는
-  //  무거운 노드). streamerNamesMeta/updatedAt(작은 값 하나)만 먼저 확인해서
-  // localStorage 캐시와 같으면 재다운로드 없이 캐시를 쓰고, 다를 때만 전체를 다시
-  // 받는다 - onValue(실시간 구독)는 쓰지 않는다(거래마다 재전송되는 문제 재발 방지).
-  var STREAMER_NAMES_CACHE_KEY = 'galStreamerNamesCache';
-  function loadStreamerNames() {
-    if (!window.galFirebase || !window.galDb) { setTimeout(loadStreamerNames, 200); return; }
-    var metaRef = window.galFirebase.ref(window.galDb, 'streamerNamesMeta/updatedAt');
-    window.galFirebase.get(metaRef).then(function (snap) {
-      var remoteUpdatedAt = snap.val();
-      var cached = null;
-      try { cached = JSON.parse(localStorage.getItem(STREAMER_NAMES_CACHE_KEY) || 'null'); } catch (e) {}
-      if (cached && cached.updatedAt === remoteUpdatedAt && Array.isArray(cached.names)) {
-        allStreamers = cached.names;
-        window.galAllStreamers = allStreamers;
-        return;
-      }
-      var namesRef = window.galFirebase.ref(window.galDb, 'streamerNames');
-      return window.galFirebase.get(namesRef).then(function (namesSnap) {
-        var data = namesSnap.val() || {};
-        var names = Object.keys(data).map(function (id) { return { id: id, name: data[id] }; });
-        allStreamers = names;
-        window.galAllStreamers = allStreamers; // 관리자 패널의 스트리머 연결 검색이 재사용
-        try { localStorage.setItem(STREAMER_NAMES_CACHE_KEY, JSON.stringify({ updatedAt: remoteUpdatedAt, names: names })); } catch (e) {}
-      });
-    }).catch(function (e) { console.error('스트리머 이름 목록을 불러오지 못했습니다:', e); });
+  // 갤러리 스트리머 = SOOP 아이디(2026-11-17). 주식 종목 이름 목록(4천여 개)은 더 받지 않고,
+  // 업로드·관리자 연결의 스트리머 고르기는 서버를 거친 SOOP 검색(gallerySearchSoopStreamers)을 쓴다.
+  var SOOP_ID_RE = /^[a-z0-9]{2,20}$/;
+  try { localStorage.removeItem('galStreamerNamesCache'); } catch (e) {} // 예전 종목 이름 목록 캐시 정리
+  var soopSearchCache = {};
+  function searchSoopStreamers(q) {
+    var key = q.trim().toLowerCase();
+    if (soopSearchCache[key]) return Promise.resolve(soopSearchCache[key]);
+    return window.galFirebase.httpsCallable('gallerySearchSoopStreamers')({ q: q.trim() }).then(function (r) {
+      var list = (r.data && r.data.results) || [];
+      soopSearchCache[key] = list;
+      return list;
+    });
   }
-  loadStreamerNames();
+  // 입력이 멈춘 뒤 한 번만 검색한다(타자마다 부르지 않음). 마지막 입력의 결과만 그린다.
+  function bindSoopSearch(input, onResults, onStatus) {
+    var timer = null; var seq = 0;
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      var q = input.value.trim();
+      var mySeq = ++seq;
+      if (q.length < 2) { onResults(null); onStatus(q ? '2글자 이상 입력해 주세요.' : ''); return; }
+      onStatus('SOOP에서 찾는 중…');
+      timer = setTimeout(function () {
+        searchSoopStreamers(q).then(function (list) {
+          if (mySeq !== seq) return;
+          onStatus(list.length ? '' : '일치하는 SOOP 스트리머가 없어요.');
+          onResults(list);
+        }).catch(function (err) {
+          if (mySeq !== seq) return;
+          onResults(null);
+          onStatus(String(err && err.code || '').indexOf('unauthenticated') !== -1 || String(err && err.code || '').indexOf('permission-denied') !== -1
+            ? '로그인 후 검색할 수 있어요.' : '검색에 실패했어요: ' + (err && err.message ? err.message : err));
+        });
+      }, 500);
+    });
+  }
+  window.galBindSoopSearch = bindSoopSearch;
 
   //  스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
   //  열림이고, streamerFirstUpload(첫 업로드 시각)로부터 30일 무료체험, 이후
@@ -600,23 +604,21 @@
   }
 
   if (uploadStreamerSearch) {
-    uploadStreamerSearch.addEventListener('input', function () {
-      var q = uploadStreamerSearch.value.trim();
+    bindSoopSearch(uploadStreamerSearch, function (list) {
       uploadStreamerResults.innerHTML = '';
-      if (!q) return;
-      var matches = allStreamers.filter(function (s) { return s.name.includes(q); }).slice(0, 12);
-      if (!matches.length) {
-        uploadStreamerResults.innerHTML = '<p class="empty-msg">일치하는 스트리머가 없어요.</p>';
-        return;
-      }
-      matches.forEach(function (s) {
+      (list || []).forEach(function (s) {
         var row = document.createElement('div');
         row.className = 'streamer-row';
-        var icon = isStreamerUnlocked(s.id) ? '✅ ' : (hasStreamerEverUploaded(s.id) ? '🔒 ' : '🆕 ');
-        row.textContent = icon + s.name;
-        row.addEventListener('click', function () { pickStreamer(s.name, s.id); });
+        var icon = isStreamerUnlocked(s.soopId) ? '✅ ' : (hasStreamerEverUploaded(s.soopId) ? '🔒 ' : '🆕 ');
+        row.textContent = icon + s.nickname + ' (' + s.soopId + ')';
+        row.addEventListener('click', function () { pickStreamer(s.nickname, s.soopId); });
         uploadStreamerResults.appendChild(row);
       });
+    }, function (msg) {
+      if (!msg) return;
+      uploadStreamerResults.innerHTML = '';
+      var p = document.createElement('p'); p.className = 'empty-msg'; p.textContent = msg;
+      uploadStreamerResults.appendChild(p);
     });
   }
 
@@ -687,7 +689,7 @@
     // 업로드에 성공한 스트리머를 열 때마다 미리 선택해둔다(2026-09-05 추가).
     try {
       var lastStreamer = JSON.parse(localStorage.getItem('galLastUploadStreamer') || 'null');
-      if (lastStreamer && lastStreamer.id && lastStreamer.name) pickStreamer(lastStreamer.name, lastStreamer.id);
+      if (lastStreamer && SOOP_ID_RE.test(String(lastStreamer.id || '')) && lastStreamer.name) pickStreamer(lastStreamer.name, lastStreamer.id);
     } catch (e) {}
     uploadBackdrop.classList.add('open');
     window.galPushModal(closeUploadModal);
