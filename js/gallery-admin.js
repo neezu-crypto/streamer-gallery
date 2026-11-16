@@ -121,6 +121,11 @@
 
   // 원본은 비공개 버킷에 있으므로 서버가 발급한 5분 서명 URL로 연다(관리자는 열람 권한 있음).
   // 발급에 실패하면 썸네일로 대신 보여 준다.
+  // R2 점검: 원본은 비공개 버킷, 썸네일은 공개 버킷(2026-11-17). 어느 버킷 파일인지 표시한다.
+  function bucketLabel(item) {
+    return item && item.bucket === 'private' ? '<em class="admin-storage-classification">원본·비공개</em> ' : item && item.bucket === 'public' ? '<em class="admin-storage-classification">공개</em> ' : '';
+  }
+
   async function openAdminOriginal(imageId, fallbackUrl) {
     if (!window.galOpenImageView) return;
     try {
@@ -429,13 +434,13 @@
       storageOrphans.innerHTML = storageOrphanItems.length ? storageOrphanItems.map(function (item) {
         var classification = item.classification === 'register_failed' ? '등록 중 오류' : item.classification === 'delete_failed' ? '삭제 중 오류' : '원인 미확인';
         var badgeClass = item.classification === 'unknown' ? '' : ' is-warning';
-        return '<label class="admin-storage-row"><input class="admin-storage-checkbox" type="checkbox" data-storage-key="' + escapeHtml(item.key) + '"><span class="admin-storage-key">' + escapeHtml(item.key) + '<em class="admin-storage-classification' + badgeClass + '">' + escapeHtml(classification) + '</em></span><span class="admin-storage-size">' + escapeHtml(formatBytes(item.size)) + '</span><time>' + escapeHtml(formatWhen(item.lastModified)) + '</time></label>';
+        return '<label class="admin-storage-row"><input class="admin-storage-checkbox" type="checkbox" data-storage-key="' + escapeHtml(item.key) + '"><span class="admin-storage-key">' + bucketLabel(item) + escapeHtml(item.objectKey || item.key) + '<em class="admin-storage-classification' + badgeClass + '">' + escapeHtml(classification) + '</em></span><span class="admin-storage-size">' + escapeHtml(formatBytes(item.size)) + '</span><time>' + escapeHtml(formatWhen(item.lastModified)) + '</time></label>';
       }).join('') : '<p class="empty-msg">현재 고아 파일 후보가 없습니다.</p>';
     }
     if (storageMissing) {
       var missing = data.missingReferences || [];
       storageMissing.innerHTML = missing.length ? missing.map(function (item) {
-        return '<div class="admin-storage-missing-row"><code>' + escapeHtml(item.key) + '</code><span>R2에서 파일을 찾지 못했습니다.</span></div>';
+        return '<div class="admin-storage-missing-row"><code>' + bucketLabel(item) + escapeHtml(String(item.key).replace(/^private:/, '')) + '</code><span>' + (item.bucket === 'private' ? '비공개 버킷에서 원본을 찾지 못했습니다.' : 'R2에서 파일을 찾지 못했습니다.') + '</span></div>';
       }).join('') : '<p class="empty-msg">메타데이터와 R2 파일이 모두 일치합니다.</p>';
     }
     updateStorageSelectionUi();
