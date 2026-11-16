@@ -119,6 +119,18 @@
     });
   }
 
+  // 원본은 비공개 버킷에 있으므로 서버가 발급한 5분 서명 URL로 연다(관리자는 열람 권한 있음).
+  // 발급에 실패하면 썸네일로 대신 보여 준다.
+  async function openAdminOriginal(imageId, fallbackUrl) {
+    if (!window.galOpenImageView) return;
+    try {
+      var res = await window.galFirebase.httpsCallable('getGalleryImageAccess')({ imageId: imageId });
+      window.galOpenImageView((res && res.data && res.data.viewUrl) || fallbackUrl);
+    } catch (_) {
+      if (fallbackUrl) window.galOpenImageView(fallbackUrl);
+    }
+  }
+
   function findImage(id) {
     return (window.galAllImages || []).find(function (i) { return i.id === id; }) || pageImages[id] || null;
   }
@@ -619,8 +631,8 @@
     var authorUid = getDetailAuthorUid(report, image, kind);
     var ban = authorUid && (latestBans.find(function (b) { return b.uid === authorUid; }) || report.ban);
     var recentReports = getRecentAuthorReports(authorUid);
-    var previewUrl = image && (image.thumbUrl || image.imageUrl);
-    var fullUrl = image && (image.imageUrl || image.thumbUrl);
+    var previewUrl = image && image.thumbUrl;
+    var fullUrl = image && image.thumbUrl;
     var detailType = kind === 'comment' ? '댓글 신고' : '이미지 신고';
     var targetName = image && image.streamerName ? image.streamerName : '(이미지 정보 없음)';
     var reportText = kind === 'comment'
@@ -1409,7 +1421,8 @@
   if (detailPanel) detailPanel.addEventListener('click', function (e) {
     var preview = e.target.closest('.admin-detail-preview[data-detail-preview-url]');
     if (preview) {
-      window.galOpenImageView && window.galOpenImageView(preview.dataset.detailPreviewUrl);
+      var detailReport = getSelectedReport();
+      openAdminOriginal(detailReport && detailReport.imageId, preview.dataset.detailPreviewUrl);
       return;
     }
     var btn = e.target.closest('.admin-detail-action');
@@ -1434,7 +1447,7 @@
       var reportedImg = findImage(row.dataset.imageId);
       var report = latestReports.find(function (r) { return r.id === row.dataset.reportId; });
       if (report) selectDetail('image', report);
-      if (reportedImg) window.galOpenImageView(reportedImg.imageUrl || reportedImg.thumbUrl);
+      if (reportedImg) openAdminOriginal(row.dataset.imageId, reportedImg.thumbUrl);
       return;
     }
     if (e.target.closest('.admin-ban-btn')) {
@@ -1473,7 +1486,7 @@
     if (!row) return;
     if (e.target.closest('.admin-row-thumb.clickable')) {
       var img = findImage(row.dataset.imageId);
-      if (img) window.galOpenImageView(img.imageUrl || img.thumbUrl);
+      if (img) openAdminOriginal(row.dataset.imageId, img.thumbUrl);
       return;
     }
     if (e.target.closest('.admin-ban-btn')) {
