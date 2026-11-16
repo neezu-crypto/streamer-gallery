@@ -118,7 +118,7 @@
         var c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        c.toBlob(function (blob) { blob ? resolve(blob) : reject(new Error('썸네일 생성에 실패했어요.')); }, 'image/jpeg', 0.82);
+        c.toBlob(function (blob) { blob ? resolve({ blob: blob, width: w, height: h }) : reject(new Error('썸네일 생성에 실패했어요.')); }, 'image/jpeg', 0.82);
       };
       img.onerror = function () { reject(new Error('SOOP 이미지를 읽지 못했어요.')); };
       img.src = url;
@@ -141,13 +141,13 @@
       s.setProgress('업로드 준비 중…', 45);
       var prep = await window.galFirebase.httpsCallable('requestSoopImageUpload')({
         url: current.url, streamerId: current.streamerId,
-        photos: chosen.map(function (p) { return { photoNo: p.photoNo, thumbFileSize: thumbs[p.photoNo].size }; }),
+        photos: chosen.map(function (p) { var t = thumbs[p.photoNo]; return { photoNo: p.photoNo, thumbFileSize: t.blob.size, width: t.width, height: t.height }; }),
       });
       var uploads = (prep.data && prep.data.uploads) || [];
       for (var j = 0; j < uploads.length; j++) {
         var u = uploads[j];
         s.setProgress('미리보기 올리는 중… (' + (j + 1) + '/' + uploads.length + ')', 50 + Math.round(30 * j / uploads.length));
-        var put = await fetch(u.thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumbs[u.photoNo] });
+        var put = await fetch(u.thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumbs[u.photoNo].blob });
         if (!put.ok) throw new Error('미리보기 업로드 실패 (status ' + put.status + ')');
       }
       s.setProgress('등록 중…', 88);
