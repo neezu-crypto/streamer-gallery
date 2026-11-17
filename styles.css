@@ -53,7 +53,9 @@
 }
 
 *{ box-sizing: border-box; }
+/* 가로 넘침은 clip으로 자른다. hidden은 html·body를 스크롤 상자로 만들어 왼쪽 사이드바(position:sticky)가 화면을 따라오지 못했다(2026-11-18). */
 html, body{ margin:0; padding:0; overflow-x:hidden; }
+@supports (overflow-x:clip){ html, body{ overflow-x:clip; } }
 /* 모달이 하나라도 열려있는 동안(js/modal-stack.js) 배경 페이지 스크롤 잠금.
    overscroll-behavior-y는 모바일에서 화면 맨 위를 아래로 당길 때 브라우저의
    당겨서 새로고침 제스처가 겹쳐 뜨는 걸 한 번 더 막아주는 안전장치(주 방어는
