@@ -1187,3 +1187,6 @@ button{ font-family: inherit; cursor: pointer; }
 /* SOOP 캐치(2026-11-17) */
 .soop-catch-mark,.gallery-catch-badge{position:absolute;left:6px;top:6px;padding:2px 7px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-style:normal;font-weight:700;pointer-events:none}
 .detail-catch-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:100%;border:0;display:block;background:transparent;z-index:1}
+
+/* 모바일 전체화면 버튼: 지원하지 않는 브라우저에선 hidden으로 숨긴다(.mtab-btn의 display:flex보다 우선). */
+.mtab-btn[hidden]{ display:none !important; }

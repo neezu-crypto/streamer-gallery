@@ -98,4 +98,31 @@
   });
 
   categoryBtn.addEventListener('touchcancel', closeFan);
+
+  // 페이지 전체화면(2026-11-17): 브라우저 주소창·메뉴를 숨기고 갤러리만 화면 가득 보여 준다.
+  // 지원하지 않는 브라우저(아이폰 사파리 등)에서는 버튼을 숨긴다.
+  (function () {
+    var btn = document.getElementById('mtab-fullscreen-btn');
+    var label = document.getElementById('mtab-fullscreen-label');
+    var root = document.documentElement;
+    var request = root.requestFullscreen || root.webkitRequestFullscreen;
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (!btn || typeof request !== 'function' || typeof exit !== 'function') return;
+    btn.hidden = false;
+    function current() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+    function sync() {
+      var on = !!current();
+      var text = on ? '전체화면 종료' : '전체화면 보기';
+      btn.setAttribute('aria-pressed', String(on)); btn.setAttribute('aria-label', text); btn.title = text;
+      if (label) label.textContent = on ? '화면 복귀' : '전체화면';
+    }
+    btn.addEventListener('click', function () {
+      // 전체화면 요청은 탭 이벤트 안에서 바로 시작해야 한다.
+      var p = current() ? exit.call(document) : request.call(root);
+      if (p && typeof p.catch === 'function') p.catch(function (e) { console.warn('전체화면 전환 실패', e); });
+    });
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    sync();
+  })();
 })();
