@@ -1194,7 +1194,8 @@ button{ font-family: inherit; cursor: pointer; }
 /* 상세 보기: 가로가 넓은 이미지(js/gallery-detail.js가 .detail-landscape를 붙임, 2026-11-18).
    이미지를 창 폭에 꽉 채워 비율대로(여백 없이) 보이고, 상세 영역(좋아요·댓글)은 이미지 아래로 옮긴다.
    아주 긴 파노라마만 높이 상한(62vh)에 걸려 양옆에 작은 여백이 생기고, 그 아래 댓글이 조금 보이게 한다. */
-.detail-modal.detail-landscape{ width:min(1100px, 94vw); max-width:min(1100px, 94vw); }
+/* 창 폭을 이미지 높이 상한(62vh)×비율 이하로 맞춰 양옆 여백도 생기지 않게 한다(최소 640px은 유지). */
+.detail-modal.detail-landscape{ width:min(1100px, 94vw, max(640px, calc(62vh * var(--detail-ratio, 1.78)))); max-width:94vw; }
 .detail-modal.detail-landscape .detail-split{ flex-direction:column; overflow-y:auto; }
 .detail-modal.detail-landscape .detail-image-wrap{ flex:0 0 auto; width:100%; aspect-ratio:var(--detail-ratio, 16/9); max-height:62vh; }
 .detail-modal.detail-landscape .detail-image-wrap img{ max-height:none; }
