@@ -78,3 +78,5 @@
 .gtut-card>*,.gtut-stage>*,.gtut-form>*{flex-shrink:0}
 .gtut-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .gtut-btn[hidden]{display:none}
+.gtut-thumb{background:var(--panel-raised)}
+.gtut-thumb img{display:block;width:100%;height:100%;object-fit:cover}
