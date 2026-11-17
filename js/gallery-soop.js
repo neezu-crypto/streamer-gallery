@@ -54,6 +54,7 @@
       var img = document.createElement('img');
       img.src = p.url; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
       b.appendChild(img);
+      if (p.catch) { var play = document.createElement('i'); play.className = 'soop-catch-mark'; play.textContent = '▶ 캐치'; b.appendChild(play); }
       if (p.registered) {
         b.disabled = true; b.classList.add('registered');
         var tag = document.createElement('span'); tag.textContent = '이미 등록됨'; b.appendChild(tag);
@@ -83,14 +84,14 @@
   function updateSubmit() {
     submitBtn.hidden = !current;
     submitBtn.disabled = picked.size === 0;
-    submitBtn.textContent = picked.size ? '고른 사진 ' + picked.size + '장 등록하기' : '등록할 사진을 골라 주세요';
+    submitBtn.textContent = picked.size ? '고른 ' + picked.size + '개 등록하기' : '등록할 사진·캐치를 골라 주세요';
   }
 
   loadBtn.addEventListener('click', async function () {
     var s = shared(); var who = s && s.picked();
     var url = (urlInput.value || '').trim();
     if (!who || !who.id) { msg('⚠️ 먼저 스트리머를 검색해서 선택해 주세요.'); return; }
-    if (!url) { msg('⚠️ SOOP 게시글 링크를 넣어 주세요.'); return; }
+    if (!url) { msg('⚠️ SOOP 게시글 또는 캐치 링크를 넣어 주세요.'); return; }
     if (!window.galTrusted) { msg('로그인 후 이용할 수 있어요.'); window.galOpenLoginModal && window.galOpenLoginModal(); return; }
     showNotice('');
     var cacheKey = url + '|' + who.id;
@@ -101,15 +102,16 @@
       var res = await window.galFirebase.httpsCallable('galleryPreviewSoopPost')({ url: url, streamerId: who.id });
       current = { url: url, streamerId: who.id, photos: (res.data && res.data.photos) || [] };
       previewCache[cacheKey] = current;
-      msg('사진 ' + current.photos.length + '장을 찾았어요. 등록할 사진을 골라 주세요.');
+      msg(current.photos.length && current.photos[0].catch ? '캐치 영상을 찾았어요. 골라서 등록해 주세요.' : '사진 ' + current.photos.length + '장을 찾았어요. 등록할 사진을 골라 주세요.');
       render();
     } catch (err) {
       current = null; render();
       var notPublic = (err && err.details && err.details.reason === 'not-public');
       if (notPublic) {
         msg('');
-        showNotice('🔒 전체 공개 글이 아니에요',
-          errText(err) + ' SOOP에서 게시판 공개 범위를 \'전체 공개\'로 바꾸거나, 전체 공개 게시판에 올린 글의 링크를 넣어 주세요.');
+        var isCatch = /vod\.(sooplive|afreecatv)\./.test(url);
+        showNotice(isCatch ? '🔒 전체 공개 캐치가 아니에요' : '🔒 전체 공개 글이 아니에요',
+          errText(err) + (isCatch ? ' 전체 공개 캐치의 링크를 넣어 주세요.' : ' SOOP에서 게시판 공개 범위를 \'전체 공개\'로 바꾸거나, 전체 공개 게시판에 올린 글의 링크를 넣어 주세요.'));
       } else {
         msg('❌ ' + errText(err));
       }
@@ -165,7 +167,7 @@
       });
       var ok = (reg.data && reg.data.registered || []).length; var bad = (reg.data && reg.data.failed || []).length;
       s.setProgress('완료!', 100);
-      msg('✅ 사진 ' + ok + '장을 등록했어요.' + (bad ? ' (' + bad + '장은 실패)' : ''));
+      msg('✅ ' + ok + '개를 등록했어요.' + (bad ? ' (' + bad + '장은 실패)' : ''));
       window.galNoteUploaded && window.galNoteUploaded(ok);
       window.galSound && window.galSound.uploadSuccess();
       Object.keys(previewCache).forEach(function (k) { delete previewCache[k]; });

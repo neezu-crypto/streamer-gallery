@@ -269,6 +269,7 @@
       return (
         '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
           (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
+          (img.mediaType === 'catch' ? '<span class="gallery-catch-badge">▶ 캐치</span>' : '') +
           (locked ? '<span class="gallery-lock-badge" title="열람 기간 만료 - 갱신 필요">🔒</span>' : '') +
           (img.id === lastViewedId ? '<span class="gallery-recent-badge">최근에 확인함</span>' : '') +
           '<span class="gallery-card-hover-likes">♥ ' + (img.likeCount || 0) + '</span>' +

@@ -71,7 +71,23 @@
     }
   }
 
+  // SOOP 캐치 재생기(2026-11-17): 상세를 열면 SOOP 플레이어를 음소거로 넣고, 닫거나 다른 항목으로 바뀌면 뺀다.
+  function clearCatchPlayer() {
+    var wrap = imageEl.parentNode;
+    var old = wrap && wrap.querySelector('.detail-catch-frame');
+    if (old) old.remove();
+    if (catchResize) { catchResize.disconnect(); catchResize = null; }
+  }
+  // 이미지(object-fit:contain)처럼 영상 비율 그대로 영역 안에 꽉 맞춰 가운데 둔다(검은 여백 없음).
+  var catchResize = null;
+  function fitCatchFrame(frame, ratio) {
+    var wrap = frame.parentNode; if (!wrap) return;
+    var W = wrap.clientWidth, H = wrap.clientHeight; if (!W || !H) return;
+    var w = Math.min(W, H * ratio), h = w / ratio;
+    frame.style.width = Math.floor(w) + 'px'; frame.style.height = Math.floor(h) + 'px';
+  }
   function closeModal() {
+    clearCatchPlayer();
     detailAccessToken += 1;
     backdrop.classList.remove('open');
     window.galPopModal(closeModal);
@@ -331,6 +347,33 @@
     // SOOP 게시글에서 불러온 이미지는 원래 공개 이미지라 서버 호출 없이 SOOP 주소로 바로 보여 준다.
     var soopLink = document.getElementById('detail-soop-link');
     if (soopLink) soopLink.hidden = img.source !== 'soop';
+    clearCatchPlayer();
+    var isCatch = img.source === 'soop' && img.mediaType === 'catch' && /^\d{1,20}$/.test(String(img.soopCatchNo || ''));
+    if (isCatch) {
+      if (soopLink) { soopLink.href = 'https://vod.sooplive.com/player/' + img.soopCatchNo + '/catch'; soopLink.textContent = 'SOOP에서 캐치 보기 ↗'; }
+      // 상세를 열면 바로 음소거로 자동 재생한다(소리는 재생기에서 켬).
+      var frame = document.createElement('iframe');
+      frame.className = 'detail-catch-frame';
+      frame.src = 'https://vod.sooplive.com/player/' + img.soopCatchNo + '/embed?autoPlay=true&mutePlay=true&showChat=false';
+      frame.title = 'SOOP 캐치 재생';
+      frame.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
+      frame.allowFullscreen = true;
+      frame.referrerPolicy = 'strict-origin-when-cross-origin';
+      imageEl.parentNode.appendChild(frame);
+      var ratio = (img.width > 0 && img.height > 0) ? img.width / img.height : 16 / 9;
+      fitCatchFrame(frame, ratio);
+      if (window.ResizeObserver) { catchResize = new ResizeObserver(function () { fitCatchFrame(frame, ratio); }); catchResize.observe(imageEl.parentNode); }
+      // 원본 캐치가 내려갔는지 서버가 확인한다(같은 캐치는 서버가 10분 기억). 내려갔으면 재생하지 않는다.
+      window.galFirebase.httpsCallable('galleryCheckSoopImage')({ imageId: img.id }).then(function (r) {
+        if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+        if (r.data && r.data.available === false) {
+          img._soopRemoved = true;
+          clearCatchPlayer();
+          if (soopLink) soopLink.textContent = '원본 캐치가 내려가서 재생할 수 없어요';
+        }
+      }).catch(function (e) { console.warn('SOOP 원본 확인 실패', e); });
+      return;
+    }
     if (img.source === 'soop') {
       if (soopLink) { soopLink.href = img.sourcePostUrl || '#'; soopLink.textContent = 'SOOP 원본 글 보기 ↗'; }
       // 원본 글에서 사진이 내려갔는지 서버가 확인한다(같은 글은 서버가 10분 기억). 내려갔으면 원본을 보여 주지 않는다.
