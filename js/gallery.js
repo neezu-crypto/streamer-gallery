@@ -225,10 +225,38 @@
       var ratio = parseFloat(card.dataset.ratio) || DEFAULT_ASPECT_RATIO;
       var h = w / ratio;
       var span = Math.max(1, Math.ceil((h + MASONRY_GAP) / (MASONRY_ROW_UNIT + MASONRY_GAP)));
-      card.style.gridRowEnd = 'span ' + span;
+      if (card.style.gridRowEnd !== 'span ' + span) card.style.gridRowEnd = 'span ' + span;
     });
   }
 
+  //  카드 칸 폭: 그리드의 첫 열 폭(px). 카드를 넣기 전에 알아야 높이(span)를 HTML에 함께 넣을 수 있다.
+  function masonryColumnWidth() {
+    var cols = getComputedStyle(grid).gridTemplateColumns;
+    var w = parseFloat(cols);
+    return w > 0 ? w : 0;
+  }
+  function masonrySpanFor(ratio, colW) {
+    var h = colW / (parseFloat(ratio) || DEFAULT_ASPECT_RATIO);
+    return Math.max(1, Math.ceil((h + MASONRY_GAP) / (MASONRY_ROW_UNIT + MASONRY_GAP)));
+  }
+  //  새로고침 직후 여러 구독이 같은 결과로 그리드를 다시 그리며, 카드를 넣고 높이를 계산하기 전
+  // 순간에 문서가 짧아져 스크롤이 맨 위로 튀었다(2026-11-18 확인). 높이를 HTML에 미리 넣고,
+  // 결과가 같으면 다시 그리지 않는다.
+  // 배지 옮기기·카드 숨기기처럼 다른 코드가 그리드를 직접 바꾸면 그 뒤로는 다시 그린다(gridTouched).
+  var lastGridHtml = '';
+  var gridTouched = true;
+  var gridWatcher = (grid && window.MutationObserver) ? new MutationObserver(function () { gridTouched = true; }) : null;
+  if (gridWatcher) gridWatcher.observe(grid, { childList: true, subtree: true, attributes: true, characterData: true });
+  function setGridHtml(html) {
+    if (gridWatcher) { if (gridWatcher.takeRecords().length) gridTouched = true; }
+    else gridTouched = true;
+    if (html === lastGridHtml && !gridTouched) return false;
+    lastGridHtml = html;
+    grid.innerHTML = html;
+    if (gridWatcher) gridWatcher.takeRecords();
+    gridTouched = false;
+    return true;
+  }
   function renderGrid() {
     if (!grid) return;
     // 내 갤러리 필터는 같은 그리드를 그대로 걸러서 보여주는 것뿐이라("다른 탭으로
@@ -254,7 +282,7 @@
 
     if (!filtered.length) {
       var emptyMsg = myGalleryOnly ? '아직 업로드한 이미지가 없어요.' : (allImages.length ? '조건에 맞는 이미지가 없어요.' : '아직 업로드된 이미지가 없어요. 첫 이미지를 올려보세요!');
-      grid.innerHTML = '<p class="empty-msg">' + emptyMsg + '</p>';
+      setGridHtml('<p class="empty-msg">' + emptyMsg + '</p>');
       return;
     }
 
@@ -264,11 +292,12 @@
     // "최근에 확인함" 배지(2026-09-05 추가)는 호버와 무관하게 상시 노출 — 스크롤
     // 하다가 바로 눈에 띄어야 하는 용도라서. localStorage에 마지막 1개만 기록.
     var lastViewedId = localStorage.getItem('galLastViewedImageId');
-    grid.innerHTML = filtered.map(function (img) {
+    var colW = masonryColumnWidth();
+    var html = filtered.map(function (img) {
       var locked = img.source !== 'soop' && !isStreamerUnlocked(img.streamerId);
       var ratio = (img.width && img.height) ? (img.width / img.height) : '';
       return (
-        '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '">' +
+        '<div class="gallery-card" data-image-id="' + escapeHtml(img.id) + '" data-ratio="' + ratio + '"' + (colW ? ' style="grid-row-end:span ' + masonrySpanFor(ratio, colW) + '"' : '') + '>' +
           (img.thumbUrl ? '<img src="' + escapeHtml(img.thumbUrl) + '" alt="" loading="lazy">' : '') +
           (img.mediaType === 'catch' ? '<span class="gallery-catch-badge">▶ 캐치</span>' : '') +
           (locked ? '<span class="gallery-lock-badge" title="열람 기간 만료 - 갱신 필요">🔒</span>' : '') +
@@ -278,7 +307,7 @@
         '</div>'
       );
     }).join('');
-    applyMasonrySpans();
+    if (setGridHtml(html)) { applyMasonrySpans(); if (gridWatcher) gridWatcher.takeRecords(); }
   }
   // "최근에 확인함" 배지는 localStorage 값이 바뀐다고 그리드가 저절로 다시 그려지지
   // 않으므로(2026-09-06 실사용 테스트로 발견 — 상세 패널을 열고 닫아도 배지가 바로
@@ -464,7 +493,7 @@
       mergeStatsAndRender();
     }, function (err) {
       console.error('갤러리 목록 구독 실패', err);
-      grid.innerHTML = '<p class="empty-msg">이미지를 불러오지 못했어요. 새로고침해 주세요.</p>';
+      setGridHtml('<p class="empty-msg">이미지를 불러오지 못했어요. 새로고침해 주세요.</p>');
     });
   }
 
