@@ -34,7 +34,7 @@
     });
   }
 
-  var CATEGORY_LABELS_SHORT = { all: '전체', screenshot: '스샷', 'ai-art': 'AI', 'fan-art': '팬', meme: '밈', etc: '기타', soop: 'SOOP' };
+  var CATEGORY_LABELS_SHORT = { all: '전체', screenshot: '스샷', 'ai-art': 'AI', 'fan-art': '팬', meme: '밈', etc: '기타', catch: '캐치', soop: 'SOOP' };
 
   var fanOpen = false;
 

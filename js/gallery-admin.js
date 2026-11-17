@@ -103,7 +103,7 @@
   var TAB_CONFIG = {
     reports: { label: '신고 목록', types: [['all', '전체'], ['image', '이미지 신고']], statuses: [['pending', '대기'], ['dismissed', '무시 처리'], ['deleted', '삭제 처리'], ['all', '전체']], actions: [['dismiss', '신고 무시'], ['delete-image', '이미지 삭제']] },
     comments: { label: '댓글 검수', types: [['all', '전체'], ['comment', '댓글 신고']], statuses: [['pending', '대기'], ['dismissed', '무시 처리'], ['deleted', '삭제 처리'], ['all', '전체']], actions: [['dismiss', '신고 무시'], ['delete-comment', '댓글 삭제']] },
-    images: { label: '전체 이미지', types: [['all', '전체'], ['screenshot', '스크린샷'], ['ai-art', 'AI 일러스트'], ['fan-art', '팬아트'], ['meme', '밈'], ['etc', '기타']], statuses: [['active', '게시 중'], ['all', '전체']], actions: [['delete-image', '이미지 삭제']] },
+    images: { label: '전체 이미지', types: [['all', '전체'], ['screenshot', '스크린샷'], ['ai-art', 'AI 일러스트'], ['fan-art', '팬아트'], ['meme', '밈'], ['etc', '기타'], ['catch', '캐치']], statuses: [['active', '게시 중'], ['all', '전체']], actions: [['delete-image', '이미지 삭제']] },
     unlocks: { label: '해금 신청', types: [['all', '전체']], statuses: [['pending', '대기'], ['approved', '승인'], ['rejected', '거절'], ['all', '전체']], actions: [['approve', '해금 승인'], ['reject', '거절']] },
     bans: { label: '정지 관리', types: [['all', '전체']], statuses: [['banned', '정지 중'], ['all', '전체']], actions: [['unban', '정지 해제']] },
     links: { label: '스트리머 연결', types: [['all', '전체']], statuses: [['linked', '연결됨'], ['unlinked', '미연결'], ['all', '전체']], actions: [['unlink', '연결 해제']] },
@@ -532,7 +532,7 @@
     }
     if (statsCategories) {
       var categories = data.categories || [];
-      var categoryLabels = { screenshot: '스크린샷', 'ai-art': 'AI 일러스트', 'fan-art': '팬아트', meme: '밈', etc: '기타' };
+      var categoryLabels = { screenshot: '스크린샷', 'ai-art': 'AI 일러스트', 'fan-art': '팬아트', meme: '밈', etc: '기타', catch: '캐치' };
       if (!categories.length) statsCategories.innerHTML = '<p class="empty-msg">등록된 이미지가 없습니다.</p>';
       else {
         var categoryMax = Math.max(1, ...categories.map(function (item) { return Number(item.count) || 0; }));

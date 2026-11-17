@@ -48,6 +48,7 @@
     'fan-art': '팬아트',
     meme: '밈',
     etc: '기타',
+    catch: '캐치',
   };
   window.galCategoryLabels = CATEGORY_LABELS;
 

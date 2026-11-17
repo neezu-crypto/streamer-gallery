@@ -102,7 +102,7 @@
       var res = await window.galFirebase.httpsCallable('galleryPreviewSoopPost')({ url: url, streamerId: who.id });
       current = { url: url, streamerId: who.id, photos: (res.data && res.data.photos) || [] };
       previewCache[cacheKey] = current;
-      msg(current.photos.length && current.photos[0].catch ? '캐치 영상을 찾았어요. 골라서 등록해 주세요.' : '사진 ' + current.photos.length + '장을 찾았어요. 등록할 사진을 골라 주세요.');
+      msg(current.photos.length && current.photos[0].catch ? '캐치 영상을 찾았어요. 골라서 등록하면 \'캐치\' 카테고리에 들어가요.' : '사진 ' + current.photos.length + '장을 찾았어요. 등록할 사진을 골라 주세요.');
       render();
     } catch (err) {
       current = null; render();
