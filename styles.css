@@ -1190,3 +1190,18 @@ button{ font-family: inherit; cursor: pointer; }
 
 /* 모바일 전체화면 버튼: 지원하지 않는 브라우저에선 hidden으로 숨긴다(.mtab-btn의 display:flex보다 우선). */
 .mtab-btn[hidden]{ display:none !important; }
+
+/* 상세 보기: 가로가 넓은 이미지(js/gallery-detail.js가 .detail-landscape를 붙임, 2026-11-18).
+   이미지를 창 폭에 꽉 채워 비율대로(여백 없이) 보이고, 상세 영역(좋아요·댓글)은 이미지 아래로 옮긴다.
+   아주 긴 파노라마만 높이 상한(62vh)에 걸려 양옆에 작은 여백이 생기고, 그 아래 댓글이 조금 보이게 한다. */
+.detail-modal.detail-landscape{ width:min(1100px, 94vw); max-width:min(1100px, 94vw); }
+.detail-modal.detail-landscape .detail-split{ flex-direction:column; overflow-y:auto; }
+.detail-modal.detail-landscape .detail-image-wrap{ flex:0 0 auto; width:100%; aspect-ratio:var(--detail-ratio, 16/9); max-height:62vh; }
+.detail-modal.detail-landscape .detail-image-wrap img{ max-height:none; }
+.detail-modal.detail-landscape .detail-panel{ flex:0 0 auto; min-width:0; overflow:visible; }
+@media (max-width:720px){
+  .detail-modal.detail-landscape{ width:100%; max-width:100%; }
+  .detail-modal.detail-landscape .detail-split{ overflow:hidden; }
+  .detail-modal.detail-landscape .detail-image-wrap{ max-height:42vh; }
+  .detail-modal.detail-landscape .detail-panel{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+}

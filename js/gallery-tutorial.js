@@ -216,7 +216,7 @@
   }
   function detailShell(stage, item, liked) {
     stage.textContent = '';
-    var box = el('div', 'gtut-detail');
+    var box = el('div', 'gtut-detail' + ((item.ratio || 1) >= 1.2 ? ' gtut-detail-wide' : '')); // 가로 이미지는 상세를 아래로(실제 상세 창과 같게)
     box.appendChild(thumb(item, 'gtut-detail-img'));
     var panel = el('div', 'gtut-detail-panel');
     var row = el('div', 'gtut-detail-row');

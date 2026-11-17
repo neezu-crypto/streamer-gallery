@@ -86,6 +86,19 @@
     var w = Math.min(W, H * ratio), h = w / ratio;
     frame.style.width = Math.floor(w) + 'px'; frame.style.height = Math.floor(h) + 'px';
   }
+  var DETAIL_WIDE_RATIO = 1.2;
+  var detailShapeKnown = false;
+  function applyDetailShape(ratio) {
+    detailShapeKnown = ratio > 0;
+    var wide = ratio >= DETAIL_WIDE_RATIO;
+    modalEl.classList.toggle('detail-landscape', wide);
+    if (wide) modalEl.style.setProperty('--detail-ratio', String(Math.min(ratio, 4)));
+    else modalEl.style.removeProperty('--detail-ratio');
+  }
+  imageEl.addEventListener('load', function () {
+    if (detailShapeKnown || !currentImageId || !imageEl.naturalWidth || !imageEl.naturalHeight) return;
+    applyDetailShape(imageEl.naturalWidth / imageEl.naturalHeight);
+  });
   function closeModal() {
     clearCatchPlayer();
     detailAccessToken += 1;
@@ -313,6 +326,9 @@
     // 이전에 보던 이미지가 열린 것처럼 보이는 버그가 있었다(2026-09-06 실사용
     // 확인). 그리드에서 이미 로드돼 캐시돼있는 썸네일을 먼저 즉시 보여주고, 원본은
     // 백그라운드에서 불러와 로드가 끝나면 그때 교체한다.
+    // 가로가 넓은 이미지(가로÷세로 1.2 이상)는 상세 영역을 이미지 아래로 옮기고 이미지를 비율대로 여백 없이 보인다(2026-11-18).
+    // 저장된 크기로 열기 전에 정해 깜빡임이 없게 하고, 크기가 없으면 썸네일을 받은 뒤 판정한다.
+    applyDetailShape(img.width > 0 && img.height > 0 ? img.width / img.height : 0);
     imageEl.src = img.thumbUrl || '';
     streamerEl.textContent = img.streamerName || '익명';
     currentStreamerName = img.streamerName || '';

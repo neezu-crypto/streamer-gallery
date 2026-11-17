@@ -80,3 +80,6 @@
 .gtut-btn[hidden]{display:none}
 .gtut-thumb{background:var(--panel-raised)}
 .gtut-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+/* 가로가 넓은 이미지: 실제 상세 창처럼 이미지를 폭에 꽉 채우고 상세 영역은 아래로 */
+.gtut-detail-wide{grid-template-columns:1fr}
+.gtut-detail-wide .gtut-detail-img{max-height:none}
