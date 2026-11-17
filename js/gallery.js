@@ -89,7 +89,7 @@
   var routeStreamer = (routeParams.get('streamer') || '').trim().slice(0, 20);
   var routeCategory = routeParams.get('category') || 'all';
   if (searchInput && routeStreamer) searchInput.value = routeStreamer;
-  if (routeCategory === 'all' || Object.prototype.hasOwnProperty.call(CATEGORY_LABELS, routeCategory)) {
+  if (routeCategory === 'all' || routeCategory === 'soop' || Object.prototype.hasOwnProperty.call(CATEGORY_LABELS, routeCategory)) {
     activeCategory = routeCategory;
     if (chipsWrap) chipsWrap.querySelectorAll('.chip').forEach(function (chip) {
       chip.classList.toggle('active', chip.dataset.category === activeCategory);
@@ -239,7 +239,9 @@
     var filtered = allImages.filter(function (img) {
       if (window.galHiddenImages && window.galHiddenImages[img.id]) return false;
       if (myGalleryOnly && (!window.galPublicId || img.uploaderPublicId !== window.galPublicId)) return false;
-      if (activeCategory !== 'all' && img.category !== activeCategory) return false;
+      // 'soop'은 카테고리가 아니라 출처 필터다(SOOP 게시글 링크로 등록한 이미지, 카테고리는 그대로 유지).
+      if (activeCategory === 'soop') { if (img.source !== 'soop') return false; }
+      else if (activeCategory !== 'all' && img.category !== activeCategory) return false;
       if (streamerQuery && !(img.streamerName || '').toLowerCase().includes(streamerQuery)) return false;
       return true;
     });
