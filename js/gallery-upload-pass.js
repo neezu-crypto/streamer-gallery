@@ -1,6 +1,6 @@
 //  하루 업로드 한도 표시와 업로드 늘리기 이용권(2026-11-17).
 //  업로드 창을 열 때 galleryUploadPass status를 1번 불러 "오늘 남은 업로드"를 보여 주고,
-//  한도에 닿으면 이용권 창(30캐시·30일·하루 50장)으로 이어진다. 결제는 통합 캐시(서버가 차감·자동 환불).
+//  한도에 닿으면 이용권 창(30캐시·30일·하루 20장)으로 이어진다. 결제는 통합 캐시(서버가 차감·자동 환불).
 (function () {
   'use strict';
   var backdrop = document.getElementById('upload-pass-backdrop');
