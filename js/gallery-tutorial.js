@@ -354,7 +354,7 @@
       (function tick() {
         pct = Math.min(100, pct + 25); fill.style.width = pct + '%';
         if (pct < 100) { later(250, tick); return; }
-        f.hint.textContent = '✅ 올렸어요! (체험이라 실제로는 올라가지 않아요) 무료로 하루 10장까지 올릴 수 있고, 업로드 늘리기 이용권으로 더 올릴 수 있어요.';
+        f.hint.textContent = '✅ 올렸어요! (체험이라 실제로는 올라가지 않아요) 무료로 하루 5장까지 올릴 수 있고, 업로드 늘리기 이용권으로 더 올릴 수 있어요.';
         next(f.foot, '다음', step4);
       })();
     });
