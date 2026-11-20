@@ -12,7 +12,7 @@
   if (!backdrop) return;
 
   var currentStreamerId = '';
-  var priceCash = 10;
+  var priceCash = 30;
   var busy = false;
   var checking = false;
   var timer = 0;

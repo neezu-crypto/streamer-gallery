@@ -137,13 +137,13 @@
   window.galBindSoopSearch = bindSoopSearch;
 
   //  스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
-  //  열림이고, streamerFirstUpload(첫 업로드 시각)로부터 30일 무료체험, 이후
+  //  열림이고, streamerFirstUpload(첫 업로드 시각)로부터 7일 무료체험, 이후
   // streamerUnlockedUntil(별풍선 갱신으로 연장된 만료 시각)이 지금보다 미래면
   // 접근 가능. 두 노드 다 작고(스트리머당 숫자 하나) 새 업로드/갱신 승인 때만
   //  드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
   //  노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
   //  반드시 같은 공식을 유지할 것.
-  var UNLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 - 서버 UNLOCK_DURATION_MS와 동일해야 함
+  var FREE_TRIAL_MS = 7 * 24 * 60 * 60 * 1000; // 첫 업로드부터 무료 7일 - 서버 FREE_TRIAL_MS와 동일해야 함
   window.galStreamerFirstUpload = {};
   window.galStreamerUnlockedUntil = {};
   function subscribeUnlockedStreamers() {
@@ -190,7 +190,7 @@
     if (!streamerId) return false;
     var now = Date.now();
     var firstUpload = window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId];
-    if (firstUpload && now < firstUpload + UNLOCK_DURATION_MS) return true;
+    if (firstUpload && now < firstUpload + FREE_TRIAL_MS) return true;
     var unlockedUntil = window.galStreamerUnlockedUntil && window.galStreamerUnlockedUntil[streamerId];
     if (unlockedUntil && now < unlockedUntil) return true;
     return false;
