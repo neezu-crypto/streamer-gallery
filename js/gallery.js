@@ -736,8 +736,54 @@
     uploadBackdrop.addEventListener('click', function (e) { if (e.target === uploadBackdrop) closeUploadModal(); });
   }
   var ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-  var MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+  //  업로드 용량(2026-11-21, 서버 SIZE_LIMITS와 같게): 고를 수 있는 원본 / 저장되는 압축본
+  var MB = 1024 * 1024;
+  var SIZE_LIMITS = {
+    free: { raw: 3 * MB, stored: 1 * MB, label: '원본 3MB·압축본 1MB' },
+    paid: { raw: 6 * MB, stored: 2.5 * MB, label: '원본 6MB·압축본 2.5MB' },
+  };
+  function uploadTier() { return window.galUploadTier ? window.galUploadTier() : 'free'; }
   var THUMB_MAX_DIMENSION = 480;
+  var STORE_MAX_DIMENSION = 2560; // 저장용 긴 변 상한
+
+  //  저장 용량 절감: 긴 변 2560px 이하·WebP(못 만들면 JPEG)로 다시 저장하되, 압축본 상한(target)에
+  //  들어갈 때까지 화질(0.85→0.6)을 낮추고, 그래도 크면 크기를 0.8배씩 줄인다.
+  //  GIF는 움직임을 지키려고 그대로 올린다(상한을 넘으면 서버·화면이 거절).
+  function compressForStorage(file, target) {
+    if (file.type === 'image/gif') return Promise.resolve({ blob: file, type: file.type });
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, STORE_MAX_DIMENSION / Math.max(w, h));
+        var qualities = [0.85, 0.75, 0.6];
+        var qi = 0, useJpeg = false, tries = 0;
+        var canvas = document.createElement('canvas');
+        function draw() {
+          canvas.width = Math.max(1, Math.round(w * scale));
+          canvas.height = Math.max(1, Math.round(h * scale));
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        function attempt() {
+          canvas.toBlob(function (blob) {
+            if (!useJpeg && (!blob || blob.type !== 'image/webp')) { useJpeg = true; attempt(); return; } // WebP 미지원 브라우저
+            if (!blob) { reject(new Error('이미지 압축에 실패했어요.')); return; }
+            // 처음부터 작고 줄일 필요 없는 원본이면 원본 그대로
+            if (tries === 0 && file.size <= target && file.size <= blob.size && scale === 1 && file.type !== 'image/png') { resolve({ blob: file, type: file.type }); return; }
+            if (blob.size <= target || ++tries > 12) { resolve({ blob: blob, type: blob.type }); return; }
+            if (qi < qualities.length - 1) qi++;
+            else { scale *= 0.8; draw(); }
+            attempt();
+          }, useJpeg ? 'image/jpeg' : 'image/webp', qualities[qi]);
+        }
+        draw(); attempt();
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없어요.')); };
+      img.src = url;
+    });
+  }
 
   //  실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
   //  그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
@@ -789,7 +835,17 @@
       if (!selectedStreamerId) { uploadStatus.textContent = '⚠️ 검색해서 스트리머를 선택해 주세요.'; return; }
       if (!file) { uploadStatus.textContent = '⚠️ 이미지 파일을 선택해 주세요.'; return; }
       if (!ALLOWED_CONTENT_TYPES.has(file.type)) { uploadStatus.textContent = '⚠️ jpg/png/webp/gif 이미지만 업로드할 수 있어요.'; return; }
-      if (file.size > MAX_UPLOAD_BYTES) { uploadStatus.textContent = '⚠️ 이미지 용량은 15MB 이하여야 해요.'; return; }
+      var tier = uploadTier(), lim = SIZE_LIMITS[tier];
+      if (file.size > lim.raw) {
+        uploadStatus.textContent = tier === 'paid'
+          ? '⚠️ 원본 이미지는 6MB까지 올릴 수 있어요.'
+          : '⚠️ 무료 이용자는 원본 3MB까지 올릴 수 있어요. 업로드 늘리기 이용권이 있으면 6MB까지 돼요.';
+        return;
+      }
+      if (file.type === 'image/gif' && file.size > lim.stored) {
+        uploadStatus.textContent = '⚠️ GIF는 움직임을 지키려고 압축하지 않아서 ' + (tier === 'paid' ? '2.5MB' : '1MB') + '까지 올릴 수 있어요.';
+        return;
+      }
 
       // 스트리머별 업로드 잠금은 폐지(2026-09-06) — 로그인 유저면 잠긴 스트리머도
       // 바로 업로드 가능. 그 이미지의 상세보기 자체는 여전히 해금 전까지 막힌다.
@@ -799,15 +855,18 @@
       setUploadProgress('썸네일 생성 중…', 15);
       try {
         var thumb = await makeThumbnailBlob(file);
+        setUploadProgress('이미지 압축 중…', 25);
+        var stored = await compressForStorage(file, lim.stored);
+        if (stored.blob.size > lim.stored) throw new Error('압축해도 ' + (tier === 'paid' ? '2.5MB' : '1MB') + '보다 커요. 더 작은 이미지를 골라 주세요.');
 
         setUploadProgress('업로드 준비 중…', 35);
         var requestUploadFn = window.galFirebase.httpsCallable('requestImageUpload');
-        var prepared = await requestUploadFn({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size });
+        var prepared = await requestUploadFn({ contentType: stored.type, fileSize: stored.blob.size, rawSize: file.size, thumbFileSize: thumb.blob.size });
         var uploadUrl = prepared.data.uploadUrl, thumbUploadUrl = prepared.data.thumbUploadUrl;
         var imageId = prepared.data.imageId, key = prepared.data.key, thumbKey = prepared.data.thumbKey;
 
         setUploadProgress('이미지 업로드 중…', 60);
-        var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+        var putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': stored.type }, body: stored.blob });
         if (!putRes.ok) throw new Error('R2 업로드 실패 (status ' + putRes.status + ')');
         var thumbPutRes = await fetch(thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
         if (!thumbPutRes.ok) throw new Error('썸네일 업로드 실패 (status ' + thumbPutRes.status + ')');

@@ -44,6 +44,8 @@
     return Math.max(0, (Number(state.limitToday) || 0) - (Number(state.usedToday) || 0));
   }
   window.galUploadRemaining = remaining;
+  // 용량 등급: 이용권·관리자 'paid', 그 밖 'free'(서버가 최종 판정)
+  window.galUploadTier = function () { return state && (state.unlimited || Number(state.passUntil) > Date.now()) ? 'paid' : 'free'; };
 
   function renderQuota() {
     if (!state) { quotaBox.hidden = true; return; }
