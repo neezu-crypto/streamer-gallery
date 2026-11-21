@@ -31,6 +31,7 @@ import {
   httpsCallable,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
+import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 
 // 갤러리 전용 Web App 등록 (자매 저장소들과 같은 프로젝트 soop-stock-market, appId만 별개)
 const firebaseConfig = {
@@ -70,6 +71,14 @@ const gallerySubscriptionStatusFn = callable('gallerySubscriptionStatus');
 const linkGoogleAccountFn = httpsCallable(functions, 'linkGoogleAccount');
 const linkKakaoAccountFn = httpsCallable(functions, 'linkKakaoAccount');
 const requestStreamerVerificationFn = httpsCallable(functions, 'requestStreamerVerification');
+//  2026-11-21 공용 버그 제보 창(팬페이지·갤러리·상점 공통). 접수는 팬페이지 서버가 로그인 계정인지 판정한다.
+setupBugReport({
+  service: 'gallery',
+  call: httpsCallable(functions, 'streamerFanPageViewerStatsBugReports'),
+  getUid: () => auth.currentUser?.uid || '',
+  openLogin: () => window.galOpenLoginModal && window.galOpenLoginModal(),
+  trigger: document.getElementById('openBugReport'),
+});
 const googleProvider = new GoogleAuthProvider();
 
 window.galFirebase = {
