@@ -33,6 +33,14 @@
   if (!backdrop) return;
   var modalEl = backdrop.querySelector('.detail-modal');
 
+  // 원본 주소 기억: 계정·보기 모드별(로그아웃·계정 전환·관리자 보기 모드 전환 시 다른 키)
+  var ORIGINAL_URL_TTL_MS = 4 * 60 * 1000;
+  var originalUrlCache = new Map();
+  function originalCacheKey(imageId) {
+    var uid = window.galAuth && window.galAuth.currentUser ? window.galAuth.currentUser.uid : '';
+    var viewAs = ''; try { viewAs = sessionStorage.getItem('galViewAs.v1') || ''; } catch (_) {}
+    return uid + '|' + viewAs + '|' + imageId;
+  }
   function isMobile() { return window.matchMedia('(max-width: 720px)').matches; }
 
   var currentImageId = null;
@@ -422,18 +430,27 @@
     }
     // 공개 목록에는 썸네일만 들어 있다. 원본은 서버가 통합 구독 또는 기존
     // 스트리머별 공개 기간을 다시 확인한 뒤 발급하는 5분짜리 서명 URL로 교체한다.
-    var accessFn = window.galFirebase.httpsCallable('getGalleryImageAccess');
-    accessFn({ imageId: img.id }).then(function (result) {
-      if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
+    // 원본 주소 기억(2026-11-21): 서명 URL은 5분 유효라 같은 계정·같은 사진은 4분 동안 받은 주소를
+    // 다시 써서 서버 호출과 원본 재다운로드를 없앤다(같은 주소라 브라우저가 받아 둔 이미지를 쓴다).
+    var cacheKey = originalCacheKey(img.id);
+    var cached = originalUrlCache.get(cacheKey);
+    var urlPromise = cached && cached.expiresAt > Date.now()
+      ? Promise.resolve({ data: { viewUrl: cached.url } })
+      : window.galFirebase.httpsCallable('getGalleryImageAccess')({ imageId: img.id });
+    urlPromise.then(function (result) {
       var viewUrl = result.data && result.data.viewUrl || '';
+      if (viewUrl && !(cached && cached.url === viewUrl)) originalUrlCache.set(cacheKey, { url: viewUrl, expiresAt: Date.now() + ORIGINAL_URL_TTL_MS });
+      if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
       if (!viewUrl) throw new Error('원본 이미지 주소가 없습니다.');
       currentImageUrl = viewUrl;
       var fullImg = new Image();
       fullImg.onload = function () {
         if (currentImageId === img.id && detailAccessToken === accessToken) imageEl.src = viewUrl;
       };
+      fullImg.onerror = function () { originalUrlCache.delete(cacheKey); }; // 만료·삭제된 주소는 다음에 새로 받는다
       fullImg.src = viewUrl;
     }).catch(function (error) {
+      originalUrlCache.delete(cacheKey);
       if (currentImageId !== img.id || detailAccessToken !== accessToken) return;
       console.error('원본 이미지 권한 확인 실패', error);
       var code = String(error && error.code || '');
