@@ -111,7 +111,7 @@
       return list;
     });
   }
-  // 입력이 멈춘 뒤 한 번만 검색한다(타자마다 부르지 않음). 마지막 입력의 결과만 그린다.
+  //  입력이 멈춘 뒤 한 번만 검색한다(타자마다 부르지 않음). 마지막 입력의 결과만 그린다.
   function bindSoopSearch(input, onResults, onStatus) {
     var timer = null; var seq = 0;
     input.addEventListener('input', function () {
@@ -136,12 +136,12 @@
   }
   window.galBindSoopSearch = bindSoopSearch;
 
-  //  스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
+  // 스트리머 구독제(2026-09, 영구 해금 → 구독형 전환) - 모든 스트리머는 기본
   //  열림이고, streamerFirstUpload(첫 업로드 시각)로부터 7일 무료체험, 이후
   // streamerUnlockedUntil(별풍선 갱신으로 연장된 만료 시각)이 지금보다 미래면
-  // 접근 가능. 두 노드 다 작고(스트리머당 숫자 하나) 새 업로드/갱신 승인 때만
-  //  드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
-  //  노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
+  //  접근 가능. 두 노드 다 작고(스트리머당 숫자 하나) 새 업로드/갱신 승인 때만
+  // 드물게 바뀌므로 onValue 유지 - gallery/stocks처럼 거래마다 바뀌는 무거운
+  // 노드가 아니다. 서버(functions/src/unlock.js의 isStreamerAccessible)와
   //  반드시 같은 공식을 유지할 것.
   var FREE_TRIAL_MS = 7 * 24 * 60 * 60 * 1000; // 첫 업로드부터 무료 7일 - 서버 FREE_TRIAL_MS와 동일해야 함
   window.galStreamerFirstUpload = {};
@@ -160,7 +160,7 @@
     }, function (err) { console.error('스트리머 구독 갱신 목록 구독 실패', err); });
   }
 
-  // 썸네일 숨기기(2026-09-05 추가) — 다른 사람에겐 영향 없이 이 계정의 메인
+  //  썸네일 숨기기(2026-09-05 추가) — 다른 사람에겐 영향 없이 이 계정의 메인
   // 그리드에서만 안 보이게 하는 개인 취향 필터. userLikes와 동일한 패턴으로
   // 로그인 상태가 바뀔 때마다 다시 구독한다(로그아웃하면 목록을 비움).
   window.galHiddenImages = {};
@@ -201,23 +201,23 @@
     document.dispatchEvent(new CustomEvent('gal-unlocked-updated'));
   });
 
-  // isStreamerUnlocked()는 "만료됨"과 "애초에 업로드가 한 번도 없었음"을 둘 다
-  // false로 뭉뚱그린다(firstUpload가 falsy면 둘 다 같은 경로) — 업로드 모달에서
+  //  isStreamerUnlocked()는 "만료됨"과 "애초에 업로드가 한 번도 없었음"을 둘 다
+  //  false로 뭉뚱그린다(firstUpload가 falsy면 둘 다 같은 경로) — 업로드 모달에서
   //  이 둘을 구분해 보여주려면 firstUpload 존재 여부를 따로 확인해야 한다.
   function hasStreamerEverUploaded(streamerId) {
     return !!(streamerId && window.galStreamerFirstUpload && window.galStreamerFirstUpload[streamerId]);
   }
 
-  //  매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
+  // 매소너리 계산 — styles.css의 .gallery-grid { grid-auto-rows:4px; gap:16px }와
   // 반드시 같은 값이어야 한다(둘 중 하나만 바꾸면 span 계산이 어긋난다).
   var MASONRY_ROW_UNIT = 4;
   var MASONRY_GAP = 16;
   var DEFAULT_ASPECT_RATIO = 4 / 3; // width/height — 비율 정보 없는(마이그레이션 이전) 이미지용 기본값
 
-  //  카드 너비(반응형이라 컬럼 수에 따라 바뀜)는 실제 DOM에 붙은 뒤에만 알 수 있어서,
-  //  grid.innerHTML을 채운 직후 한 번 읽어(reflow 1회) 각 카드의 grid-row-end span을
-  //  계산해 넣는다. 이미지의 실제 로드를 기다리지 않아도 되는 게 핵심 — width/height를
-  // 업로드 시점에 이미 저장해뒀기 때문에(registerImage) 레이아웃이 튀지 않는다.
+  // 카드 너비(반응형이라 컬럼 수에 따라 바뀜)는 실제 DOM에 붙은 뒤에만 알 수 있어서,
+  // grid.innerHTML을 채운 직후 한 번 읽어(reflow 1회) 각 카드의 grid-row-end span을
+  // 계산해 넣는다. 이미지의 실제 로드를 기다리지 않아도 되는 게 핵심 — width/height를
+  //  업로드 시점에 이미 저장해뒀기 때문에(registerImage) 레이아웃이 튀지 않는다.
   function applyMasonrySpans() {
     grid.querySelectorAll('.gallery-card').forEach(function (card) {
       var w = card.offsetWidth;
@@ -239,10 +239,10 @@
     var h = colW / (parseFloat(ratio) || DEFAULT_ASPECT_RATIO);
     return Math.max(1, Math.ceil((h + MASONRY_GAP) / (MASONRY_ROW_UNIT + MASONRY_GAP)));
   }
-  //  새로고침 직후 여러 구독이 같은 결과로 그리드를 다시 그리며, 카드를 넣고 높이를 계산하기 전
-  // 순간에 문서가 짧아져 스크롤이 맨 위로 튀었다(2026-11-18 확인). 높이를 HTML에 미리 넣고,
-  // 결과가 같으면 다시 그리지 않는다.
-  // 배지 옮기기·카드 숨기기처럼 다른 코드가 그리드를 직접 바꾸면 그 뒤로는 다시 그린다(gridTouched).
+  // 새로고침 직후 여러 구독이 같은 결과로 그리드를 다시 그리며, 카드를 넣고 높이를 계산하기 전
+  //  순간에 문서가 짧아져 스크롤이 맨 위로 튀었다(2026-11-18 확인). 높이를 HTML에 미리 넣고,
+  //  결과가 같으면 다시 그리지 않는다.
+  //  배지 옮기기·카드 숨기기처럼 다른 코드가 그리드를 직접 바꾸면 그 뒤로는 다시 그린다(gridTouched).
   var lastGridHtml = '';
   var gridTouched = true;
   var gridWatcher = (grid && window.MutationObserver) ? new MutationObserver(function () { gridTouched = true; }) : null;
@@ -748,7 +748,7 @@
 
   //  저장 용량 절감: 긴 변 2560px 이하·WebP(못 만들면 JPEG)로 다시 저장하되, 압축본 상한(target)에
   //  들어갈 때까지 화질(0.85→0.6)을 낮추고, 그래도 크면 크기를 0.8배씩 줄인다.
-  //  GIF는 움직임을 지키려고 그대로 올린다(상한을 넘으면 서버·화면이 거절).
+  // GIF는 움직임을 지키려고 그대로 올린다(상한을 넘으면 서버·화면이 거절).
   function compressForStorage(file, target) {
     if (file.type === 'image/gif') return Promise.resolve({ blob: file, type: file.type });
     return new Promise(function (resolve, reject) {
@@ -785,11 +785,11 @@
     });
   }
 
-  //  실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
-  //  그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
-  //  축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
-  // 나오는데, 썸네일은 정지 이미지로 충분하고 원본(imageUrl)은 애니메이션 그대로다.
-  // 이 김에 원본 실제 크기(width/height)도 같이 얻어서 매소너리 그리드가 이미지
+  // 실제 리사이즈된 썸네일 생성(2026-09-05 추가) — 원본을 그대로 썸네일로 쓰면
+  // 그리드/관리자 목록 로딩마다 원본 용량을 통째로 내려받아야 해서, canvas로
+  // 축소한 JPEG을 별도 파일로 만들어 같이 올린다. GIF도 canvas에 그리면 첫 프레임만
+  //  나오는데, 썸네일은 정지 이미지로 충분하고 원본(imageUrl)은 애니메이션 그대로다.
+  //  이 김에 원본 실제 크기(width/height)도 같이 얻어서 매소너리 그리드가 이미지
   // 로드를 기다리지 않고 바로 비율대로 배치할 수 있게 registerImage에 같이 넘긴다.
   function makeThumbnailBlob(file) {
     return new Promise(function (resolve, reject) {
@@ -901,12 +901,12 @@
     });
   }
 
-  //  #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
-  //  모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
+  // #open-login-btn 클릭 처리는 js/profile-modal.js가 전담한다(로그인 전엔 로그인
+  // 모달, 로그인 후엔 프로필 모달을 여는 이중 역할 — 여기서 별도로 열면 두 핸들러가
   // 경합해서 로그인 후에도 항상 로그인 모달만 뜨는 버그가 생긴다).
 
   // 초기 로드 체감 속도(2026-09-06 추가) — 실시간 구독 응답을 기다리지 않고 지난
-  // 방문 때 캐싱해둔 최신 페이지를 먼저 그린다. subscribeImages()가 곧 실제 데이터로
+  //  방문 때 캐싱해둔 최신 페이지를 먼저 그린다. subscribeImages()가 곧 실제 데이터로
   // 교체하므로 여기 값이 stale해도 아주 잠깐만 보인다.
   try {
     var cachedGrid = JSON.parse(localStorage.getItem(GRID_CACHE_KEY) || 'null');
