@@ -585,69 +585,15 @@
   </div>
 </div>
 
-<div class="profile-backdrop" id="login-backdrop">
-  <div class="profile-modal">
-    <div class="terminal-header">
-      <span class="terminal-title">SECURE_LOGIN</span>
-      <div class="terminal-dots">
-        <button class="profile-modal-close" id="login-modal-close" type="button" aria-label="닫기">✕</button>
-      </div>
-    </div>
-    <h3 class="profile-modal-title">로그인</h3>
-    <p class="login-modal-sub">로그인하면 업로드하거나 좋아요·댓글을 남길 수 있어요.</p>
-    <button class="btn-login-option btn-google" id="login-google-btn" type="button">
-      <span class="login-option-icon">G</span> Google로 시작하기
-    </button>
-    <button class="btn-login-option btn-kakao" id="kakao-login-btn" type="button">
-      <span class="login-option-icon">K</span> 카카오로 시작하기
-    </button>
-    <button class="btn-login-option btn-verify-cta" id="login-verify-btn" type="button">
-      스트리머 인증 신청하기
-    </button>
-    <p class="login-modal-hint">스트리머 인증 신청은 로그인 없이도 가능해요.</p>
-  </div>
-</div>
 
-<div class="propose-backdrop" id="verify-backdrop">
-  <div class="propose-modal" style="max-height:calc(100dvh - 40px);overflow-y:auto;">
-    <div class="terminal-header">
-      <span class="terminal-title">STREAMER_VERIFY</span>
-      <div class="terminal-dots">
-        <button class="propose-modal-close" id="verify-modal-close" type="button" aria-label="닫기">✕</button>
-      </div>
-    </div>
-    <p class="propose-modal-title">🎙️ 스트리머 인증</p>
-    <p class="propose-modal-sub">SOOP에서 본인을 검색해 신청하고 안내되는 코드를 SOOP 쪽지로 보내면 자동 승인돼요. 인증되면 로그인 없이도 실계정처럼 업로드하고 좋아요·댓글을 남길 수 있어요.</p>
-    <div id="verify-form">
-      <input type="text" id="verify-nickname" maxlength="20" placeholder="방송 닉네임">
-      <input type="text" id="verify-soopid" maxlength="20" placeholder="SOOP 아이디">
-      <button class="glitch-btn" id="verify-submit-btn" type="button">신청하기</button>
-    </div>
-    <div id="verify-pending" style="display:none;">
-      <p class="propose-modal-sub" id="verify-pending-text"></p>
-      <div id="verify-note" style="display:none;padding:12px;border:1px solid #666;border-radius:8px;margin-bottom:12px;">
-        <strong>SOOP 쪽지로 본인 확인</strong>
-        <p>6자리 코드를 SOOP 쪽지로 보내주세요. 계정 전환 신청은 기존 인증 스트리머의 SOOP 아이디로 보내야 자동 승인됩니다. 상태 확인은 코드를 바꾸지 않습니다.</p>
-        <button id="verify-note-code" type="button" style="width:100%;font-size:20px;letter-spacing:4px;"></button>
-        <a href="https://note.sooplive.com/app/index.php?page=write&amp;id_list=skftodwocks2" target="_blank" rel="noopener noreferrer" style="display:block;margin:10px 0;">SOOP 쪽지 보내기 ↗</a>
-        <p id="verify-note-status" role="status"></p>
-        <button id="verify-renew-btn" type="button">새 코드 발급 (이전 코드 무효화)</button>
-      </div>
-      <button class="glitch-btn" id="verify-check-btn" type="button">🔄 승인됐는지 확인하기</button>
-    </div>
-  </div>
-</div>
 
 <script defer src="js/sound.js"></script>
 <script defer src="js/modal-stack.js"></script>
 <script defer src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-<script type="module" src="js/firebase-init.js?v=20261121-bug1"></script>
+<script type="module" src="js/firebase-init.js?v=20261128-kit2"></script>
 <script type="module" src="js/devbar-links.js"></script>
 <script defer src="js/devbar.js"></script>
-<script defer src="js/login-modal.js"></script>
 <script defer src="js/profile-modal.js"></script>
-<script defer src="js/kakao-login.js"></script>
-<script defer src="js/streamer-verify.js?v=20261006-live-verification"></script>
 <script defer src="js/gallery.js?v=20261121-size1"></script>
 <script defer src="js/gallery-soop.js?v=20261117-catchcat1"></script>
 <script defer src="js/gallery-view-as.js?v=20261117-viewas1"></script>

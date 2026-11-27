@@ -3,9 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInAnonymously,
-  signInWithPopup,
   signInWithCustomToken,
-  linkWithPopup,
   signOut,
   onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
@@ -32,6 +30,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
+import { createSeriesLogin } from './series-login.js?v=20261128-kit2';
 
 // 갤러리 전용 Web App 등록 (자매 저장소들과 같은 프로젝트 soop-stock-market, appId만 별개)
 const firebaseConfig = {
@@ -64,13 +63,12 @@ function callable(name) {
 const whoAmIFn = callable('galleryCheckAdmin');
 const logGalleryVisitFn = httpsCallable(functions, 'logGalleryVisit');
 const gallerySubscriptionStatusFn = callable('gallerySubscriptionStatus');
+// 계정 전환 승인(다른 기기에서 인증된 스트리머) 확인용. 로그인 창 자체는 공통 부품이 같은 함수를 부른다.
+const requestStreamerVerificationFn = httpsCallable(functions, 'requestStreamerVerification');
 // linkGoogleAccount/linkKakaoAccount/requestStreamerVerification은 이 저장소
 // 소스에 없다 - 같은 Firebase 프로젝트(soop-stock-market)에 이미 배포돼 있는
 // 함수를 codebase 구분 없이 이름으로 그대로 호출한다(다른 자매 저장소들과 동일 -
 // "다른 앱 소스에 없다고 삭제하면 안 되는 함수" 목록에 있는 걸 그대로 갖다 쓰는 입장).
-const linkGoogleAccountFn = httpsCallable(functions, 'linkGoogleAccount');
-const linkKakaoAccountFn = httpsCallable(functions, 'linkKakaoAccount');
-const requestStreamerVerificationFn = httpsCallable(functions, 'requestStreamerVerification');
 //  2026-11-21 공용 버그 제보 창(팬페이지·갤러리·상점 공통). 접수는 팬페이지 서버가 로그인 계정인지 판정한다.
 setupBugReport({
   service: 'gallery',
@@ -79,7 +77,6 @@ setupBugReport({
   openLogin: () => window.galOpenLoginModal && window.galOpenLoginModal(),
   trigger: document.getElementById('openBugReport'),
 });
-const googleProvider = new GoogleAuthProvider();
 
 window.galFirebase = {
   ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, endBefore, limitToFirst, limitToLast, serverTimestamp,
@@ -202,48 +199,19 @@ function confirmModal(message) {
 }
 window.galConfirmModal = confirmModal; // 팝업 기반 로그인(카카오 등) 직후 confirm()에도 재사용
 
-async function completeAccountSwitch(customToken) {
-  await signInWithCustomToken(auth, customToken);
-  alert('✅ 이제 이 기기에서도 같은 계정을 이어서 쓸 수 있어요.');
-  window.location.reload();
-}
-
-// 익명 계정을 그대로 승격(linkWithPopup)해 지금까지 쌓인 진행도(업로드·좋아요 등)를
-// 잃지 않는다 - 새 계정을 만드는 게 아니라 지금 쓰던 익명 uid를 보호하는 방식
-// (streamer-life-game과 동일한 패턴). 이미 다른 uid에 연동된 구글 계정이면 그
-// 계정으로 전환.
-function signIn() {
-  return linkWithPopup(auth.currentUser, googleProvider).then(async () => {
-    await linkGoogleAccountFn();
-    alert('✅ 구글 연동 완료!');
-    window.galCloseLoginModal && window.galCloseLoginModal();
-  }).catch(async (err) => {
-    if (err && err.code === 'auth/credential-already-in-use') {
-      // 로그인 모달과 확인 모달의 z-index가 같아서(둘 다 500), 로그인 모달을 먼저
-      // 안 닫으면 DOM 순서상 나중에 오는 로그인 모달이 확인 모달을 가려버린다 —
-      // 실제로 "로그인이 멈춘 것처럼 보이는" 것으로 재현됨(2026-09-05, 사용자 확인).
-      window.galCloseLoginModal && window.galCloseLoginModal();
-      if (!(await confirmModal('🔗 이미 연동된 계정을 발견했어요!\n이 기기에서도 같은 계정으로 이어서 진행할까요?'))) return;
-      try {
-        await signInWithPopup(auth, googleProvider);
-        await linkGoogleAccountFn();
-        window.location.reload();
-      } catch (e2) {
-        console.error('계정 전환용 재인증 실패:', e2);
-        alert('⚠️ 계정 전환 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
-      }
-      return;
-    }
-    if (err && (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request')) return;
-    console.error('Google 로그인 실패', err);
-    alert('Google 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-  });
-}
-window.galSignIn = signIn;
+// 로그인 창은 시리즈 공통 부품(series-kit login-modal, 2026-11-28). 갤러리는 신뢰 상태를 로그인 시점에
+// 한 번 계산하므로, 로그인·연결·인증이 끝나면 새로고침해 다시 계산한다(기존 동작과 같음).
+const seriesLogin = createSeriesLogin({
+  auth, functions, source: 'streamer-gallery',
+  soopSearchScript: './js/soop-verify-search.js?v=20261118-svs1',
+  intro: '로그인하면 업로드하거나 좋아요·댓글을 남길 수 있어요. 스트리머 인증은 로그인 없이도 신청할 수 있어요.',
+  reloadAfterSwitch: true, reloadAfterVerify: true,
+  onChange: () => { window.location.reload(); },
+});
+window.galOpenLoginModal = (options) => seriesLogin.open(options || {});
+window.galCloseLoginModal = () => seriesLogin.close();
+window.galOpenVerifyModal = () => seriesLogin.open({ streamer: true });
 window.galSignOut = () => signOut(auth);
-window.galLinkKakaoAccount = (kakaoAccessToken) => linkKakaoAccountFn({ kakaoAccessToken });
-window.galRequestStreamerVerification = (data) => requestStreamerVerificationFn(Object.assign({ source: 'streamer-gallery' }, data));
-window.galCompleteAccountSwitch = completeAccountSwitch;
 
 // 스트리머 인증 유저 프로필 자동 채움(2026-09-05 추가) — 인증 신청 때 이미 제출한
 // 닉네임/SOOP 아이디를 프로필 모달에서 다시 입력하게 하지 않는다. 이미 사용자가
@@ -456,45 +424,6 @@ auth.authStateReady().then(() => onAuthStateChanged(auth, async (user) => {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'Enter' && !window.galRealUser) {
     e.preventDefault();
-    signIn();
+    seriesLogin.open();
   }
 });
-
-// 스트리머 인증 신청: SOOP 검색을 기본 방식으로(2026-11-18). 기존 입력칸은 "직접 입력하기"로 남긴다.
-// 검색은 팬페이지 서버의 streamerFanPageVerifySearch(로그인 필요, 사용자별 횟수 제한)를 함께 쓴다.
-{
-  const soopVerifySearchFn = httpsCallable(functions, 'streamerFanPageVerifySearch');
-  const attachSoopVerifySearchTo = (nicknameId, soopIdId, steps) => {
-    if (!document.getElementById(nicknameId) || !document.getElementById(soopIdId)) return;
-    window.attachSoopVerifySearch({
-      nicknameInput: nicknameId,
-      soopIdInput: soopIdId,
-      steps,
-      search: async (query) => {
-        await auth.authStateReady();
-        if (!auth.currentUser) await signInAnonymously(auth);
-        // 검색하는 동안 인증 서버를 미리 깨운다(확인 전용 호출: 신청·코드를 만들지 않음, 5분에 한 번).
-        if (Date.now() - (window.__verifyWarmAt || 0) > 300000) {
-          window.__verifyWarmAt = Date.now();
-          httpsCallable(functions, 'requestStreamerVerification')({ checkOnly: true }).catch(() => {});
-        }
-        const result = await soopVerifySearchFn({ query });
-        return (result.data && result.data.streamers) || [];
-      },
-    });
-  };
-  const attachAll = () => {
-  attachSoopVerifySearchTo('verify-nickname', 'verify-soopid', {
-      root: 'verify-backdrop',
-      isPending: () => document.getElementById('verify-pending').style.display !== 'none',
-      afterSelect: ['verify-submit-btn'],
-    });
-  };
-  if (window.attachSoopVerifySearch) attachAll();
-  else {
-    const script = document.createElement('script');
-    script.src = new URL('./soop-verify-search.js?v=20261118-svs1', import.meta.url).href;
-    script.onload = attachAll;
-    document.head.appendChild(script);
-  }
-}
