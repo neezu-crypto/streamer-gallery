@@ -30,7 +30,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
-import { createSeriesLogin } from './series-login.js?v=20261128-kit2';
+import { createSeriesLogin } from './series-login.js?v=20261128-kit3';
 
 // 갤러리 전용 Web App 등록 (자매 저장소들과 같은 프로젝트 soop-stock-market, appId만 별개)
 const firebaseConfig = {
